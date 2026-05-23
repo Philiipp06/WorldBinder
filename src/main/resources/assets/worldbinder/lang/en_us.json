@@ -668,5 +668,15 @@
   "worldbinder.config.radar_x": "X offset",
   "worldbinder.config.radar_y": "Y offset",
   "worldbinder.config.radar_limit": "Chunk limit",
-  "worldbinder.config.radar_update_rate": "Update rate"
+  "worldbinder.config.radar_update_rate": "Update rate",
+  "worldbinder.tooltip.config.blocks_per_tick": "Maximum block states processed per client tick. Higher values finish faster, but can cause stutters.",
+  "worldbinder.tooltip.config.commands_per_tick": "Maximum queued commands/actions processed per tick. Keep this modest on busy servers.",
+  "worldbinder.tooltip.config.ms_budget": "Soft time budget for capture work per tick. WorldBinder slows down when this budget is reached.",
+  "worldbinder.tooltip.config.target_fps": "FPS target used by adaptive throttle. If your FPS drops below this, capture speed is reduced.",
+  "worldbinder.tooltip.config.new_chunks": "How many newly observed chunks may enter the capture queue per tick.",
+  "worldbinder.tooltip.config.queue_limit": "Maximum chunk backlog kept in memory. Higher values allow longer captures, but use more RAM.",
+  "worldbinder.tooltip.config.hot_chunks": "How many nearby visible chunks are prioritized per tick.",
+  "worldbinder.tooltip.config.capture_ms": "Time budget for block/chunk capture work.",
+  "worldbinder.tooltip.config.ui_ms": "Time budget for UI, map and HUD refresh work.",
+  "worldbinder.tooltip.config.archive_ms": "Time budget for archive/export background work."
 }

@@ -169,16 +169,16 @@ public final class WorldBinderConfigScreen extends Screen {
         int formY = y + (cols == 2 ? 96 : 78);
         int fieldW = Math.max(62, Math.min(90, (w - 24) / 4));
         int fieldGap = Math.max(8, Math.min(24, (w - fieldW * 4) / 3));
-        blocksPerTick = field(x, formY + 18, fieldW, Integer.toString(config.blocksPerTick), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(blocksPerTick);
-        commandsPerTick = field(x + (fieldW + fieldGap), formY + 18, fieldW, Integer.toString(config.commandsPerTick), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(commandsPerTick);
-        budgetMs = field(x + (fieldW + fieldGap) * 2, formY + 18, fieldW, Integer.toString(config.tickBudgetMillis), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(budgetMs);
-        targetFps = field(x + (fieldW + fieldGap) * 3, formY + 18, fieldW, Integer.toString(config.targetFps), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(targetFps);
-        newChunks = field(x, formY + 70, fieldW, Integer.toString(config.newChunksPerTick), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(newChunks);
-        queueLimit = field(x + (fieldW + fieldGap), formY + 70, fieldW, Integer.toString(config.chunkQueueLimit), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(queueLimit);
-        hotChunks = field(x + (fieldW + fieldGap) * 2, formY + 70, fieldW, Integer.toString(config.hotChunksPerTick), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(hotChunks);
-        maxCaptureWorkMs = field(x, formY + 122, fieldW, Integer.toString(config.maxCaptureWorkMs), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxCaptureWorkMs);
-        maxUiWorkMs = field(x + (fieldW + fieldGap), formY + 122, fieldW, Integer.toString(config.maxUiWorkMs), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxUiWorkMs);
-        maxArchiveWorkMs = field(x + (fieldW + fieldGap) * 2, formY + 122, fieldW, Integer.toString(config.maxArchiveWorkMs), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxArchiveWorkMs);
+        blocksPerTick = field(x, formY + 18, fieldW, Integer.toString(config.blocksPerTick), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.blocks_per_tick"); addContentWidget(blocksPerTick);
+        commandsPerTick = field(x + (fieldW + fieldGap), formY + 18, fieldW, Integer.toString(config.commandsPerTick), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.commands_per_tick"); addContentWidget(commandsPerTick);
+        budgetMs = field(x + (fieldW + fieldGap) * 2, formY + 18, fieldW, Integer.toString(config.tickBudgetMillis), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.ms_budget"); addContentWidget(budgetMs);
+        targetFps = field(x + (fieldW + fieldGap) * 3, formY + 18, fieldW, Integer.toString(config.targetFps), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.target_fps"); addContentWidget(targetFps);
+        newChunks = field(x, formY + 70, fieldW, Integer.toString(config.newChunksPerTick), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.new_chunks"); addContentWidget(newChunks);
+        queueLimit = field(x + (fieldW + fieldGap), formY + 70, fieldW, Integer.toString(config.chunkQueueLimit), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.queue_limit"); addContentWidget(queueLimit);
+        hotChunks = field(x + (fieldW + fieldGap) * 2, formY + 70, fieldW, Integer.toString(config.hotChunksPerTick), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.hot_chunks"); addContentWidget(hotChunks);
+        maxCaptureWorkMs = field(x, formY + 122, fieldW, Integer.toString(config.maxCaptureWorkMs), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.capture_ms"); addContentWidget(maxCaptureWorkMs);
+        maxUiWorkMs = field(x + (fieldW + fieldGap), formY + 122, fieldW, Integer.toString(config.maxUiWorkMs), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.ui_ms"); addContentWidget(maxUiWorkMs);
+        maxArchiveWorkMs = field(x + (fieldW + fieldGap) * 2, formY + 122, fieldW, Integer.toString(config.maxArchiveWorkMs), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.archive_ms"); addContentWidget(maxArchiveWorkMs);
     }
 
     private void initHud(WorldBinderConfig config, int x, int y, int w) {
@@ -444,6 +444,12 @@ public final class WorldBinderConfigScreen extends Screen {
         return f;
     }
 
+    private EditBox field(int x, int y, int w, String value, int maxLength, String tooltipKey) {
+        EditBox f = field(x, y, w, value, maxLength);
+        f.setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
+        return f;
+    }
+
     private Button button(int x, int y, int w, int h, String key, String tooltipKey, Button.OnPress action) {
         return Button.builder(Component.translatable(key), action).bounds(x, y, w, h).tooltip(Tooltip.create(Component.translatable(tooltipKey))).build();
     }
@@ -535,11 +541,29 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private void drawPerformanceLabels(GuiGraphicsExtractor c, int x, int y, int w) {
-        int formY = y + (w < 420 ? 96 : 78);
-        label(c, x, formY + 4, "worldbinder.config.blocks_per_tick");
-        label(c, x, formY + 56, "worldbinder.config.new_chunks");
-        label(c, x, formY + 108, "worldbinder.config.capture_ms");
+        int cols = w < 420 ? 2 : 4;
+        int formY = y + (cols == 2 ? 96 : 78);
+        int fieldW = Math.max(62, Math.min(90, (w - 24) / 4));
+        int fieldGap = Math.max(8, Math.min(24, (w - fieldW * 4) / 3));
+
+        performanceLabel(c, x, formY, fieldW, "worldbinder.config.blocks_per_tick");
+        performanceLabel(c, x + (fieldW + fieldGap), formY, fieldW, "worldbinder.config.commands_per_tick");
+        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY, fieldW, "worldbinder.config.ms_budget");
+        performanceLabel(c, x + (fieldW + fieldGap) * 3, formY, fieldW, "worldbinder.config.target_fps");
+
+        performanceLabel(c, x, formY + 52, fieldW, "worldbinder.config.new_chunks");
+        performanceLabel(c, x + (fieldW + fieldGap), formY + 52, fieldW, "worldbinder.config.queue_limit");
+        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY + 52, fieldW, "worldbinder.config.hot_chunks");
+
+        performanceLabel(c, x, formY + 104, fieldW, "worldbinder.config.capture_ms");
+        performanceLabel(c, x + (fieldW + fieldGap), formY + 104, fieldW, "worldbinder.config.ui_ms");
+        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY + 104, fieldW, "worldbinder.config.archive_ms");
+
         if (isTextInContentArea(y + 252)) WbText.drawWrapped(c, font, WorldBinder.config().presetDescription(), x, y + 252, w, WbTheme.TEXT_DIM, 2);
+    }
+
+    private void performanceLabel(GuiGraphicsExtractor c, int x, int y, int width, String text) {
+        clippedLabel(c, x, y, width + 18, text);
     }
 
     private void drawHudLabels(GuiGraphicsExtractor c, int x, int y, int w) {
