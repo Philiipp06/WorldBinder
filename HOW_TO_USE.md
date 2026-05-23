@@ -1,4 +1,4 @@
-# WorldBinder Alpha 1.0 — How to Use
+# WorldBinder Alpha V2 — How to Use
 
 WorldBinder is a client-side Fabric tool for permitted world capture, archive management, recovery and validation. It records data that your Minecraft client receives and can export that data into a local world folder.
 
@@ -130,3 +130,15 @@ Before sharing an Alpha result, test:
 - Loading the world in the selected Minecraft version.
 - Small-window UI scrolling and settings navigation.
 
+
+
+---
+
+## Feedback, Ideas and Bugs
+
+Please report issues or ideas on GitHub:
+
+- https://github.com/Philiipp06/WorldBinder
+- https://github.com/Philiipp06/WorldBinder/issues
+
+For bug reports, include the Minecraft version, selected target output version, screenshots/logs and what you expected to happen.

@@ -29,7 +29,7 @@ public final class WorldBinderFinishScreen extends Screen {
         }).bounds(left, y, 170, 22).tooltip(Tooltip.create(Component.translatable("worldbinder.finish.finish_queue.tooltip"))).build());
         addRenderableWidget(Button.builder(Component.translatable("worldbinder.finish.save_now"), button -> {
             capture.abortQueueAndSaveNow();
-            minecraft.setScreen(parent);
+            minecraft.setScreen(new WorldBinderFinishProgressScreen(parent, capture));
         }).bounds(left + 190, y, 170, 22).tooltip(Tooltip.create(Component.translatable("worldbinder.finish.save_now.tooltip"))).build());
         addRenderableWidget(Button.builder(Component.translatable("worldbinder.config.cancel"), button -> {
             minecraft.setScreen(parent);

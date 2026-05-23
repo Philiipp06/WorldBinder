@@ -16,10 +16,12 @@ import net.minecraft.world.level.chunk.storage.RegionFile;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.scene.BlockRecord;
+import net.worldbinder.scene.ChunkSnapshot;
 import net.worldbinder.scene.EntityRecord;
 import net.worldbinder.scene.WorldScene;
 import net.worldbinder.storage.StorageProgress;
 import net.worldbinder.storage.StorageStage;
+import net.worldbinder.util.BlockStateStrings;
 import net.worldbinder.version.TargetMinecraftVersion;
 
 import java.io.DataOutputStream;
@@ -65,6 +67,7 @@ public final class VanillaWorldExporter {
         if (progress != null) progress.update(StorageStage.VANILLA_WORLD, "Writing level.dat and world generation settings", 0.26D);
         writeLevelDat(scene, worldFolder);
         writeWorldGenSettingsFile(scene, worldFolder);
+        writeGameRulesFile(scene, worldFolder);
         writeSessionLock(worldFolder);
         writeIconPlaceholder(worldFolder);
 
@@ -115,17 +118,55 @@ public final class VanillaWorldExporter {
         }
         if (scene.entities != null) {
             for (EntityRecord record : scene.entities) {
+                if (record == null) {
+                    continue;
+                }
                 double absX = scene.originX + record.x;
                 double absZ = scene.originZ + record.z;
                 int chunkX = Math.floorDiv((int) Math.floor(absX), 16);
                 int chunkZ = Math.floorDiv((int) Math.floor(absZ), 16);
                 ChunkKey key = new ChunkKey(chunkX, chunkZ);
-                chunks.computeIfAbsent(key, ChunkBuilder::new).entities.add(record);
+                chunks.computeIfAbsent(key, ChunkBuilder::new).addEntity(record);
             }
         }
+        addSnapshotFallbackChunks(scene, chunks);
         return chunks;
     }
 
+
+    private static void addSnapshotFallbackChunks(WorldScene scene, Map<ChunkKey, ChunkBuilder> chunks) {
+        if (scene.chunkSnapshots == null || scene.chunkSnapshots.isEmpty()) {
+            return;
+        }
+        for (ChunkSnapshot snapshot : scene.chunkSnapshots.values()) {
+            if (snapshot == null) {
+                continue;
+            }
+            ChunkKey key = new ChunkKey(snapshot.chunkX, snapshot.chunkZ);
+            ChunkBuilder builder = chunks.computeIfAbsent(key, ChunkBuilder::new);
+            if (builder.hasBlockSections()) {
+                continue;
+            }
+            int added = 0;
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    int index = z * 16 + x;
+                    if (snapshot.heights == null || index >= snapshot.heights.length || snapshot.heights[index] == Integer.MIN_VALUE) {
+                        continue;
+                    }
+                    int y = snapshot.heights[index];
+                    String state = snapshot.states != null && index < snapshot.states.length && snapshot.states[index] != null && !snapshot.states[index].isBlank()
+                            ? snapshot.states[index]
+                            : "minecraft:stone";
+                    builder.addSyntheticBlock((snapshot.chunkX << 4) + x, y, (snapshot.chunkZ << 4) + z, state);
+                    added++;
+                }
+            }
+            if (added == 0 && snapshot.hasSnapshot) {
+                builder.addSyntheticBlock((snapshot.chunkX << 4) + 8, Math.max(-64, scene.originY), (snapshot.chunkZ << 4) + 8, "minecraft:stone");
+            }
+        }
+    }
     private static void writeLevelDat(WorldScene scene, Path worldFolder) throws IOException {
         CompoundTag data = new CompoundTag();
         TargetMinecraftVersion.Entry targetVersion = targetVersion(scene);
@@ -179,24 +220,85 @@ public final class VanillaWorldExporter {
         NbtIo.writeCompressed(savedData, target);
     }
 
+    private static void writeGameRulesFile(WorldScene scene, Path worldFolder) throws IOException {
+        TargetMinecraftVersion.Entry target = targetVersion(scene);
+        if (!target.usesGameRulesFile()) {
+            return;
+        }
+        CompoundTag data = new CompoundTag();
+        CompoundTag exported = gameRules(scene);
+        for (String key : exported.keySet()) {
+            String value = exported.getString(key).orElse("false");
+            putTypedGameRule(data, namespacedSnakeGameRule(key), value);
+        }
+        CompoundTag root = new CompoundTag();
+        root.putInt("DataVersion", target.effectiveDataVersion());
+        root.put("data", data);
+        Path targetFile = worldFolder.resolve("data").resolve("minecraft").resolve("game_rules.dat");
+        Files.createDirectories(targetFile.getParent());
+        NbtIo.writeCompressed(root, targetFile);
+    }
+
+    private static void putTypedGameRule(CompoundTag tag, String key, String value) {
+        String cleaned = value == null ? "false" : value.trim();
+        if ("true".equalsIgnoreCase(cleaned) || "false".equalsIgnoreCase(cleaned)) {
+            tag.putBoolean(key, Boolean.parseBoolean(cleaned));
+            return;
+        }
+        try {
+            tag.putInt(key, Integer.parseInt(cleaned));
+        } catch (NumberFormatException ignored) {
+            tag.putString(key, cleaned);
+        }
+    }
+
+    private static String namespacedSnakeGameRule(String key) {
+        if (key == null || key.isBlank()) {
+            return "minecraft:unknown";
+        }
+        String raw = key.contains(":") ? key.substring(key.indexOf(':') + 1) : key;
+        StringBuilder result = new StringBuilder("minecraft:");
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (Character.isUpperCase(c)) {
+                if (i > 0) result.append('_');
+                result.append(Character.toLowerCase(c));
+            } else {
+                result.append(c == '-' ? '_' : c);
+            }
+        }
+        return result.toString();
+    }
+
     private static CompoundTag gameRules(WorldScene scene) {
         CompoundTag rules = defaultGameRules();
         if (scene.gameRulesNbt != null && !scene.gameRulesNbt.isBlank()) {
-            try {
-                CompoundTag overrides = TagParser.parseCompoundFully(scene.gameRulesNbt);
-                for (String key : overrides.keySet()) {
-                    // Vanilla stores gamerules as strings in level.dat. Keep that shape even when
-                    // users typed true/false/integers in WorldBinder's config.
-                    String value = overrides.getString(key).orElse(null);
-                    if (value == null && overrides.get(key) != null) {
-                        value = overrides.get(key).toString().replace("\"", "");
-                    }
-                    if (value != null && !value.isBlank()) {
+            String raw = scene.gameRulesNbt.trim();
+            if (raw.contains("=") && !raw.startsWith("{")) {
+                for (String part : raw.split(";")) {
+                    int split = part.indexOf('=');
+                    if (split <= 0 || split >= part.length() - 1) continue;
+                    String key = part.substring(0, split).trim();
+                    String value = part.substring(split + 1).trim();
+                    if (!key.isBlank() && !value.isBlank()) {
                         rules.putString(key, value);
                     }
                 }
-            } catch (CommandSyntaxException exception) {
-                WorldBinder.LOGGER.warn("Failed to parse captured game rules. Falling back to safe defaults.", exception);
+            } else {
+                try {
+                    CompoundTag overrides = TagParser.parseCompoundFully(raw);
+                    for (String key : overrides.keySet()) {
+                        String value = overrides.getString(key).orElse(null);
+                        if (value == null && overrides.get(key) != null) {
+                            value = overrides.get(key).toString().replace("\"", "");
+                        }
+                        if (value != null && !value.isBlank()) {
+                            rules.putString(key, value);
+                        }
+                    }
+                } catch (CommandSyntaxException exception) {
+                    WorldBinder.LOGGER.warn("Failed to parse captured game rules. Falling back to safe defaults.", exception);
+                }
             }
         }
         return rules;
@@ -342,7 +444,7 @@ public final class VanillaWorldExporter {
                         "Blocks: " + scene.blockCount() + "\n" +
                         "Block entities: " + scene.blockEntityCount() + "\n" +
                         "Entities: " + scene.entityCount() + "\n\n" +
-                        "This folder contains a real vanilla-shaped save: level.dat, dimensions/minecraft/overworld/region/*.mca, entities/*.mca and poi/*.mca.\n" +
+                        "This folder contains a vanilla-shaped save: level.dat, region/*.mca, entities/*.mca where supported, poi/*.mca where supported and resources.zip when available.\n" +
                         "Only data actually seen/captured by the client can be exported. Server-hidden data cannot be reconstructed.\n");
     }
 
@@ -356,10 +458,21 @@ public final class VanillaWorldExporter {
             return "minecraft:air";
         }
         TargetMinecraftVersion.Entry target = targetVersionHolder.get();
-        if (target == null) {
-            return state;
+        String downgraded = target == null ? state : downgradeBlockState(state, target);
+        return normalizeBlockStateForExport(downgraded);
+    }
+
+    private static String normalizeBlockStateForExport(String state) {
+        if (state == null || state.isBlank()) {
+            return "minecraft:air";
         }
-        return downgradeBlockState(state, target);
+        try {
+            net.minecraft.world.level.block.state.BlockState parsed = BlockStateStrings.parse(state);
+            return parsed == null ? state : BlockStateStrings.toCommandString(parsed);
+        } catch (Throwable ignored) {
+            int propertyStart = state.indexOf('[');
+            return propertyStart > 0 ? state.substring(0, propertyStart) : "minecraft:air";
+        }
     }
 
     private static String downgradeBlockState(String state, TargetMinecraftVersion.Entry target) {
@@ -408,6 +521,20 @@ public final class VanillaWorldExporter {
             return new ChunkPos(key.x, key.z);
         }
 
+        private boolean hasBlockSections() {
+            return !sections.isEmpty();
+        }
+
+        private void addSyntheticBlock(int absX, int absY, int absZ, String state) {
+            int sectionY = Math.floorDiv(absY, 16);
+            int localX = Math.floorMod(absX, 16);
+            int localY = Math.floorMod(absY, 16);
+            int localZ = Math.floorMod(absZ, 16);
+            sections.computeIfAbsent(sectionY, SectionBuilder::new).set(localX, localY, localZ, exportState(state));
+            int hmIndex = localZ * 16 + localX;
+            heightmap[hmIndex] = Math.max(heightmap[hmIndex], Math.max(0, absY + 65));
+        }
+
         private void addBlock(int absX, int absY, int absZ, BlockRecord record) {
             int sectionY = Math.floorDiv(absY, 16);
             int localX = Math.floorMod(absX, 16);
@@ -425,6 +552,17 @@ public final class VanillaWorldExporter {
                     blockEntity.putBoolean("keepPacked", false);
                     blockEntities.add(blockEntity);
                 }
+            }
+        }
+
+        private void addEntity(EntityRecord record) {
+            entities.add(record);
+            ensureChunkHasAtLeastOneSection();
+        }
+
+        private void ensureChunkHasAtLeastOneSection() {
+            if (sections.isEmpty()) {
+                sections.put(-4, new SectionBuilder(-4));
             }
         }
 
@@ -625,9 +763,7 @@ public final class VanillaWorldExporter {
         double absY = scene.originY + entity.y;
         double absZ = scene.originZ + entity.z;
 
-        if (!nbt.contains("id")) {
-            nbt.putString("id", entity.type == null || entity.type.isBlank() ? "minecraft:marker" : entity.type);
-        }
+        nbt.putString("id", exportEntityType(scene, entity.type));
 
         ListTag pos = new ListTag();
         pos.add(DoubleTag.valueOf(absX));
@@ -643,7 +779,94 @@ public final class VanillaWorldExporter {
         nbt.putBoolean("NoGravity", entity.noGravity);
         nbt.putBoolean("Glowing", entity.glowing);
         nbt.putBoolean("Invisible", entity.invisible);
+        normalizeEntityForTarget(nbt, targetVersion(scene));
         return nbt;
+    }
+
+    private static void normalizeEntityForTarget(CompoundTag nbt, TargetMinecraftVersion.Entry target) {
+        if (target.effectiveDataVersion() < 3837) {
+            downgradeModernItemStack(nbt, "item");
+            downgradeModernItemStack(nbt, "Item");
+            downgradeItemStackList(nbt, "HandItems");
+            downgradeItemStackList(nbt, "ArmorItems");
+        }
+    }
+
+    private static void downgradeItemStackList(CompoundTag holder, String key) {
+        if (!(holder.get(key) instanceof ListTag list)) {
+            return;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i) instanceof CompoundTag item) {
+                CompoundTag wrapper = new CompoundTag();
+                wrapper.put("value", item);
+                downgradeModernItemStack(wrapper, "value");
+            }
+        }
+    }
+
+    private static void downgradeModernItemStack(CompoundTag holder, String key) {
+        if (!(holder.get(key) instanceof CompoundTag item)) {
+            return;
+        }
+        String id = item.getString("id").orElse("minecraft:air");
+        item.putString("id", id);
+        item.putByte("Count", (byte) readIntTag(item, "count", 1));
+        item.remove("count");
+
+        if (item.get("components") instanceof CompoundTag components) {
+            CompoundTag tag = item.get("tag") instanceof CompoundTag existingTag ? existingTag : new CompoundTag();
+            int damage = readIntTag(components, "minecraft:damage", Integer.MIN_VALUE);
+            if (damage != Integer.MIN_VALUE) {
+                tag.putInt("Damage", damage);
+            }
+            int customModelData = readIntTag(components, "minecraft:custom_model_data", Integer.MIN_VALUE);
+            if (customModelData != Integer.MIN_VALUE) {
+                tag.putInt("CustomModelData", customModelData);
+            }
+            String customName = readStringTag(components, "minecraft:custom_name");
+            if (customName != null && !customName.isBlank()) {
+                CompoundTag display = tag.get("display") instanceof CompoundTag existingDisplay ? existingDisplay : new CompoundTag();
+                display.putString("Name", customName);
+                tag.put("display", display);
+            }
+            if (!tag.keySet().isEmpty()) {
+                item.put("tag", tag);
+            }
+            item.remove("components");
+        }
+    }
+
+    private static int readIntTag(CompoundTag tag, String key, int fallback) {
+        if (tag == null || tag.get(key) == null) {
+            return fallback;
+        }
+        try {
+            String raw = tag.get(key).toString().replace("\"", "");
+            int suffix = raw.endsWith("b") || raw.endsWith("s") || raw.endsWith("l") || raw.endsWith("f") || raw.endsWith("d") ? 1 : 0;
+            return Integer.parseInt(suffix == 1 ? raw.substring(0, raw.length() - 1) : raw);
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static String readStringTag(CompoundTag tag, String key) {
+        return tag == null ? null : tag.getString(key).orElse(null);
+    }
+
+    private static String exportEntityType(WorldScene scene, String type) {
+        String id = type == null || type.isBlank() ? "minecraft:marker" : type;
+        int dataVersion = targetVersion(scene).effectiveDataVersion();
+        if (dataVersion < 3337 && (id.equals("minecraft:block_display") || id.equals("minecraft:item_display") || id.equals("minecraft:text_display") || id.equals("minecraft:interaction"))) {
+            return "minecraft:armor_stand";
+        }
+        if (dataVersion < 3463 && (id.equals("minecraft:camel") || id.equals("minecraft:sniffer"))) {
+            return "minecraft:pig";
+        }
+        if (dataVersion < 3953 && (id.equals("minecraft:bogged") || id.equals("minecraft:breeze") || id.equals("minecraft:wind_charge") || id.equals("minecraft:ominous_item_spawner"))) {
+            return "minecraft:marker";
+        }
+        return id;
     }
 
     private static int bitsFor(int maxValue) {

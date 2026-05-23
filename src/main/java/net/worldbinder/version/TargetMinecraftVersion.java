@@ -33,6 +33,14 @@ public final class TargetMinecraftVersion {
         public int effectiveDataVersion() {
             return dataVersion > 0 ? dataVersion : SharedConstants.getCurrentVersion().dataVersion().version();
         }
+
+        public boolean usesGameRulesFile() {
+            return profile == GenerationProfile.CURRENT_26;
+        }
+
+        public boolean supportsModernItemComponents() {
+            return effectiveDataVersion() >= 3837;
+        }
     }
 
     public static final List<Entry> FINAL_RELEASES = List.of(

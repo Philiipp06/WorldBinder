@@ -44,13 +44,13 @@ public final class ChunkSnapshot {
     }
 
     public void markScanned(boolean saved, boolean blockEntity) {
-        scannedBlocks++;
-        if (saved) {
-            savedBlocks++;
-        }
-        if (blockEntity) {
-            blockEntityCount++;
-        }
+        markScanned(1, saved ? 1 : 0, blockEntity ? 1 : 0);
+    }
+
+    public void markScanned(int scanned, int saved, int blockEntities) {
+        scannedBlocks += Math.max(0, scanned);
+        savedBlocks += Math.max(0, saved);
+        blockEntityCount += Math.max(0, blockEntities);
         touchMetadata();
     }
 

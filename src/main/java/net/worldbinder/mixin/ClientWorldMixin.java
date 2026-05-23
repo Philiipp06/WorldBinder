@@ -14,6 +14,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ClientLevel.class)
 public abstract class ClientWorldMixin {
+    @Inject(method = "addEntity", at = @At("TAIL"), require = 0)
+    private void worldbinder$cacheEntityAfterAdd(Entity entity, CallbackInfo ci) {
+        if (WorldBinderClient.capture() != null && entity != null) {
+            WorldBinderClient.capture().onEntityLoaded(entity);
+        }
+    }
+
     @Inject(method = "removeEntity", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;onClientRemoval()V", shift = At.Shift.BEFORE), require = 0)
     private void worldbinder$cacheEntityBeforeRemoval(int entityId, Entity.RemovalReason removalReason, CallbackInfo ci, @Local Entity entity) {
         if (WorldBinderClient.capture() != null && entity != null) {

@@ -2,6 +2,8 @@ package net.worldbinder.capture;
 
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -13,6 +15,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.io.WorldBinderPaths;
 import net.worldbinder.scene.BlockRecord;
@@ -29,8 +35,6 @@ import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.util.BlockStateStrings;
 import net.worldbinder.util.Chat;
 import net.worldbinder.util.FileNames;
-import net.worldbinder.util.Lang;
-import net.worldbinder.version.TargetMinecraftVersion;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -50,8 +54,9 @@ public final class SceneCaptureService {
     private static final int DEFAULT_MAX_NEW_CHUNKS_PER_TICK = 1;
     private static final int DEFAULT_MAX_QUEUED_CHUNKS = 96;
     private static final int STALE_QUEUE_MARGIN_CHUNKS = 2;
-    private static final int MAX_ACTIVE_SCAN_CURSORS = 3;
+    private static final int MAX_ACTIVE_SCAN_CURSORS = 6;
     private static final int MAX_HOT_CHUNKS_PER_TICK = 1;
+    private static final int MAX_HOTCACHE_CHUNKS_PER_TICK = 24;
     private static final double STATIONARY_EPSILON_SQUARED = 0.0025D;
 
     private final SelectionManager selections;
@@ -105,6 +110,8 @@ public final class SceneCaptureService {
     private int stationaryTicks;
     private long mapDataRevision;
     private int entityScanCooldownTicks;
+    private BlockPos lastInteractedBlockEntityPos;
+    private Entity lastInteractedEntity;
 
     private static final class ScanCursor {
         final long key;
@@ -114,13 +121,19 @@ public final class SceneCaptureService {
         int y;
         int z;
         ChunkSnapshot snapshot;
+        LevelChunk chunk;
 
         ScanCursor(long key, int chunkX, int chunkZ, int minY, ChunkSnapshot snapshot) {
+            this(key, chunkX, chunkZ, minY, snapshot, null);
+        }
+
+        ScanCursor(long key, int chunkX, int chunkZ, int minY, ChunkSnapshot snapshot, LevelChunk chunk) {
             this.key = key;
             this.chunkX = chunkX;
             this.chunkZ = chunkZ;
             this.y = minY;
             this.snapshot = snapshot;
+            this.chunk = chunk;
         }
     }
 
@@ -152,22 +165,23 @@ public final class SceneCaptureService {
     public void startRoamingCapture(String requestedName) {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null || client.player == null) {
-            Chat.errorKey("worldbinder.chat.no_world");
+            Chat.error("No world loaded.");
             return;
         }
         if (isCapturing()) {
-            Chat.warnKey("worldbinder.chat.capture_running");
+            Chat.warn("A WorldBinder capture is already running.");
             return;
         }
 
         beginNewScene(requestedName, "world", client.player.blockPosition());
         roamingCapture = true;
-        OperationStatus.begin("WorldBinder", net.worldbinder.util.Lang.string("worldbinder.status.download_running"));
-        Chat.infoKey("worldbinder.chat.download_started", activeArchiveName, WorldBinder.config().targetVersion().name(), WorldBinder.config().performancePreset, WorldBinder.config().roamingRadiusChunks, WorldBinder.config().targetFps);
+        OperationStatus.begin("WorldBinder", "World download running. Move through the world.");
+        Chat.info("World download started: §f" + activeArchiveName + "§7 • preset §f" + WorldBinder.config().performancePreset + "§7 • radius §f" + WorldBinder.config().roamingRadiusChunks + "§7 chunks • target FPS §f" + WorldBinder.config().targetFps + "§7.");
         WorldBinderActivityLog.add("Started download: " + activeArchiveName);
         if (multiplayerSafetyActive()) {
-            Chat.infoKey("worldbinder.chat.server_safety_active");
+            Chat.info("Server Safety Mode active: disconnect autosave and placement throttles are enabled.");
         }
+        primeLoadedChunkHotCache(client);
     }
 
     public void finishActiveCapture() {
@@ -176,7 +190,7 @@ public final class SceneCaptureService {
 
     public void requestFinishCapture() {
         if (!isCapturing()) {
-            Chat.warnKey("worldbinder.chat.no_capture_running");
+            Chat.warn("No WorldBinder capture is running.");
             return;
         }
         if (saving) {
@@ -203,6 +217,7 @@ public final class SceneCaptureService {
     private void saveWorldDownloadNow() {
         Minecraft client = Minecraft.getInstance();
         if (client != null && client.level != null && client.player != null) {
+            flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
         }
         pendingBlocks.clear();
@@ -211,7 +226,7 @@ public final class SceneCaptureService {
         clearActiveScans();
         finishing = true;
         paused = false;
-        OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.finalizing"), 0.98D);
+        OperationStatus.update("Finalizing current captured data...", 0.98D);
         saveActiveSceneAsync();
     }
 
@@ -224,8 +239,8 @@ public final class SceneCaptureService {
         finishStartedAtMillis = System.currentTimeMillis();
         finishStartedProcessedBlocks = processedBlocks;
         finishStartedQueueChunks = queuedChunkCount();
-        OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.finishing_queue"), progress());
-        Chat.infoKey("worldbinder.chat.finish_queue");
+        OperationStatus.update("Finishing queued chunks before save...", progress());
+        Chat.info("WorldBinder will finish the remaining queue before writing the world save.");
     }
 
     public void abortQueueAndSaveNow() {
@@ -262,19 +277,19 @@ public final class SceneCaptureService {
 
     public String finishStatusLine() {
         if (!isCapturing()) {
-            return Lang.string("worldbinder.capture.finish.idle");
+            return "Idle";
         }
         if (saving) {
-            return Lang.string("worldbinder.capture.finish.saving");
+            return "Writing vanilla save to disk";
         }
         if (!hasPendingWork()) {
-            return Lang.string("worldbinder.capture.finish.ready_to_save");
+            return "Queue finished. Saving will start now.";
         }
         ScanCursor cursor = activeScanCursors.peek();
         if (cursor != null) {
-            return Lang.string("worldbinder.capture.finish.scanning", activeScanCursors.size(), activeScanCursors.size() == 1 ? "" : "s", cursor.chunkX, cursor.chunkZ, cursor.y);
+            return "Scanning " + activeScanCursors.size() + " chunk" + (activeScanCursors.size() == 1 ? "" : "s") + " • lead " + cursor.chunkX + ", " + cursor.chunkZ + " • Y " + cursor.y;
         }
-        return Lang.string("worldbinder.capture.finish.waiting");
+        return "Waiting for next queued chunk";
     }
 
     public int queuedChunkCount() {
@@ -313,7 +328,7 @@ public final class SceneCaptureService {
         }
         int seconds = estimatedFinishSeconds();
         if (seconds <= 0 || seconds >= 9999) {
-            return Lang.string("worldbinder.capture.eta.calculating");
+            return "calculating";
         }
         int minutes = seconds / 60;
         int rest = seconds % 60;
@@ -322,7 +337,7 @@ public final class SceneCaptureService {
 
     public void stopAndSaveNow() {
         if (!isCapturing()) {
-            Chat.warnKey("worldbinder.chat.no_capture_running");
+            Chat.warn("No WorldBinder capture is running.");
             return;
         }
         if (saving) {
@@ -330,6 +345,7 @@ public final class SceneCaptureService {
         }
         Minecraft client = Minecraft.getInstance();
         if (client.level != null && client.player != null) {
+            flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
         }
         pendingBlocks.clear();
@@ -338,7 +354,7 @@ public final class SceneCaptureService {
         clearActiveScans();
         finishing = true;
         paused = false;
-        OperationStatus.update(Lang.string("worldbinder.status.saving_now"), 1.0D);
+        OperationStatus.update("Saving archive now...", 1.0D);
         saveActiveSceneAsync();
     }
 
@@ -347,9 +363,9 @@ public final class SceneCaptureService {
             return;
         }
         resetActiveJob();
-        OperationStatus.finish(Lang.string("worldbinder.status.capture_cancelled"));
-        Chat.warnKey("worldbinder.chat.capture_cancelled");
-        WorldBinderActivityLog.add(Lang.string("worldbinder.activity.capture_cancelled"));
+        OperationStatus.finish("Capture cancelled");
+        Chat.warn("WorldBinder capture cancelled.");
+        WorldBinderActivityLog.add("Capture cancelled");
     }
 
     public void togglePause() {
@@ -357,9 +373,9 @@ public final class SceneCaptureService {
             return;
         }
         paused = !paused;
-        OperationStatus.update(paused ? Lang.string("worldbinder.status.paused") : statusLine(), progress());
-        Chat.infoKey(paused ? "worldbinder.chat.capture_paused" : "worldbinder.chat.capture_resumed");
-        WorldBinderActivityLog.add(Lang.string(paused ? "worldbinder.activity.capture_paused" : "worldbinder.activity.capture_resumed"));
+        OperationStatus.update(paused ? "WorldBinder paused" : statusLine(), progress());
+        Chat.info(paused ? "WorldBinder capture paused." : "WorldBinder capture resumed.");
+        WorldBinderActivityLog.add(paused ? "Capture paused" : "Capture resumed");
     }
 
     public boolean isPaused() {
@@ -392,15 +408,15 @@ public final class SceneCaptureService {
 
     public String modeName() {
         if (!isCapturing()) {
-            return Lang.string("worldbinder.capture.mode.ready");
+            return "Ready";
         }
         if (saving) {
-            return Lang.string("worldbinder.capture.mode.saving");
+            return "Saving archive";
         }
         if (paused) {
-            return Lang.string(roamingCapture ? "worldbinder.capture.mode.world_paused" : "worldbinder.capture.mode.position_paused");
+            return roamingCapture ? "World download paused" : "Position archive paused";
         }
-        return Lang.string(roamingCapture ? "worldbinder.capture.mode.world" : "worldbinder.capture.mode.position");
+        return roamingCapture ? "World download" : "Position archive";
     }
 
     public int pendingBlocks() {
@@ -502,7 +518,11 @@ public final class SceneCaptureService {
     }
 
     public String queueDiagnosticsLine() {
-        return Lang.string("worldbinder.capture.queue_diagnostics", observedLoadedChunkAges.size(), queuePacketEnqueued, queueLoadedViewEnqueued, queueSkippedUnloaded, queueSkippedFarAway);
+        return "Observed " + observedLoadedChunkAges.size()
+                + " • packet " + queuePacketEnqueued
+                + " • loaded-view " + queueLoadedViewEnqueued
+                + " • skipped unloaded " + queueSkippedUnloaded
+                + " • skipped far " + queueSkippedFarAway;
     }
 
     public int adaptiveThrottlePercent() {
@@ -526,49 +546,49 @@ public final class SceneCaptureService {
 
     public String safetySummary() {
         if (!multiplayerSafetyActive()) {
-            return Lang.string("worldbinder.capture.safety.local");
+            return "Singleplayer/local mode: full local export tools available.";
         }
         int radius = WorldBinder.config().roamingRadiusChunks;
         if (radius >= 12) {
-            return Lang.string("worldbinder.capture.safety.large_radius");
+            return "Server Safety: large radius detected. Commands and scanner throughput are capped.";
         }
-        return Lang.string("worldbinder.capture.safety.multiplayer");
+        return "Server Safety: multiplayer detected. Disconnect autosave and placement throttles are active.";
     }
 
 
     public String captureRouteHint() {
         Minecraft client = Minecraft.getInstance();
         if (client.player == null) {
-            return Lang.string("worldbinder.capture.route.waiting");
+            return "Route optimizer: waiting for player position.";
         }
         int playerChunkX = client.player.blockPosition().getX() >> 4;
         int playerChunkZ = client.player.blockPosition().getZ() >> 4;
         RouteTarget target = nearestRouteTarget(playerChunkX, playerChunkZ);
         if (target == null) {
             if (isCapturing()) {
-                return Lang.string("worldbinder.capture.route.stable");
+                return "Route optimizer: nearby capture looks stable. Move toward uncaptured areas to discover more chunks.";
             }
-            return Lang.string("worldbinder.capture.route.start");
+            return "Route optimizer: start capture to receive movement suggestions.";
         }
         int dx = target.chunkX - playerChunkX;
         int dz = target.chunkZ - playerChunkZ;
         String direction = routeDirection(dx, dz);
-        return Lang.string("worldbinder.capture.route.target", target.reason, target.chunkX, target.chunkZ, direction, Math.max(Math.abs(dx), Math.abs(dz)));
+        return "Route optimizer: " + target.reason + " at " + target.chunkX + ", " + target.chunkZ + " • " + direction + " • " + Math.max(Math.abs(dx), Math.abs(dz)) + " chunks";
     }
 
     private RouteTarget nearestRouteTarget(int playerChunkX, int playerChunkZ) {
         RouteTarget best = null;
         for (long key : pendingChunkKeys) {
-            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, Lang.string("worldbinder.capture.route.queued"));
+            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, "queued chunk");
         }
         for (long key : queuedChunkKeys) {
-            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, Lang.string("worldbinder.capture.route.queued"));
+            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, "queued chunk");
         }
         for (long key : partialChunkKeys) {
-            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, Lang.string("worldbinder.capture.route.partial"));
+            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, "partial chunk");
         }
         for (long key : failedChunkKeys) {
-            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, Lang.string("worldbinder.capture.route.problem"));
+            best = betterRouteTarget(best, key, playerChunkX, playerChunkZ, "problem chunk");
         }
         return best;
     }
@@ -593,17 +613,17 @@ public final class SceneCaptureService {
 
     private static String routeDirection(int dx, int dz) {
         if (dx == 0 && dz == 0) {
-            return Lang.string("worldbinder.capture.route.there");
+            return "you are there";
         }
-        String eastWest = dx > 0 ? Lang.string("worldbinder.direction.east") : dx < 0 ? Lang.string("worldbinder.direction.west") : "";
-        String northSouth = dz > 0 ? Lang.string("worldbinder.direction.south") : dz < 0 ? Lang.string("worldbinder.direction.north") : "";
+        String eastWest = dx > 0 ? "east" : dx < 0 ? "west" : "";
+        String northSouth = dz > 0 ? "south" : dz < 0 ? "north" : "";
         if (eastWest.isEmpty()) {
-            return Lang.string("worldbinder.capture.route.go", northSouth);
+            return "go " + northSouth;
         }
         if (northSouth.isEmpty()) {
-            return Lang.string("worldbinder.capture.route.go", eastWest);
+            return "go " + eastWest;
         }
-        return Lang.string("worldbinder.capture.route.go_diagonal", northSouth, eastWest);
+        return "go " + northSouth + "-" + eastWest;
     }
 
     private record RouteTarget(int chunkX, int chunkZ, int distance, String reason) {
@@ -647,8 +667,11 @@ public final class SceneCaptureService {
         activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
     }
 
+    public void onEntityLoaded(Entity entity) {
+        cacheEntityHot(entity);
+    }
+
     public void onEntityRemoved(Entity entity) {
-        // Final chance to retain vehicles/display entities when the client unloads a chunk.
         cacheEntityHot(entity);
     }
 
@@ -671,10 +694,7 @@ public final class SceneCaptureService {
         if (isDone(key)) {
             return;
         }
-        // Packet events are only observation hints. Keep the queue tied to the player's
-        // current loaded radius so join bursts or server-side view-distance spikes cannot
-        // schedule thousands of chunks the player never actually walked through.
-        if (enqueueChunk(key, true, "chunk-load-or-update", "packet")) {
+        if (captureLoadedChunkHot(client, chunkX, chunkZ, key, "chunk-load", false)) {
             queuePacketEnqueued++;
         }
     }
@@ -706,6 +726,7 @@ public final class SceneCaptureService {
             return;
         }
         BlockPos pos = hitResult.getBlockPos();
+        lastInteractedBlockEntityPos = pos.immutable();
         cacheBlockEntityHot(client, pos);
     }
 
@@ -713,6 +734,7 @@ public final class SceneCaptureService {
         if (!isCapturing() || entity == null || captureInputPaused()) {
             return;
         }
+        lastInteractedEntity = entity;
         cacheEntityHot(entity);
     }
 
@@ -725,6 +747,49 @@ public final class SceneCaptureService {
             activeScene.mapIds.add(id);
             activeScene.includesMapData = true;
             activeScene.storageNotes.add("Observed map_" + id + ".dat");
+        }
+    }
+
+
+    public void onContainerScreenClosed(Screen screen) {
+        if (!isCapturing() || captureInputPaused() || screen == null) {
+            return;
+        }
+        Minecraft client = Minecraft.getInstance();
+        if (client.level == null) {
+            return;
+        }
+        int storedSlots = inspectVisibleContainerSlots(screen);
+        if (lastInteractedBlockEntityPos != null) {
+            cacheBlockEntityHot(client, lastInteractedBlockEntityPos);
+            if (storedSlots > 0 && activeScene != null) {
+                activeScene.storageNotes.add("Captured visible container screen at " + lastInteractedBlockEntityPos.toShortString() + " (" + storedSlots + " slots visible)");
+            }
+        }
+        if (lastInteractedEntity != null) {
+            cacheEntityHot(lastInteractedEntity);
+            if (storedSlots > 0 && activeScene != null) {
+                activeScene.storageNotes.add("Captured visible entity container screen (" + storedSlots + " slots visible)");
+            }
+        }
+    }
+
+    private int inspectVisibleContainerSlots(Screen screen) {
+        if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
+            return 0;
+        }
+        try {
+            AbstractContainerMenu menu = containerScreen.getMenu();
+            int stored = 0;
+            for (Slot slot : menu.slots) {
+                if (slot != null && slot.hasItem()) {
+                    stored++;
+                }
+            }
+            return stored;
+        } catch (Throwable throwable) {
+            WorldBinder.LOGGER.warn("Failed to inspect closed container screen", throwable);
+            return 0;
         }
     }
 
@@ -796,7 +861,7 @@ public final class SceneCaptureService {
         if (queuedChunkKeys.add(key)) {
             pendingChunkKeys.addFirst(key);
         }
-        Chat.infoKey("worldbinder.chat.chunk_queued_rescan", chunkX, chunkZ);
+        Chat.info("Queued chunk §f" + chunkX + ", " + chunkZ + "§7 for rescan.");
         WorldBinderActivityLog.add("Queued rescan for chunk " + chunkX + ", " + chunkZ);
     }
 
@@ -828,7 +893,7 @@ public final class SceneCaptureService {
                 queuedChunkKeys.clear();
                 clearActiveScans();
                 finishing = true;
-                OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.writing_cached_export"), 1.0D);
+                OperationStatus.update("Writing cached WorldBinder export...", 1.0D);
                 saveActiveSceneAsync();
             } else {
                 cancelActiveCapture();
@@ -837,14 +902,14 @@ public final class SceneCaptureService {
         }
 
         if (saving) {
-            OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.writing_archive"), 1.0D);
+            OperationStatus.update("Writing archive to disk...", 1.0D);
             return;
         }
 
         maybeApplyMemoryGuard();
 
         if (paused && !finishing) {
-            OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.paused", statusLine()), progress());
+            OperationStatus.update("Paused: " + statusLine(), progress());
             return;
         }
 
@@ -854,16 +919,17 @@ public final class SceneCaptureService {
                 maybeWarnServerSafety(client);
                 maybeRecoveryAutosave();
                 updateObservedLoadedChunks(client);
-                scheduleLoadedObservedChunks(client);
-                captureNearbyEntities(client, false);
-                processHotVisibleChunks(client);
+                cacheObservedLoadedChunks(client);
             }
-            processRoamingBlocks(client);
+            if (!pendingChunkKeys.isEmpty() || !activeScanCursors.isEmpty()) {
+                processRoamingBlocks(client);
+            }
         } else {
             processPendingBlocks(client);
         }
 
         if (finishing && pendingBlocks.isEmpty() && pendingChunkKeys.isEmpty() && activeScanCursors.isEmpty()) {
+            flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
             saveActiveSceneAsync();
         } else {
@@ -874,15 +940,15 @@ public final class SceneCaptureService {
     private void startSelectionCapture(String requestedName, String archiveType) {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null || client.player == null) {
-            Chat.errorKey("worldbinder.chat.no_world");
+            Chat.error("No world loaded.");
             return;
         }
         if (isCapturing()) {
-            Chat.warnKey("worldbinder.chat.capture_running_finish_first");
+            Chat.warn("A WorldBinder capture is already running. Finish or cancel it first.");
             return;
         }
         if (!selections.hasCompleteSelection()) {
-            Chat.warnKey("worldbinder.chat.selection_missing");
+            Chat.warn("Set both positions first or use World Download mode.");
             return;
         }
 
@@ -902,8 +968,8 @@ public final class SceneCaptureService {
             }
         }
         finishing = true;
-        OperationStatus.begin("WorldBinder", net.worldbinder.util.Lang.string("worldbinder.status.capturing_selection"));
-        Chat.infoKey("worldbinder.chat.position_queued", scheduledBlocks);
+        OperationStatus.begin("WorldBinder", "Capturing selected area...");
+        Chat.info("Position archive queued with §f" + scheduledBlocks + "§7 blocks. It will be processed over multiple ticks.");
     }
 
     private void beginNewScene(String requestedName, String archiveType, BlockPos origin) {
@@ -914,15 +980,14 @@ public final class SceneCaptureService {
         activeScene = new WorldScene();
         activeScene.name = activeArchiveName;
         activeScene.archiveType = archiveType;
-        TargetMinecraftVersion.Entry targetVersion = WorldBinder.config().targetVersion();
-        activeScene.targetMinecraftVersion = targetVersion.name();
-        activeScene.targetGenerationProfile = targetVersion.profile().name();
         activeScene.dimension = client.level == null ? "unknown" : client.level.dimension().toString();
         activeScene.includesBlockEntityNbt = WorldBinder.config().captureBlockEntities;
         activeScene.includesEntityNbt = WorldBinder.config().captureEntities;
         activeScene.includesMapData = WorldBinder.config().exportMaps;
         activeScene.includesAdvancements = WorldBinder.config().exportAdvancements;
         activeScene.includesStats = WorldBinder.config().exportStats;
+        activeScene.targetMinecraftVersion = net.worldbinder.version.TargetMinecraftVersion.normalize(WorldBinder.config().targetMinecraftVersion);
+        activeScene.targetGenerationProfile = net.worldbinder.version.TargetMinecraftVersion.profileLabel(activeScene.targetMinecraftVersion);
         activeScene.gameRulesNbt = readGameRulesNbt(client);
         activeScene.originX = activeOrigin.getX();
         activeScene.originY = activeOrigin.getY();
@@ -957,6 +1022,8 @@ public final class SceneCaptureService {
         stationaryTicks = 0;
         mapDataRevision = 0L;
         entityScanCooldownTicks = 0;
+        lastInteractedBlockEntityPos = null;
+        lastInteractedEntity = null;
         scheduledBlocks = 0L;
         processedBlocks = 0L;
         roamingCapture = false;
@@ -1027,6 +1094,152 @@ public final class SceneCaptureService {
                 }
             }
         }
+    }
+
+
+    private void primeLoadedChunkHotCache(Minecraft client) {
+        if (client == null || client.level == null || client.player == null) {
+            return;
+        }
+        updateObservedLoadedChunks(client);
+        cacheObservedLoadedChunks(client);
+    }
+
+    private void flushLoadedChunksForFinish(Minecraft client) {
+        if (!roamingCapture || client == null || client.level == null || client.player == null) {
+            return;
+        }
+        updateObservedLoadedChunks(client);
+        int centerChunkX = client.player.blockPosition().getX() >> 4;
+        int centerChunkZ = client.player.blockPosition().getZ() >> 4;
+        List<Long> observed = new ArrayList<>(observedLoadedChunkAges.keySet());
+        observed.sort((a, b) -> Integer.compare(distanceSq(a, centerChunkX, centerChunkZ), distanceSq(b, centerChunkX, centerChunkZ)));
+        for (long key : observed) {
+            int chunkX = unpackChunkX(key);
+            int chunkZ = unpackChunkZ(key);
+            if (isClientChunkLoaded(client, chunkX, chunkZ)) {
+                captureLoadedChunkHot(client, chunkX, chunkZ, key, "finish-sync", false);
+            }
+        }
+    }
+
+    private void cacheObservedLoadedChunks(Minecraft client) {
+        int centerChunkX = client.player.blockPosition().getX() >> 4;
+        int centerChunkZ = client.player.blockPosition().getZ() >> 4;
+        int radius = Math.max(1, WorldBinder.config().effectiveRoamingRadiusChunks());
+        trimStaleQueuedChunks(client, centerChunkX, centerChunkZ, radius + STALE_QUEUE_MARGIN_CHUNKS);
+
+        List<Long> observed = new ArrayList<>(observedLoadedChunkAges.keySet());
+        observed.sort((a, b) -> Integer.compare(distanceSq(a, centerChunkX, centerChunkZ), distanceSq(b, centerChunkX, centerChunkZ)));
+        int captured = 0;
+        int maxPerTick = hotCacheChunkLimit();
+        long deadline = System.nanoTime() + adaptiveTickBudgetMillis(client) * 1_000_000L;
+        for (long key : observed) {
+            if (captured >= maxPerTick || System.nanoTime() >= deadline) {
+                break;
+            }
+            int chunkX = unpackChunkX(key);
+            int chunkZ = unpackChunkZ(key);
+            if (Math.max(Math.abs(chunkX - centerChunkX), Math.abs(chunkZ - centerChunkZ)) > radius) {
+                queueSkippedFarAway++;
+                continue;
+            }
+            if (!isClientChunkLoaded(client, chunkX, chunkZ)) {
+                queueSkippedUnloaded++;
+                continue;
+            }
+            if (isDone(key) || failedChunkKeys.contains(key)) {
+                continue;
+            }
+            if (captureLoadedChunkHot(client, chunkX, chunkZ, key, "loaded-view", false)) {
+                captured++;
+                queueLoadedViewEnqueued++;
+            }
+        }
+    }
+
+    private int hotCacheChunkLimit() {
+        int configured = WorldBinder.config().effectiveNewChunksPerTick();
+        if (configured == Integer.MAX_VALUE || configured < 0) {
+            configured = isPlayerStationary() ? 20 : 10;
+        }
+        int limit = Math.max(1, Math.min(MAX_HOTCACHE_CHUNKS_PER_TICK, configured));
+        if (WorldBinder.config().effectiveAdaptiveThrottleEnabled() && adaptiveThrottlePercent < 70) {
+            limit = Math.max(1, limit * Math.max(35, adaptiveThrottlePercent) / 100);
+        }
+        if (multiplayerSafetyActive()) {
+            limit = Math.min(limit, WorldBinder.config().performancePreset == net.worldbinder.config.WorldBinderConfig.PerformancePreset.EXTREME ? 16 : 10);
+        }
+        return limit;
+    }
+
+    private boolean captureLoadedChunkHot(Minecraft client, int chunkX, int chunkZ, long key, String reason, boolean replaceDone) {
+        if (!isCapturing() || activeScene == null || client == null || client.level == null) {
+            return false;
+        }
+        if (!replaceDone && completedChunkKeys.contains(key)) {
+            return false;
+        }
+        if (!isClientChunkLoaded(client, chunkX, chunkZ)) {
+            queueSkippedUnloaded++;
+            return false;
+        }
+        LevelChunk chunk = client.level.getChunk(chunkX, chunkZ);
+        if (chunk == null) {
+            queueSkippedUnloaded++;
+            return false;
+        }
+        pendingChunkKeys.remove(key);
+        queuedChunkKeys.remove(key);
+        removeActiveScan(key);
+        removeHotChunk(key);
+        partialChunkKeys.add(key);
+        ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
+        snapshot.markQueued(reason, "hot-cache");
+        snapshot.markScanning();
+        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
+        mapDataRevision++;
+
+        int minY = WorldBinder.config().effectiveCaptureMinY();
+        int maxY = WorldBinder.config().effectiveCaptureMaxY();
+        if (chunk.isEmpty()) {
+            int skippedBlocks = 16 * 16 * Math.max(1, maxY - minY + 1);
+            snapshot.markScanned(skippedBlocks, 0, 0);
+            processedBlocks += skippedBlocks;
+            scheduledBlocks += skippedBlocks;
+            partialChunkKeys.remove(key);
+            completeChunk(key, snapshot);
+            return true;
+        }
+
+        for (int sectionY = minY >> 4; sectionY <= maxY >> 4; sectionY++) {
+            int yStart = Math.max(minY, sectionY << 4);
+            int yEnd = Math.min(maxY, (sectionY << 4) + 15);
+            if (!WorldBinder.config().captureAir && isEmptySection(chunk, yStart)) {
+                int skippedBlocks = (yEnd - yStart + 1) * 16 * 16;
+                snapshot.markScanned(skippedBlocks, 0, 0);
+                processedBlocks += skippedBlocks;
+                scheduledBlocks += skippedBlocks;
+                continue;
+            }
+            for (int y = yStart; y <= yEnd; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        BlockPos pos = new BlockPos((chunkX << 4) + x, y, (chunkZ << 4) + z);
+                        captureBlockIntoSnapshot(client, chunk, pos, snapshot);
+                        expandBounds(pos);
+                        processedBlocks++;
+                        scheduledBlocks++;
+                    }
+                }
+            }
+        }
+        snapshot.hasBiomeData = true;
+        snapshot.lightEstimated = true;
+        partialChunkKeys.remove(key);
+        completeChunk(key, snapshot);
+        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
+        return true;
     }
 
     private void scheduleLoadedObservedChunks(Minecraft client) {
@@ -1249,8 +1462,9 @@ public final class SceneCaptureService {
     }
 
     private void captureChunkImmediately(Minecraft client, int chunkX, int chunkZ, long key) {
-        // Hot snapshots are kept for chunks that should be captured before the normal queue.
-        // The per-tick cap prevents one client tick from scanning too much work at once.
+        // Hot snapshots are reserved for chunks that are currently very valuable to capture.
+        // The amount is capped per tick by processHotVisibleChunks so custom/aggressive values do
+        // not turn one client tick into an unbounded full-world scan.
         pendingChunkKeys.remove(key);
         queuedChunkKeys.remove(key);
         removeActiveScan(key);
@@ -1488,15 +1702,19 @@ public final class SceneCaptureService {
 
 
     private void captureBlockIntoSnapshot(Minecraft client, BlockPos pos, ChunkSnapshot snapshot) {
-        BlockState state = client.level.getBlockState(pos);
-        BlockEntity blockEntity = client.level.getBlockEntity(pos);
+        captureBlockIntoSnapshot(client, null, pos, snapshot);
+    }
+
+    private void captureBlockIntoSnapshot(Minecraft client, LevelChunk chunk, BlockPos pos, ChunkSnapshot snapshot) {
+        BlockState state = blockStateAt(client, chunk, pos);
         boolean savedBlock = WorldBinder.config().captureAir || !state.isAir();
+        BlockEntity blockEntity = savedBlock && WorldBinder.config().captureBlockEntities ? blockEntityAt(client, chunk, pos) : null;
         snapshot.markScanned(savedBlock, blockEntity != null);
         if (!savedBlock) {
             return;
         }
         String blockEntityNbt = null;
-        if (WorldBinder.config().captureBlockEntities && blockEntity != null) {
+        if (blockEntity != null) {
             try {
                 CompoundTag nbt = blockEntity.saveWithFullMetadata(client.level.registryAccess());
                 blockEntityNbt = nbt.toString();
@@ -1519,6 +1737,42 @@ public final class SceneCaptureService {
                 blockEntity != null,
                 blockEntityNbt
         ));
+    }
+
+    private BlockState blockStateAt(Minecraft client, LevelChunk chunk, BlockPos pos) {
+        if (chunk == null) {
+            return client.level.getBlockState(pos);
+        }
+        int sectionIndex = chunk.getSectionIndex(pos.getY());
+        LevelChunkSection[] sections = chunk.getSections();
+        if (sectionIndex < 0 || sectionIndex >= sections.length) {
+            return client.level.getBlockState(pos);
+        }
+        LevelChunkSection section = sections[sectionIndex];
+        return section == null ? client.level.getBlockState(pos) : section.getBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
+    }
+
+    private BlockEntity blockEntityAt(Minecraft client, LevelChunk chunk, BlockPos pos) {
+        if (chunk != null) {
+            BlockEntity blockEntity = chunk.getBlockEntity(pos);
+            if (blockEntity != null) {
+                return blockEntity;
+            }
+        }
+        return client.level.getBlockEntity(pos);
+    }
+
+    private boolean isEmptySection(LevelChunk chunk, int y) {
+        if (chunk == null) {
+            return false;
+        }
+        int sectionIndex = chunk.getSectionIndex(y);
+        LevelChunkSection[] sections = chunk.getSections();
+        if (sectionIndex < 0 || sectionIndex >= sections.length) {
+            return true;
+        }
+        LevelChunkSection section = sections[sectionIndex];
+        return section == null || section.hasOnlyAir();
     }
 
 
@@ -1587,8 +1841,8 @@ public final class SceneCaptureService {
     private int adaptiveBlockLimit(Minecraft client) {
         int configured = WorldBinder.config().effectiveBlocksPerTick();
         if (configured == Integer.MAX_VALUE) {
-            long requested = 16L * 16L * Math.max(1, WorldBinder.config().effectiveCaptureHeight()) * Math.max(1, newChunkScheduleLimit());
-            configured = (int) Math.min(Integer.MAX_VALUE, requested);
+            long aggressive = 16L * 16L * Math.max(1, WorldBinder.config().effectiveCaptureHeight()) * Math.max(1, newChunkScheduleLimit());
+            configured = (int) Math.min(Integer.MAX_VALUE, aggressive);
         }
         configured = Math.max(16, configured);
         if (WorldBinder.config().performancePreset == net.worldbinder.config.WorldBinderConfig.PerformancePreset.CUSTOM && WorldBinder.config().blocksPerTick < 0) {
@@ -1641,9 +1895,9 @@ public final class SceneCaptureService {
         }
         serverSafetyWarningSent = true;
         if (WorldBinder.config().roamingRadiusChunks >= 12) {
-            Chat.warnKey("worldbinder.chat.server_safety_large_radius");
+            Chat.warn("Server Safety Mode: large radius on multiplayer. Scanner throttling and disconnect autosave are active.");
         } else {
-            Chat.infoKey("worldbinder.chat.server_safety_active");
+            Chat.info("Server Safety Mode active: disconnect autosave and placement throttles are enabled.");
         }
     }
 
@@ -1822,12 +2076,12 @@ public final class SceneCaptureService {
     private String statusLine() {
         if (roamingCapture) {
             if (finishing) {
-                return Lang.string("worldbinder.capture.status.finishing", queuedChunkCount());
+                return "Finishing queue: " + queuedChunkCount() + " chunks left";
             }
-            String pause = paused ? Lang.string("worldbinder.capture.status.paused_prefix") : "";
-            return Lang.string("worldbinder.capture.status.downloading", pause);
+            String pause = paused ? "Paused: " : "";
+            return pause + "Downloading World";
         }
-        return Lang.string("worldbinder.capture.status.capturing_blocks", processedBlocks, scheduledBlocks);
+        return "Capturing: " + processedBlocks + " / " + scheduledBlocks + " blocks";
     }
 
     private WorldScene copySceneForIo(WorldScene source, boolean completedOnly) {
@@ -1837,8 +2091,10 @@ public final class SceneCaptureService {
         copy.name = source.name;
         copy.createdAt = source.createdAt;
         copy.minecraftVersion = source.minecraftVersion;
-        copy.targetMinecraftVersion = source.targetMinecraftVersion;
-        copy.targetGenerationProfile = source.targetGenerationProfile;
+        copy.targetMinecraftVersion = source.targetMinecraftVersion == null || source.targetMinecraftVersion.isBlank()
+                ? net.worldbinder.version.TargetMinecraftVersion.normalize(WorldBinder.config().targetMinecraftVersion)
+                : net.worldbinder.version.TargetMinecraftVersion.normalize(source.targetMinecraftVersion);
+        copy.targetGenerationProfile = net.worldbinder.version.TargetMinecraftVersion.profileLabel(copy.targetMinecraftVersion);
         copy.dimension = source.dimension;
         copy.originX = source.originX;
         copy.originY = source.originY;
@@ -1922,19 +2178,19 @@ public final class SceneCaptureService {
     public void continueRecovery(Path recoveryFolder) {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null || client.player == null) {
-            Chat.errorKey("worldbinder.chat.recovery_join_world");
+            Chat.error("Join a world before continuing a recovery.");
             return;
         }
         if (isCapturing()) {
-            Chat.warnKey("worldbinder.chat.recovery_finish_active");
+            Chat.warn("Finish or cancel the active WorldBinder capture before continuing a recovery.");
             return;
         }
         if (!library.canFinalizeRecovery(recoveryFolder)) {
-            Chat.warnKey("worldbinder.chat.recovery_invalid");
+            Chat.warn("Selected archive is not a valid completed recovery folder.");
             return;
         }
         OperationStatus.begin("WorldBinder Recovery", "Loading recovery asynchronously...");
-        Chat.infoKey("worldbinder.chat.recovery_loading");
+        Chat.info("Loading recovery in the background. Large sessions will not freeze F9.");
         ioExecutor.execute(() -> {
             try {
                 WorldScene scene = library.read(recoveryFolder);
@@ -1942,7 +2198,7 @@ public final class SceneCaptureService {
             } catch (Exception exception) {
                 Minecraft.getInstance().execute(() -> {
                     OperationStatus.finish("Recovery load failed");
-                    Chat.errorKey("worldbinder.chat.recovery_continue_failed");
+                    Chat.error("Failed to continue recovery. Check the log.");
                 });
                 WorldBinder.LOGGER.warn("Failed to continue recovery", exception);
             }
@@ -1953,17 +2209,17 @@ public final class SceneCaptureService {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null || client.player == null) {
             OperationStatus.finish("Recovery load cancelled");
-            Chat.errorKey("worldbinder.chat.recovery_join_world");
+            Chat.error("Join a world before continuing a recovery.");
             return;
         }
         if (isCapturing()) {
             OperationStatus.finish("Recovery load cancelled");
-            Chat.warnKey("worldbinder.chat.recovery_finish_active");
+            Chat.warn("Finish or cancel the active WorldBinder capture before continuing a recovery.");
             return;
         }
         if (scene == null) {
             OperationStatus.finish("Recovery load failed");
-            Chat.errorKey("worldbinder.chat.recovery_read_failed");
+            Chat.error("Recovery file could not be read.");
             return;
         }
 
@@ -2026,9 +2282,9 @@ public final class SceneCaptureService {
         }
         mapDataRevision++;
         OperationStatus.begin("WorldBinder Recovery", "Recovery loaded. Continue moving or finalize it from F9 > Archives.");
-        Chat.warnKey("worldbinder.chat.recovery_loaded", activeArchiveName);
+        Chat.warn("Recovery loaded: §f" + activeArchiveName + "§7. Continue scanning or finalize it from §fF9 > Archives§7.");
         if (largeSessionDetected()) {
-            Chat.warnKey("worldbinder.chat.large_session");
+            Chat.warn("Large session detected. UI detail may be reduced while recovery continues.");
         }
         WorldBinderActivityLog.add("Recovery continued: " + activeArchiveName);
     }
@@ -2051,14 +2307,14 @@ public final class SceneCaptureService {
             OperationStatus.finish("Saved " + scene.blockCount() + " blocks, " + scene.entityCount() + " entities • " + validation);
             Chat.savedArchive(scene.archiveType, scene.name, scene.blockCount(), scene.blockEntityCount(), scene.entityCount(), savedPath);
             if (!"No validation report".equals(validation)) {
-                Chat.infoKey("worldbinder.chat.validation_short", validation);
+                Chat.info("Export validation: §f" + validation + "§7. Open the save folder for the full report.");
                 WorldBinderActivityLog.add("Validation passed: " + validation);
             }
             WorldBinderActivityLog.add("Saved archive: " + scene.name);
         }, throwable -> {
             saving = false;
             OperationStatus.finish("Save failed");
-            Chat.errorKey("worldbinder.chat.save_failed");
+            Chat.error("Failed to save archive. Check the log.");
         });
     }
 
@@ -2125,7 +2381,7 @@ public final class SceneCaptureService {
             int queueBefore = pendingChunkKeys.size();
             pendingChunkKeys.clear();
             queuedChunkKeys.removeIf(key -> !completedChunkKeys.contains(key) && !partialChunkKeys.contains(key));
-            Chat.warnKey("worldbinder.chat.memory_guard", (int) (ratio * 100.0D), queueBefore);
+            Chat.warn("WorldBinder memory guard: high RAM usage detected (" + (int) (ratio * 100.0D) + "%). Dropped " + queueBefore + " queued chunks; already cached chunks are kept.");
         }
         if (!finishing) {
             adaptiveThrottlePercent = Math.min(adaptiveThrottlePercent, 35);

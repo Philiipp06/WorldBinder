@@ -35,7 +35,7 @@ public final class ExportValidator {
         report.archiveJson = Files.isRegularFile(folder.resolve("worldbinder/worldbinder_archive.json"));
         report.manifestJson = Files.isRegularFile(folder.resolve("worldbinder/worldbinder_manifest.json"));
         report.metadataJson = Files.isRegularFile(folder.resolve("worldbinder/metadata.json"));
-        report.resourcePack = Files.isRegularFile(folder.resolve("resourcepacks").resolve("resources.zip")) || Files.isRegularFile(folder.resolve("resources.zip"));
+        report.resourcePack = Files.isRegularFile(folder.resolve("resources.zip"));
         report.zipFile = Files.isRegularFile(folder.resolveSibling(folder.getFileName().toString() + ".zip"));
         report.vanillaWorld = report.levelDat || report.sessionLock || report.regionFiles || report.entityFiles || report.poiFiles || report.metadataJson;
         if (!report.vanillaWorld && scene != null) {

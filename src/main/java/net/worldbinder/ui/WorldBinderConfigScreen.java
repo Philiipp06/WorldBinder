@@ -74,6 +74,14 @@ public final class WorldBinderConfigScreen extends Screen {
         this(parent, Tab.GENERAL, SafetyPage.CORE);
     }
 
+    public static WorldBinderConfigScreen performance(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.PERFORMANCE, SafetyPage.CORE);
+    }
+
+    public static WorldBinderConfigScreen general(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.GENERAL, SafetyPage.CORE);
+    }
+
     private WorldBinderConfigScreen(Screen parent, Tab tab) {
         this(parent, tab, SafetyPage.CORE);
     }
@@ -144,8 +152,8 @@ public final class WorldBinderConfigScreen extends Screen {
         int numericGap = Math.max(18, Math.min(28, (fullW - numericW * 3) / 2));
         int numericY = y + 164;
         radiusChunks = field(x, numericY, numericW, Integer.toString(config.roamingRadiusChunks), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radiusChunks);
-        minY = field(x + numericW + numericGap, numericY, numericW, Integer.toString(config.captureMinY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(minY);
-        maxY = field(x + (numericW + numericGap) * 2, numericY, numericW, Integer.toString(config.captureMaxY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxY);
+        minY = field(x + numericW + numericGap + 8, numericY, numericW, Integer.toString(config.captureMinY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(minY);
+        maxY = field(x + (numericW + numericGap) * 2 + 8, numericY, numericW, Integer.toString(config.captureMaxY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxY);
 
         int gridY = y + 218;
         addToggleGrid(x, gridY, w, 2,
@@ -186,17 +194,17 @@ public final class WorldBinderConfigScreen extends Screen {
         int cols = w < 420 ? 2 : 3;
         int fieldW = Math.max(70, Math.min(96, (w - gap * (cols - 1)) / cols));
 
-        bossScale = field(x, y + 50, fieldW, Integer.toString(config.bossbarScalePercent), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(bossScale);
-        bossY = field(x + fieldW + gap, y + 50, fieldW, Integer.toString(config.bossbarOffsetY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(bossY);
+        bossScale = field(x, y + 50, fieldW, Integer.toString(config.bossbarScalePercent), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.bossbar_scale"); addContentWidget(bossScale);
+        bossY = field(x + fieldW + gap, y + 50, fieldW, Integer.toString(config.bossbarOffsetY), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.bossbar_y"); addContentWidget(bossY);
 
-        radarSize = field(x, y + 118, fieldW, Integer.toString(config.chunkRadarSize), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarSize);
-        radarCell = field(x + fieldW + gap, y + 118, fieldW, Integer.toString(config.chunkRadarCellSize), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarCell);
-        radarScale = field(x + (fieldW + gap) * 2, y + 118, fieldW, Integer.toString(config.chunkRadarScalePercent), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarScale);
+        radarSize = field(x, y + 118, fieldW, Integer.toString(config.chunkRadarSize), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_size"); addContentWidget(radarSize);
+        radarCell = field(x + fieldW + gap, y + 118, fieldW, Integer.toString(config.chunkRadarCellSize), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_cell"); addContentWidget(radarCell);
+        radarScale = field(x + (fieldW + gap) * 2, y + 118, fieldW, Integer.toString(config.chunkRadarScalePercent), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_scale"); addContentWidget(radarScale);
 
-        radarX = field(x, y + 186, fieldW, Integer.toString(config.chunkRadarOffsetX), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarX);
-        radarY = field(x + fieldW + gap, y + 186, fieldW, Integer.toString(config.chunkRadarOffsetY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarY);
-        radarMaxChunks = field(x + (fieldW + gap) * 2, y + 186, fieldW, Integer.toString(config.radarMaxRenderedChunks), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarMaxChunks);
-        radarUpdateRate = field(x, y + 254, fieldW, Integer.toString(config.radarUpdateRate), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radarUpdateRate);
+        radarX = field(x, y + 186, fieldW, Integer.toString(config.chunkRadarOffsetX), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_x"); addContentWidget(radarX);
+        radarY = field(x + fieldW + gap, y + 186, fieldW, Integer.toString(config.chunkRadarOffsetY), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_y"); addContentWidget(radarY);
+        radarMaxChunks = field(x + (fieldW + gap) * 2, y + 186, fieldW, Integer.toString(config.radarMaxRenderedChunks), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_limit"); addContentWidget(radarMaxChunks);
+        radarUpdateRate = field(x, y + 254, fieldW, Integer.toString(config.radarUpdateRate), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_update_rate"); addContentWidget(radarUpdateRate);
 
         addButtonGrid(x, y + 306, w, 3,
                 modeButton(0, 0, 100, "worldbinder.config.f10_view", () -> config.f10MapLayerMode, v -> config.f10MapLayerMode = v),
@@ -534,10 +542,10 @@ public final class WorldBinderConfigScreen extends Screen {
         int numericGap = Math.max(18, Math.min(28, (fullW - numericW * 3) / 2));
         label(c, x, y + 34, "worldbinder.gui.archive_name");
         label(c, x, y + 86, "worldbinder.gui.target_output_version");
-        clippedLabel(c, x, y + 150, numericW + 8, "worldbinder.config.radius");
-        clippedLabel(c, x + numericW + numericGap, y + 150, numericW, "worldbinder.config.y_min");
-        clippedLabel(c, x + (numericW + numericGap) * 2, y + 150, numericW, "worldbinder.config.y_max");
-        wrapped(c, x, y + 312, w, "worldbinder.config.target_value", WorldBinder.config().targetVersionLabel());
+        clippedLabel(c, x, y + 150, numericW, "worldbinder.config.radius");
+        clippedLabel(c, x + numericW + numericGap + 8, y + 150, numericW, "worldbinder.config.y_min");
+        clippedLabel(c, x + (numericW + numericGap) * 2 + 8, y + 150, numericW, "worldbinder.config.y_max");
+        wrapped(c, x, y + 128, w, "worldbinder.config.target_value", WorldBinder.config().targetVersionLabel());
     }
 
     private void drawPerformanceLabels(GuiGraphicsExtractor c, int x, int y, int w) {

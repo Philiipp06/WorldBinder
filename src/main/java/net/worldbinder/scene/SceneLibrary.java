@@ -838,14 +838,10 @@ public final class SceneLibrary {
                 }
             }
             if (latest.isPresent()) {
-                Path resourcePacks = worldFolder.resolve("resourcepacks");
-                Files.createDirectories(resourcePacks);
-                Files.copy(latest.get(), resourcePacks.resolve("resources.zip"), StandardCopyOption.REPLACE_EXISTING);
                 Files.copy(latest.get(), worldFolder.resolve("resources.zip"), StandardCopyOption.REPLACE_EXISTING);
                 Files.writeString(worldFolder.resolve("WORLD_BINDER_RESOURCEPACK.txt"),
                         "WorldBinder copied the newest detected server/resource pack cache into this save.\n" +
-                        "Minecraft looks for a per-world pack at resources.zip, so the pack is also mirrored there.\n" +
-                        "A second copy stays in resourcepacks/resources.zip for manual inspection.\n" +
+                        "Minecraft looks for a per-world pack at resources.zip in the world root.\n" +
                         "Source: " + latest.get().toAbsolutePath() + "\n" +
                         "If this is the wrong pack, replace resources.zip manually with the server pack you want.\n");
             }

@@ -312,10 +312,7 @@
   "worldbinder.hint.stable": "Everything looks stable",
   "worldbinder.hud.downloading": "Downloading world",
   "worldbinder.legal.cancel.tooltip": "Return without starting capture.",
-  "worldbinder.legal.dont_show": "Don't show again",
-  "worldbinder.legal.dont_show.tooltip": "Hide this reminder for future capture starts. The capture-name prompt will still be shown.",
-  "worldbinder.legal.header": "◆ WorldBinder Capture Setup",
-  "worldbinder.legal.hidden": "Legal reminder hidden. Full permitted-use notice is still available in F9 → About.",
+  "worldbinder.legal.header": "Capture responsibly",
   "worldbinder.legal.notice_1": "Only capture servers, worlds or maps you own or where you have explicit permission.",
   "worldbinder.legal.notice_2": "Do not copy, redistribute or extract third-party builds, maps, resource packs or protected content without permission.",
   "worldbinder.legal.notice_3": "Full legal notice: F9 → About. This reminder does not block legitimate use.",
@@ -678,5 +675,7 @@
   "worldbinder.tooltip.config.hot_chunks": "How many nearby visible chunks are prioritized per tick.",
   "worldbinder.tooltip.config.capture_ms": "Time budget for block/chunk capture work.",
   "worldbinder.tooltip.config.ui_ms": "Time budget for UI, map and HUD refresh work.",
-  "worldbinder.tooltip.config.archive_ms": "Time budget for archive/export background work."
+  "worldbinder.tooltip.config.archive_ms": "Time budget for archive/export background work.",
+  "worldbinder.legal.short_notice": "Only capture worlds, servers, maps, builds and resource packs you own or have explicit permission to archive. You are responsible for permitted use.",
+  "worldbinder.legal.about_location": "Full legal details are available under F9 → About."
 }

@@ -1,10 +1,23 @@
-# WorldBinder Alpha 1.0
+# WorldBinder Alpha V2
 
-**Client-side world capture, archive, preview and validation for Minecraft Java / Fabric.**
+**Client-side world capture, archive, preview, validation and target-version export for Minecraft Java / Fabric.**
 
 WorldBinder helps you archive client-visible world data, manage interrupted sessions and export local world folders for review, backup or permitted offline use. It is built for Minecraft **26.1.2** and designed around a clear in-game control center instead of command-heavy workflows.
 
 > **Alpha notice:** this is an early testing release. Capture, recovery, validation and export workflows are available, but exported worlds can still require checking and may not perfectly match server-side data.
+
+---
+
+
+## Feedback and Bug Reports
+
+Found a bug, export issue, missing translation or have an idea for WorldBinder?
+
+Please report it on GitHub:
+- Repository: https://github.com/Philiipp06/WorldBinder
+- Issues: https://github.com/Philiipp06/WorldBinder/issues
+
+Include your Minecraft version, WorldBinder version, selected target output version, screenshots/logs and a short description of what happened.
 
 ---
 

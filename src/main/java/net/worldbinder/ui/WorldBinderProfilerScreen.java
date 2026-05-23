@@ -17,6 +17,8 @@ import java.util.Map;
 
 public final class WorldBinderProfilerScreen extends Screen {
     private final Screen parent;
+    private int scrollOffset;
+    private int maxScroll;
 
     public WorldBinderProfilerScreen(Screen parent) {
         super(Lang.text("worldbinder.profiler.title"));
@@ -43,6 +45,16 @@ public final class WorldBinderProfilerScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (maxScroll <= 0) {
+            return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        }
+        int before = scrollOffset;
+        scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + (verticalAmount < 0 ? 28 : -28)));
+        return before != scrollOffset || super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         context.fill(0, 0, width, height, 0xF005050C);
         int panelW = Math.max(240, Math.min(860, width - 24));
@@ -55,19 +67,24 @@ public final class WorldBinderProfilerScreen extends Screen {
 
         SceneCaptureService capture = WorldBinderClient.capture();
         boolean narrow = panelW < 560;
+        int contentH = narrow ? 570 : 390;
+        int visibleH = Math.max(120, panelH - 94);
+        maxScroll = Math.max(0, contentH - visibleH);
+        scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+        int contentTop = top + 64 - scrollOffset;
         int cardW = narrow ? panelW - 52 : (panelW - 78) / 2;
-        drawCard(context, left + 26, top + 64, cardW, 164, Lang.string("worldbinder.profiler.live_capture"));
-        line(context, left + 44, top + 96, Lang.string("worldbinder.profiler.mode"), capture.modeName());
-        line(context, left + 44, top + 118, Lang.string("worldbinder.profiler.blocks"), Integer.toString(capture.capturedBlocks()));
-        line(context, left + 44, top + 140, Lang.string("worldbinder.profiler.entities"), Integer.toString(capture.capturedEntities()));
-        line(context, left + 44, top + 162, Lang.string("worldbinder.profiler.chunks"), Lang.string("worldbinder.profiler.chunks_value", capture.scannedChunks(), capture.partialChunks(), capture.queuedChunks()));
-        line(context, left + 44, top + 184, Lang.string("worldbinder.profiler.queue_eta"), capture.estimatedFinishText() + "");
-        line(context, left + 44, top + 206, Lang.string("worldbinder.profiler.throttle"), capture.adaptiveThrottlePercent() + "%");
+        drawCard(context, left + 26, contentTop, cardW, 164, Lang.string("worldbinder.profiler.live_capture"));
+        line(context, left + 44, contentTop + 32, Lang.string("worldbinder.profiler.mode"), capture.modeName());
+        line(context, left + 44, contentTop + 54, Lang.string("worldbinder.profiler.blocks"), Integer.toString(capture.capturedBlocks()));
+        line(context, left + 44, contentTop + 76, Lang.string("worldbinder.profiler.entities"), Integer.toString(capture.capturedEntities()));
+        line(context, left + 44, contentTop + 98, Lang.string("worldbinder.profiler.chunks"), Lang.string("worldbinder.profiler.chunks_value", capture.scannedChunks(), capture.partialChunks(), capture.queuedChunks()));
+        line(context, left + 44, contentTop + 120, Lang.string("worldbinder.profiler.queue_eta"), capture.estimatedFinishText() + "");
+        line(context, left + 44, contentTop + 142, Lang.string("worldbinder.profiler.throttle"), capture.adaptiveThrottlePercent() + "%");
 
         StorageProgress progress = StorageFlow.progress();
-        drawCard(context, narrow ? left + 26 : left + 52 + cardW, narrow ? top + 238 : top + 64, cardW, 164, Lang.string("worldbinder.profiler.storage_flow"));
+        drawCard(context, narrow ? left + 26 : left + 52 + cardW, narrow ? contentTop + 174 : contentTop, cardW, 164, Lang.string("worldbinder.profiler.storage_flow"));
         int storageX = narrow ? left + 44 : left + 70 + cardW;
-        int storageY = narrow ? top + 270 : top + 96;
+        int storageY = narrow ? contentTop + 206 : contentTop + 32;
         line(context, storageX, storageY, Lang.string("worldbinder.profiler.stage"), progress.stage().label());
         line(context, storageX, storageY + 22, Lang.string("worldbinder.profiler.detail"), shorten(progress.detail(), 42));
         line(context, storageX, storageY + 44, Lang.string("worldbinder.profiler.progress"), (int) (progress.progress() * 100.0D) + "%");
@@ -75,9 +92,9 @@ public final class WorldBinderProfilerScreen extends Screen {
         line(context, storageX, storageY + 88, Lang.string("worldbinder.profiler.completed"), Integer.toString(StorageProfiler.completedJobs()));
         line(context, storageX, storageY + 110, Lang.string("worldbinder.profiler.failed"), Integer.toString(StorageProfiler.failedJobs()));
 
-        drawCard(context, left + 26, narrow ? top + 412 : top + 246, panelW - 52, Math.max(110, panelH - (narrow ? 430 : 260)), Lang.string("worldbinder.profiler.stage_timings"));
+        drawCard(context, left + 26, narrow ? contentTop + 348 : contentTop + 182, panelW - 52, Math.max(110, panelH - (narrow ? 430 : 260)), Lang.string("worldbinder.profiler.stage_timings"));
         int x = left + 44;
-        int y = narrow ? top + 444 : top + 278;
+        int y = narrow ? contentTop + 380 : contentTop + 214;
         Map<StorageStage, Long> times = StorageProfiler.stageTimesSnapshot();
         long max = 1L;
         for (Long value : times.values()) max = Math.max(max, value == null ? 0L : value);

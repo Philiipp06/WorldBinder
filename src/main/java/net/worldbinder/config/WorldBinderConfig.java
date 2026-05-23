@@ -40,20 +40,20 @@ public final class WorldBinderConfig {
     }
 
     public PerformancePreset performancePreset = PerformancePreset.BALANCED;
-    public int blocksPerTick = 512;
-    public int commandsPerTick = 64;
-    public int tickBudgetMillis = 2;
-    public int chunkQueueLimit = 64;
-    public int newChunksPerTick = 1;
-    public int hotChunksPerTick = 0;
+    public int blocksPerTick = 65536;
+    public int commandsPerTick = 512;
+    public int tickBudgetMillis = 18;
+    public int chunkQueueLimit = 1024;
+    public int newChunksPerTick = 8;
+    public int hotChunksPerTick = 3;
     public int roamingRadiusChunks = 5;
     public int visibleChunkPriorityRadius = 2;
-    public int customBlocksPerTick = 512;
-    public int customCommandsPerTick = 64;
-    public int customTickBudgetMillis = 2;
-    public int customChunkQueueLimit = 64;
-    public int customNewChunksPerTick = 1;
-    public int customHotChunksPerTick = 0;
+    public int customBlocksPerTick = 65536;
+    public int customCommandsPerTick = 512;
+    public int customTickBudgetMillis = 18;
+    public int customChunkQueueLimit = 1024;
+    public int customNewChunksPerTick = 8;
+    public int customHotChunksPerTick = 3;
     public int customRoamingRadiusChunks = 5;
     public int customVisibleChunkPriorityRadius = 2;
     public boolean showLegalStartReminder = true;
@@ -65,7 +65,7 @@ public final class WorldBinderConfig {
     public boolean adaptivePerformance = true;
     public boolean adaptiveThrottle = true;
     public int maxUiWorkMs = 4;
-    public int maxCaptureWorkMs = 3;
+    public int maxCaptureWorkMs = 8;
     public int maxArchiveWorkMs = 12;
     public boolean serverSafetyMode = true;
     public boolean autoSaveOnDisconnect = true;
@@ -145,61 +145,61 @@ public final class WorldBinderConfig {
 
     public int effectiveBlocksPerTick() {
         return switch (performancePreset) {
-            case SAFE -> 256;
-            case BALANCED -> 512;
-            case FAST -> 2048;
-            case EXTREME -> 4096;
+            case SAFE -> 8192;
+            case BALANCED -> 65536;
+            case FAST -> 262144;
+            case EXTREME -> Integer.MAX_VALUE;
             case CUSTOM -> blocksPerTick < 0 ? Integer.MAX_VALUE : blocksPerTick;
         };
     }
 
     public int effectiveCommandsPerTick() {
         return switch (performancePreset) {
-            case SAFE -> 8;
-            case BALANCED -> 96;
-            case FAST -> 768;
-            case EXTREME -> 4096;
+            case SAFE -> 64;
+            case BALANCED -> 512;
+            case FAST -> 2048;
+            case EXTREME -> Integer.MAX_VALUE;
             case CUSTOM -> commandsPerTick < 0 ? Integer.MAX_VALUE : commandsPerTick;
         };
     }
 
     public int effectiveTickBudgetMillis() {
         return switch (performancePreset) {
-            case SAFE -> 1;
-            case BALANCED -> 2;
-            case FAST -> 4;
-            case EXTREME -> 8;
+            case SAFE -> 6;
+            case BALANCED -> 18;
+            case FAST -> 40;
+            case EXTREME -> 90;
             case CUSTOM -> tickBudgetMillis < 0 ? 250 : tickBudgetMillis;
         };
     }
 
     public int effectiveNewChunksPerTick() {
         return switch (performancePreset) {
-            case SAFE -> 1;
-            case BALANCED -> 1;
-            case FAST -> 2;
-            case EXTREME -> 3;
-            case CUSTOM -> newChunksPerTick < 0 ? 3 : newChunksPerTick;
+            case SAFE -> 4;
+            case BALANCED -> 8;
+            case FAST -> 16;
+            case EXTREME -> 32;
+            case CUSTOM -> newChunksPerTick < 0 ? 32 : newChunksPerTick;
         };
     }
 
     public int effectiveHotChunksPerTick() {
         return switch (performancePreset) {
-            case SAFE -> 0;
-            case BALANCED -> 0;
-            case FAST -> 0;
-            case EXTREME -> 1;
-            case CUSTOM -> hotChunksPerTick < 0 ? 1 : hotChunksPerTick;
+            case SAFE -> 1;
+            case BALANCED -> 3;
+            case FAST -> 6;
+            case EXTREME -> 12;
+            case CUSTOM -> hotChunksPerTick < 0 ? 12 : hotChunksPerTick;
         };
     }
 
     public int effectiveChunkQueueLimit() {
         return switch (performancePreset) {
-            case SAFE -> 32;
-            case BALANCED -> 64;
-            case FAST -> 128;
-            case EXTREME -> 256;
-            case CUSTOM -> chunkQueueLimit < 0 ? 256 : chunkQueueLimit;
+            case SAFE -> 256;
+            case BALANCED -> 1024;
+            case FAST -> 4096;
+            case EXTREME -> 16384;
+            case CUSTOM -> chunkQueueLimit < 0 ? 16384 : chunkQueueLimit;
         };
     }
 
@@ -334,45 +334,45 @@ public final class WorldBinderConfig {
 
     private void applyPresetValues(PerformancePreset preset) {
         blocksPerTick = switch (preset) {
-            case SAFE -> 256;
-            case BALANCED -> 512;
-            case FAST -> 2048;
-            case EXTREME -> 4096;
+            case SAFE -> 8192;
+            case BALANCED -> 65536;
+            case FAST -> 262144;
+            case EXTREME -> -1;
             case CUSTOM -> customBlocksPerTick;
         };
         commandsPerTick = switch (preset) {
-            case SAFE -> 8;
-            case BALANCED -> 96;
-            case FAST -> 768;
-            case EXTREME -> 4096;
+            case SAFE -> 64;
+            case BALANCED -> 512;
+            case FAST -> 2048;
+            case EXTREME -> -1;
             case CUSTOM -> customCommandsPerTick;
         };
         tickBudgetMillis = switch (preset) {
-            case SAFE -> 1;
-            case BALANCED -> 2;
-            case FAST -> 4;
-            case EXTREME -> 8;
+            case SAFE -> 6;
+            case BALANCED -> 18;
+            case FAST -> 40;
+            case EXTREME -> 90;
             case CUSTOM -> customTickBudgetMillis;
         };
         newChunksPerTick = switch (preset) {
-            case SAFE -> 1;
-            case BALANCED -> 1;
-            case FAST -> 2;
-            case EXTREME -> 3;
+            case SAFE -> 4;
+            case BALANCED -> 8;
+            case FAST -> 16;
+            case EXTREME -> 32;
             case CUSTOM -> customNewChunksPerTick;
         };
         hotChunksPerTick = switch (preset) {
-            case SAFE -> 0;
-            case BALANCED -> 0;
-            case FAST -> 0;
-            case EXTREME -> 1;
+            case SAFE -> 1;
+            case BALANCED -> 3;
+            case FAST -> 6;
+            case EXTREME -> 12;
             case CUSTOM -> customHotChunksPerTick;
         };
         chunkQueueLimit = switch (preset) {
-            case SAFE -> 32;
-            case BALANCED -> 64;
-            case FAST -> 128;
-            case EXTREME -> 256;
+            case SAFE -> 256;
+            case BALANCED -> 1024;
+            case FAST -> 4096;
+            case EXTREME -> 16384;
             case CUSTOM -> customChunkQueueLimit;
         };
         roamingRadiusChunks = switch (preset) {

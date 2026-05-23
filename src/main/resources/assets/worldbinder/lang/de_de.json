@@ -312,10 +312,7 @@
   "worldbinder.hint.stable": "Alles wirkt stabil",
   "worldbinder.hud.downloading": "World-Download läuft",
   "worldbinder.legal.cancel.tooltip": "Zurück ohne Capture zu starten.",
-  "worldbinder.legal.dont_show": "Nicht mehr anzeigen",
-  "worldbinder.legal.dont_show.tooltip": "Blendet diese Erinnerung künftig aus. Der Archivname wird weiterhin abgefragt.",
-  "worldbinder.legal.header": "◆ WorldBinder Capture Setup",
-  "worldbinder.legal.hidden": "Rechtliche Erinnerung ausgeblendet. Der Nutzungshinweis bleibt unter F9 → Info verfügbar.",
+  "worldbinder.legal.header": "Verantwortungsvoll capturen",
   "worldbinder.legal.notice_1": "Capture nur Server, Welten oder Maps, die dir gehören oder für die du eine ausdrückliche Erlaubnis hast.",
   "worldbinder.legal.notice_2": "Kopiere, verteile oder extrahiere keine fremden Builds, Maps, Resourcepacks oder geschützten Inhalte ohne Erlaubnis.",
   "worldbinder.legal.notice_3": "Vollständiger Hinweis: F9 → Info. Diese Erinnerung blockiert legitime Nutzung nicht.",
@@ -678,5 +675,7 @@
   "worldbinder.tooltip.config.hot_chunks": "Wie viele nahe, sichtbare Chunks pro Tick bevorzugt werden.",
   "worldbinder.tooltip.config.capture_ms": "Zeitbudget für Block- und Chunk-Capture.",
   "worldbinder.tooltip.config.ui_ms": "Zeitbudget für UI-, Map- und HUD-Aktualisierungen.",
-  "worldbinder.tooltip.config.archive_ms": "Zeitbudget für Archiv- und Export-Arbeit im Hintergrund."
+  "worldbinder.tooltip.config.archive_ms": "Zeitbudget für Archiv- und Export-Arbeit im Hintergrund.",
+  "worldbinder.legal.short_notice": "Capture nur Welten, Server, Maps, Builds und Resourcepacks, die dir gehören oder für die du ausdrücklich die Erlaubnis hast. Du bist für die erlaubte Nutzung verantwortlich.",
+  "worldbinder.legal.about_location": "Den vollständigen Rechtshinweis findest du unter F9 → About."
 }
