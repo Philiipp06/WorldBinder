@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "worldbinder",
+  "version": "${version}",
+  "name": "WorldBinder",
+  "description": "WorldBinder Alpha 1.0 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery and export validation.",
+  "authors": [
+    "Philiipp06"
+  ],
+  "contact": {
+    "homepage": "https://github.com/Philiipp06/WorldBinder/releases",
+    "sources": "https://github.com/Philiipp06/WorldBinder",
+    "issues": "https://github.com/Philiipp06/WorldBinder/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/worldbinder/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "net.worldbinder.client.WorldBinderClient"
+    ],
+    "modmenu": [
+      "net.worldbinder.integration.WorldBinderModMenu"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.2",
+    "minecraft": "~26.1.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": ">=18.0.0-alpha.8"
+  },
+  "mixins": [
+    "worldbinder.mixins.json"
+  ],
+  "custom": {
+    "modmenu": {
+      "links": {
+        "Website": "https://github.com/Philiipp06/WorldBinder/releases",
+        "Source": "https://github.com/Philiipp06/WorldBinder",
+        "Issues": "https://github.com/Philiipp06/WorldBinder/issues"
+      }
+    }
+  }
+}
