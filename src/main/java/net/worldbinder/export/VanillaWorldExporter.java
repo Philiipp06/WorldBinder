@@ -53,13 +53,13 @@ public final class VanillaWorldExporter {
 
     public static ExportResult export(WorldScene scene, Path worldFolder, StorageProgress progress) throws IOException {
         Files.createDirectories(worldFolder);
-        Path overworldFolder = overworldFolder(worldFolder);
-        Path regionFolder = overworldFolder.resolve("region");
-        Path entityFolder = overworldFolder.resolve("entities");
-        Path poiFolder = overworldFolder.resolve("poi");
-        Files.createDirectories(regionFolder);
-        Files.createDirectories(entityFolder);
-        Files.createDirectories(poiFolder);
+        TargetMinecraftVersion.Entry target = targetVersion(scene);
+        List<Path> regionFolders = regionFolders(worldFolder, target);
+        List<Path> entityFolders = target.usesSeparateEntityRegionFiles() ? entityFolders(worldFolder, target) : List.of();
+        List<Path> poiFolders = target.usesPoiRegionFiles() ? poiFolders(worldFolder, target) : List.of();
+        for (Path folder : regionFolders) Files.createDirectories(folder);
+        for (Path folder : entityFolders) Files.createDirectories(folder);
+        for (Path folder : poiFolders) Files.createDirectories(folder);
         Files.createDirectories(worldFolder.resolve("data").resolve("minecraft"));
 
         if (progress != null) progress.update(StorageStage.VANILLA_WORLD, "Collecting captured chunks", 0.20D);
@@ -75,21 +75,27 @@ public final class VanillaWorldExporter {
         RegionStorageInfo entityKey = new RegionStorageInfo("worldbinder", Level.OVERWORLD, "entities");
         RegionStorageInfo poiKey = new RegionStorageInfo("worldbinder", Level.OVERWORLD, "poi");
 
-        try (RegionWriter regionWriter = new RegionWriter(regionKey, regionFolder);
-             RegionWriter entityWriter = new RegionWriter(entityKey, entityFolder);
-             RegionWriter poiWriter = new RegionWriter(poiKey, poiFolder)) {
+        List<RegionWriter> regionWriters = openWriters(regionKey, regionFolders);
+        List<RegionWriter> entityWriters = openWriters(entityKey, entityFolders);
+        List<RegionWriter> poiWriters = openWriters(poiKey, poiFolders);
+        try {
             int written = 0;
             int total = Math.max(1, chunks.size());
             for (ChunkBuilder chunk : chunks.values()) {
-                regionWriter.write(chunk.pos(), chunk.toChunkNbt(scene));
-                entityWriter.write(chunk.pos(), chunk.toEntitiesNbt(scene));
-                poiWriter.write(chunk.pos(), chunk.toPoiNbt(scene));
+                CompoundTag chunkNbt = chunk.toChunkNbt(scene);
+                CompoundTag entityNbt = target.usesSeparateEntityRegionFiles() ? chunk.toEntitiesNbt(scene) : null;
+                CompoundTag poiNbt = target.usesPoiRegionFiles() ? chunk.toPoiNbt(scene) : null;
+                writeAll(regionWriters, chunk.pos(), chunkNbt);
+                if (entityNbt != null) writeAll(entityWriters, chunk.pos(), entityNbt);
+                if (poiNbt != null) writeAll(poiWriters, chunk.pos(), poiNbt);
                 written++;
                 if (progress != null && (written == total || written % 16 == 0)) {
                     double ratio = written / (double) total;
                     progress.update(StorageStage.VANILLA_WORLD, "Writing overworld chunks " + written + " / " + total, 0.30D + ratio * 0.36D);
                 }
             }
+        } finally {
+            closeAll(regionWriters, entityWriters, poiWriters);
         }
 
         writeWorldBinderInfo(scene, worldFolder, chunks.size());
@@ -98,6 +104,72 @@ public final class VanillaWorldExporter {
 
     public static Path overworldFolder(Path worldFolder) {
         return worldFolder;
+    }
+
+    private static Path modernOverworldFolder(Path worldFolder) {
+        return worldFolder.resolve("dimensions").resolve("minecraft").resolve("overworld");
+    }
+
+    private static List<Path> regionFolders(Path worldFolder, TargetMinecraftVersion.Entry target) {
+        List<Path> folders = new ArrayList<>();
+        folders.add(worldFolder.resolve("region"));
+        if (target.usesModernDimensionFolders()) {
+            folders.add(modernOverworldFolder(worldFolder).resolve("region"));
+        }
+        return folders;
+    }
+
+    private static List<Path> entityFolders(Path worldFolder, TargetMinecraftVersion.Entry target) {
+        List<Path> folders = new ArrayList<>();
+        folders.add(worldFolder.resolve("entities"));
+        if (target.usesModernDimensionFolders()) {
+            folders.add(modernOverworldFolder(worldFolder).resolve("entities"));
+        }
+        return folders;
+    }
+
+    private static List<Path> poiFolders(Path worldFolder, TargetMinecraftVersion.Entry target) {
+        List<Path> folders = new ArrayList<>();
+        folders.add(worldFolder.resolve("poi"));
+        if (target.usesModernDimensionFolders()) {
+            folders.add(modernOverworldFolder(worldFolder).resolve("poi"));
+        }
+        return folders;
+    }
+
+    private static List<RegionWriter> openWriters(RegionStorageInfo info, List<Path> folders) throws IOException {
+        List<RegionWriter> writers = new ArrayList<>();
+        for (Path folder : folders) {
+            writers.add(new RegionWriter(info, folder));
+        }
+        return writers;
+    }
+
+    private static void writeAll(List<RegionWriter> writers, ChunkPos pos, CompoundTag tag) throws IOException {
+        for (RegionWriter writer : writers) {
+            writer.write(pos, tag);
+        }
+    }
+
+    @SafeVarargs
+    private static void closeAll(List<RegionWriter>... writerLists) throws IOException {
+        IOException first = null;
+        for (List<RegionWriter> writers : writerLists) {
+            for (RegionWriter writer : writers) {
+                try {
+                    writer.close();
+                } catch (IOException exception) {
+                    if (first == null) {
+                        first = exception;
+                    } else {
+                        first.addSuppressed(exception);
+                    }
+                }
+            }
+        }
+        if (first != null) {
+            throw first;
+        }
     }
 
     private static Map<ChunkKey, ChunkBuilder> collectChunks(WorldScene scene) {
@@ -583,6 +655,9 @@ public final class VanillaWorldExporter {
             chunk.put("fluid_ticks", new ListTag());
             chunk.put("PostProcessing", new ListTag());
             chunk.put("structures", structuresNbt());
+            if (!targetVersion(scene).usesSeparateEntityRegionFiles()) {
+                chunk.put("Entities", embeddedEntitiesNbt(scene));
+            }
             return chunk;
         }
 
@@ -598,6 +673,14 @@ public final class VanillaWorldExporter {
             ListTag list = new ListTag();
             for (CompoundTag blockEntity : blockEntities) {
                 list.add(blockEntity);
+            }
+            return list;
+        }
+
+        private ListTag embeddedEntitiesNbt(WorldScene scene) {
+            ListTag list = new ListTag();
+            for (EntityRecord entity : entities) {
+                list.add(normalizedEntityNbt(scene, entity));
             }
             return list;
         }

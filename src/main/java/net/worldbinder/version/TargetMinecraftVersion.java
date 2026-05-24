@@ -41,6 +41,18 @@ public final class TargetMinecraftVersion {
         public boolean supportsModernItemComponents() {
             return effectiveDataVersion() >= 3837;
         }
+
+        public boolean usesModernDimensionFolders() {
+            return profile == GenerationProfile.CURRENT_26;
+        }
+
+        public boolean usesSeparateEntityRegionFiles() {
+            return effectiveDataVersion() >= 2724;
+        }
+
+        public boolean usesPoiRegionFiles() {
+            return effectiveDataVersion() >= 1952;
+        }
     }
 
     public static final List<Entry> FINAL_RELEASES = List.of(

@@ -182,6 +182,7 @@ public final class SceneCaptureService {
             Chat.info("Server Safety Mode active: disconnect autosave and placement throttles are enabled.");
         }
         primeLoadedChunkHotCache(client);
+        captureNearbyEntities(client, true);
     }
 
     public void finishActiveCapture() {
@@ -1979,7 +1980,7 @@ public final class SceneCaptureService {
                         center.x - radiusBlocks, WorldBinder.config().effectiveCaptureMinY(), center.z - radiusBlocks,
                         center.x + radiusBlocks, WorldBinder.config().effectiveCaptureMaxY(), center.z + radiusBlocks
                 ),
-                entity -> entity.isAlive() && (WorldBinder.config().includeEntityPlayers || !(entity instanceof Player))
+                entity -> isEntityExportCandidate(entity) && (WorldBinder.config().includeEntityPlayers || !(entity instanceof Player))
         );
         for (Entity entity : entities) {
             if (capturedEntityIds.add(entity.getId()) || roamingCapture) {
@@ -1990,6 +1991,23 @@ public final class SceneCaptureService {
                 }
             }
         }
+    }
+
+
+    private boolean isEntityExportCandidate(Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        if (entity.isAlive()) {
+            return true;
+        }
+        String type = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
+        return type.equals("minecraft:block_display")
+                || type.equals("minecraft:item_display")
+                || type.equals("minecraft:text_display")
+                || type.equals("minecraft:interaction")
+                || type.equals("minecraft:armor_stand")
+                || type.endsWith("display");
     }
 
     private void captureEntity(Entity entity) {
