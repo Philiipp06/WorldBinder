@@ -18,6 +18,12 @@ public final class WorldScene {
     public int originX;
     public int originY;
     public int originZ;
+    public boolean hasPlayerSpawn;
+    public double playerSpawnX;
+    public double playerSpawnY;
+    public double playerSpawnZ;
+    public float playerSpawnYaw;
+    public float playerSpawnPitch;
     public int sizeX;
     public int sizeY;
     public int sizeZ;

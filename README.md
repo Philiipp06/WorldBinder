@@ -108,4 +108,4 @@ WorldBinder stores captures, recoveries and exports in the mod data folder insid
 
 ## Release Status
 
-Alpha 2.0 is intended for testing, feedback and validation. Expect edge cases with unusual servers, modded clients, older target versions, heavy entity scenes and large captures.
+Alpha 1.0 is intended for testing, feedback and validation. Expect edge cases with unusual servers, modded clients, older target versions, heavy entity scenes and large captures.

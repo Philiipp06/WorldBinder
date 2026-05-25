@@ -366,6 +366,12 @@ public final class SceneLibrary {
         copy.originX = source.originX;
         copy.originY = source.originY;
         copy.originZ = source.originZ;
+        copy.hasPlayerSpawn = source.hasPlayerSpawn;
+        copy.playerSpawnX = source.playerSpawnX;
+        copy.playerSpawnY = source.playerSpawnY;
+        copy.playerSpawnZ = source.playerSpawnZ;
+        copy.playerSpawnYaw = source.playerSpawnYaw;
+        copy.playerSpawnPitch = source.playerSpawnPitch;
         copy.sizeX = source.sizeX;
         copy.sizeY = source.sizeY;
         copy.sizeZ = source.sizeZ;

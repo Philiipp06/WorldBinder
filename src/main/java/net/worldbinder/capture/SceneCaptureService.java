@@ -907,6 +907,8 @@ public final class SceneCaptureService {
             return;
         }
 
+        updatePlayerSpawn(client.player);
+
         maybeApplyMemoryGuard();
 
         if (paused && !finishing) {
@@ -932,6 +934,7 @@ public final class SceneCaptureService {
         if (finishing && pendingBlocks.isEmpty() && pendingChunkKeys.isEmpty() && activeScanCursors.isEmpty()) {
             flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
+            updatePlayerSpawn(client.player);
             saveActiveSceneAsync();
         } else {
             OperationStatus.update(statusLine(), progress());
@@ -993,6 +996,7 @@ public final class SceneCaptureService {
         activeScene.originX = activeOrigin.getX();
         activeScene.originY = activeOrigin.getY();
         activeScene.originZ = activeOrigin.getZ();
+        updatePlayerSpawn(client.player);
         activeScene.sizeX = 0;
         activeScene.sizeY = 0;
         activeScene.sizeZ = 0;
@@ -1034,6 +1038,18 @@ public final class SceneCaptureService {
         clearActiveScans();
     }
 
+
+    private void updatePlayerSpawn(Player player) {
+        if (activeScene == null || player == null) {
+            return;
+        }
+        activeScene.hasPlayerSpawn = true;
+        activeScene.playerSpawnX = player.getX();
+        activeScene.playerSpawnY = player.getY();
+        activeScene.playerSpawnZ = player.getZ();
+        activeScene.playerSpawnYaw = player.getYRot();
+        activeScene.playerSpawnPitch = player.getXRot();
+    }
 
     private String readGameRulesNbt(Minecraft client) {
         if (!WorldBinder.config().exportGameRules) {
@@ -2117,6 +2133,12 @@ public final class SceneCaptureService {
         copy.originX = source.originX;
         copy.originY = source.originY;
         copy.originZ = source.originZ;
+        copy.hasPlayerSpawn = source.hasPlayerSpawn;
+        copy.playerSpawnX = source.playerSpawnX;
+        copy.playerSpawnY = source.playerSpawnY;
+        copy.playerSpawnZ = source.playerSpawnZ;
+        copy.playerSpawnYaw = source.playerSpawnYaw;
+        copy.playerSpawnPitch = source.playerSpawnPitch;
         copy.sizeX = source.sizeX;
         copy.sizeY = source.sizeY;
         copy.sizeZ = source.sizeZ;

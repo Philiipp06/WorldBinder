@@ -255,10 +255,11 @@ public final class VanillaWorldExporter {
         data.putByte("Difficulty", (byte) 2);
         data.putBoolean("DifficultyLocked", false);
         data.putInt("GameType", 1);
-        data.putInt("SpawnX", scene.originX);
-        data.putInt("SpawnY", Math.max(-64, scene.originY));
-        data.putInt("SpawnZ", scene.originZ);
-        data.putFloat("SpawnAngle", 0.0F);
+        SpawnLocation spawn = spawnLocation(scene, targetVersion);
+        data.putInt("SpawnX", spawn.blockX());
+        data.putInt("SpawnY", spawn.blockY());
+        data.putInt("SpawnZ", spawn.blockZ());
+        data.putFloat("SpawnAngle", spawn.yaw());
         data.putInt("clearWeatherTime", 0);
         data.putInt("rainTime", 0);
         data.putInt("thunderTime", 0);
@@ -472,21 +473,114 @@ public final class VanillaWorldExporter {
         return dataPacks;
     }
 
+    private record SpawnLocation(double x, double y, double z, float yaw, float pitch) {
+        int blockX() {
+            return (int) Math.floor(x);
+        }
+
+        int blockY() {
+            return (int) Math.floor(y);
+        }
+
+        int blockZ() {
+            return (int) Math.floor(z);
+        }
+    }
+
+    private static SpawnLocation spawnLocation(WorldScene scene, TargetMinecraftVersion.Entry targetVersion) {
+        double x = scene.hasPlayerSpawn ? scene.playerSpawnX : scene.originX + 0.5D;
+        double y = scene.hasPlayerSpawn ? scene.playerSpawnY : scene.originY + 1.0D;
+        double z = scene.hasPlayerSpawn ? scene.playerSpawnZ : scene.originZ + 0.5D;
+        float yaw = scene.hasPlayerSpawn ? scene.playerSpawnYaw : 0.0F;
+        float pitch = scene.hasPlayerSpawn ? scene.playerSpawnPitch : 0.0F;
+
+        y = clampSpawnY(y, targetVersion);
+        SpawnLocation original = new SpawnLocation(x, y, z, yaw, pitch);
+        SpawnLocation grounded = groundedSpawn(scene, original, targetVersion);
+        return grounded == null ? original : grounded;
+    }
+
+    private static SpawnLocation groundedSpawn(WorldScene scene, SpawnLocation preferred, TargetMinecraftVersion.Entry targetVersion) {
+        if (scene.blocks == null || scene.blocks.isEmpty()) {
+            return null;
+        }
+
+        int targetX = (int) Math.floor(preferred.x()) - scene.originX;
+        int targetZ = (int) Math.floor(preferred.z()) - scene.originZ;
+        int maxBelow = Integer.MIN_VALUE;
+        int maxAny = Integer.MIN_VALUE;
+        int anyX = 0;
+        int anyZ = 0;
+
+        for (BlockRecord block : scene.blocks) {
+            if (block == null || isAirState(block.state)) {
+                continue;
+            }
+            if (block.y > maxAny) {
+                maxAny = block.y;
+                anyX = block.x;
+                anyZ = block.z;
+            }
+            if (block.x == targetX && block.z == targetZ && block.y <= Math.floor(preferred.y())) {
+                maxBelow = Math.max(maxBelow, block.y);
+            }
+        }
+
+        if (maxBelow != Integer.MIN_VALUE) {
+            double safeY = clampSpawnY(scene.originY + maxBelow + 1.0D, targetVersion);
+            return new SpawnLocation(preferred.x(), safeY, preferred.z(), preferred.yaw(), preferred.pitch());
+        }
+
+        if (!scene.hasPlayerSpawn && maxAny != Integer.MIN_VALUE) {
+            double safeX = scene.originX + anyX + 0.5D;
+            double safeY = clampSpawnY(scene.originY + maxAny + 1.0D, targetVersion);
+            double safeZ = scene.originZ + anyZ + 0.5D;
+            return new SpawnLocation(safeX, safeY, safeZ, preferred.yaw(), preferred.pitch());
+        }
+
+        return null;
+    }
+
+    private static boolean isAirState(String state) {
+        if (state == null) {
+            return true;
+        }
+        String value = state.toLowerCase(Locale.ROOT);
+        return value.startsWith("minecraft:air")
+                || value.startsWith("minecraft:void_air")
+                || value.startsWith("minecraft:cave_air");
+    }
+
+    private static double clampSpawnY(double y, TargetMinecraftVersion.Entry targetVersion) {
+        int min = targetVersion.effectiveDataVersion() >= 2860 ? -63 : 1;
+        int max = targetVersion.effectiveDataVersion() >= 2860 ? 319 : 255;
+        if (Double.isNaN(y) || Double.isInfinite(y)) {
+            return Math.max(64, min);
+        }
+        return Math.max(min, Math.min(max, y));
+    }
+
     private static CompoundTag playerNbt(WorldScene scene) {
+        TargetMinecraftVersion.Entry targetVersion = targetVersion(scene);
+        SpawnLocation spawn = spawnLocation(scene, targetVersion);
+
         CompoundTag player = new CompoundTag();
         ListTag pos = new ListTag();
-        pos.add(DoubleTag.valueOf(scene.originX + 0.5D));
-        pos.add(DoubleTag.valueOf(Math.max(-64, scene.originY + 2.0D)));
-        pos.add(DoubleTag.valueOf(scene.originZ + 0.5D));
+        pos.add(DoubleTag.valueOf(spawn.x()));
+        pos.add(DoubleTag.valueOf(spawn.y()));
+        pos.add(DoubleTag.valueOf(spawn.z()));
         player.put("Pos", pos);
+
         ListTag rotation = new ListTag();
-        rotation.add(FloatTag.valueOf(0.0F));
-        rotation.add(FloatTag.valueOf(0.0F));
+        rotation.add(FloatTag.valueOf(spawn.yaw()));
+        rotation.add(FloatTag.valueOf(spawn.pitch()));
         player.put("Rotation", rotation);
+
         player.putInt("playerGameType", 1);
         player.putShort("Health", (short) 20);
-        player.putFloat("foodLevel", 20.0F);
+        player.putInt("foodLevel", 20);
         player.put("Inventory", new ListTag());
+        player.putBoolean("WorldBinderSpawn", true);
         return player;
     }
 
