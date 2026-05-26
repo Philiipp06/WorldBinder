@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.resources.Identifier;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.capture.SceneCaptureService;
 import net.worldbinder.placement.ScenePlacementService;
@@ -19,6 +20,8 @@ import net.worldbinder.storage.StorageStage;
 import org.lwjgl.glfw.GLFW;
 
 public final class WorldBinderKeybinds {
+    private static final KeyMapping.Category WORLD_BINDER_CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WorldBinder.MOD_ID, WorldBinder.MOD_ID));
+
     private static boolean storagePopupOpenedForCurrentJob;
     private static StorageStage lastStorageStage = StorageStage.IDLE;
 
@@ -30,31 +33,36 @@ public final class WorldBinderKeybinds {
                 "key.worldbinder.open_menu",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_F9,
-                KeyMapping.Category.MISC
+                WORLD_BINDER_CATEGORY,
+                0
         ));
         KeyMapping setFirst = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_1",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_F7,
-                KeyMapping.Category.MISC
+                WORLD_BINDER_CATEGORY,
+                1
         ));
         KeyMapping setSecond = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_2",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_F8,
-                KeyMapping.Category.MISC
+                WORLD_BINDER_CATEGORY,
+                2
         ));
         KeyMapping quickCapture = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.quick_capture_world",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_F6,
-                KeyMapping.Category.MISC
+                WORLD_BINDER_CATEGORY,
+                3
         ));
         KeyMapping openMap = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_map",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_F10,
-                KeyMapping.Category.MISC
+                WORLD_BINDER_CATEGORY,
+                4
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

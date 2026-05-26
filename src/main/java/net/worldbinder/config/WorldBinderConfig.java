@@ -112,6 +112,7 @@ public final class WorldBinderConfig {
     public int radarUpdateRate = 12;
 
     public String defaultArchiveName = "worldbinder_export";
+    public boolean appendTimestampToArchiveName = true;
     public String targetMinecraftVersion = TargetMinecraftVersion.CURRENT;
     public String languageMode = "system";
 

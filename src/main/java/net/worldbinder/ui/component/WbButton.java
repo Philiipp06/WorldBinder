@@ -1,7 +1,6 @@
 package net.worldbinder.ui.component;
 
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 
 public final class WbButton {
@@ -14,10 +13,9 @@ public final class WbButton {
 
     public static Button create(int x, int y, int width, int height, Component label, Component tooltip, Button.OnPress action) {
         int safeWidth = Math.max(34, width);
-        return Button.builder(Component.literal(fitLabel(label.getString(), safeWidth)), action)
+        return WbTooltips.register(Button.builder(Component.literal(fitLabel(label.getString(), safeWidth)), action)
                 .bounds(x, y, safeWidth, Math.max(18, height))
-                .tooltip(Tooltip.create(tooltip))
-                .build();
+                .build(), tooltip);
     }
 
     public static String fitLabel(String label, int width) {

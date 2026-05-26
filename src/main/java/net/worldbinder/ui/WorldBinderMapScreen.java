@@ -4,7 +4,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
@@ -16,6 +15,8 @@ import net.worldbinder.client.WorldBinderClient;
 import net.worldbinder.scene.ChunkSnapshot;
 import net.worldbinder.scene.ChunkCaptureStatus;
 import net.worldbinder.render.ChunkMapTileCache;
+import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbTooltips;
 
 import java.util.Map;
 import java.util.Set;
@@ -65,96 +66,117 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     protected void init() {
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
+            initScaled();
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
+    }
+
+    private void initScaled() {
         missingFilterButton = null;
         incompleteFilterButton = null;
         entitiesFilterButton = null;
         blockEntitiesFilterButton = null;
 
-        int margin = 18;
-        int top = width < 760 ? 58 : 46;
-        int smallGap = 6;
-        int buttonW = width >= 980 ? 86 : 74;
+        int margin = mapOuterMargin();
+        int gap = 6;
+        int top = controlsTop();
+        int rowH = 22;
+        int buttonW = width < 520 ? 64 : width < 760 ? 72 : 82;
         int x = margin;
-        int maxControlRight = width >= 900 ? width - 340 : width - 18;
+        int y = top;
+        int rightLimit = width - margin;
 
-        addRenderableWidget(button(x, top, buttonW, "Follow", Component.literal("Keep the map centered on your current chunk"), b -> followPlayer = true));
-        x += buttonW + smallGap;
-        addRenderableWidget(button(x, top, buttonW, "Player", Component.literal("Jump back to your current chunk"), b -> {
+        Button follow = button(x, y, buttonW, "Follow", Component.literal("Keep the map centered on your current chunk"), b -> followPlayer = true);
+        addRenderableWidget(follow);
+        x += buttonW + gap;
+        Button player = button(x, y, buttonW, "Player", Component.literal("Jump back to your current chunk"), b -> {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
                 panChunkX = mc.player.blockPosition().getX() >> 4;
                 panChunkZ = mc.player.blockPosition().getZ() >> 4;
                 followPlayer = true;
             }
-        }));
-        x += buttonW + smallGap;
-        addRenderableWidget(button(x, top, buttonW, "Origin", Component.literal("Jump to the first captured chunk"), b -> jumpToOrigin()));
-        x += buttonW + smallGap;
-        int viewW = buttonW + 22;
-        if (x + viewW <= maxControlRight) {
-            addRenderableWidget(button(x, top, viewW, "View: " + modeLabel(WorldBinder.config().f10MapLayerMode), Component.literal("Switch between terrain, chunk status and combined view"), b -> {
-                WorldBinder.config().f10MapLayerMode = nextMode(WorldBinder.config().f10MapLayerMode);
-                WorldBinder.config().save();
-                b.setMessage(Component.literal("View: " + modeLabel(WorldBinder.config().f10MapLayerMode)));
-            }));
-            x += viewW + smallGap;
+        });
+        addRenderableWidget(player);
+        x += buttonW + gap;
+        if (x + buttonW > rightLimit) {
+            x = margin;
+            y += rowH + 6;
         }
-        if (x + buttonW + 22 <= maxControlRight) {
-            addRenderableWidget(button(x, top, buttonW + 22, filtersOpen ? "Filters ▲" : "Filters ▼", Component.literal("Open chunk filters"), b -> {
-                filtersOpen = !filtersOpen;
-                rebuildWidgets();
-            }));
-        } else {
-            addRenderableWidget(button(margin, top + 26, buttonW + 22, filtersOpen ? "Filters ▲" : "Filters ▼", Component.literal("Open chunk filters"), b -> {
-                filtersOpen = !filtersOpen;
-                rebuildWidgets();
-            }));
-        }
+        addRenderableWidget(button(x, y, buttonW, "Origin", Component.literal("Jump to the first captured chunk"), b -> jumpToOrigin()));
+        x += buttonW + gap;
 
-        int goY = top;
-        int right = width - 280;
-        if (width >= 900 && right > x + 10) {
-            goX = new EditBox(font, right, goY, 78, 20, Component.literal("Chunk X"));
+        int viewW = Math.min(Math.max(buttonW + 20, 104), Math.max(72, rightLimit - x));
+        if (x + viewW > rightLimit) {
+            x = margin;
+            y += rowH + 6;
+            viewW = Math.min(Math.max(buttonW + 20, 104), rightLimit - x);
+        }
+        addRenderableWidget(button(x, y, viewW, "View: " + modeLabel(WorldBinder.config().f10MapLayerMode), Component.literal("Switch between terrain, chunk status and combined view"), b -> {
+            WorldBinder.config().f10MapLayerMode = nextMode(WorldBinder.config().f10MapLayerMode);
+            WorldBinder.config().save();
+            b.setMessage(Component.literal("View: " + modeLabel(WorldBinder.config().f10MapLayerMode)));
+        }));
+        x += viewW + gap;
+
+        int filterW = Math.min(Math.max(buttonW + 26, 100), Math.max(72, rightLimit - x));
+        if (x + filterW > rightLimit) {
+            x = margin;
+            y += rowH + 6;
+            filterW = Math.min(Math.max(buttonW + 26, 100), rightLimit - x);
+        }
+        addRenderableWidget(button(x, y, filterW, filtersOpen ? "Filters ▲" : "Filters ▼", Component.literal("Open chunk filters"), b -> {
+            filtersOpen = !filtersOpen;
+            rebuildWidgets();
+        }));
+
+        int goY = y;
+        int goW = 68;
+        int goTotalW = goW * 2 + 72 + gap * 2;
+        int goXStart = rightLimit - goTotalW;
+        if (width >= 650 && goXStart > x + filterW + 12) {
+            goX = new EditBox(font, goXStart, goY, goW, 20, Component.literal("Chunk X"));
             goX.setHint(Component.literal("Chunk X"));
-            goZ = new EditBox(font, right + 86, goY, 78, 20, Component.literal("Chunk Z"));
+            goZ = new EditBox(font, goXStart + goW + gap, goY, goW, 20, Component.literal("Chunk Z"));
             goZ.setHint(Component.literal("Chunk Z"));
             addRenderableWidget(goX);
             addRenderableWidget(goZ);
-            addRenderableWidget(button(right + 172, goY, 72, "Go", Component.literal("Jump to chunk X/Z"), b -> jumpToFields()));
-        } else if (width >= 520) {
-            int compactY = top + 26;
-            int compactX = Math.max(margin + 126, width - 280);
-            goX = new EditBox(font, compactX, compactY, 78, 20, Component.literal("Chunk X"));
-            goX.setHint(Component.literal("Chunk X"));
-            goZ = new EditBox(font, compactX + 86, compactY, 78, 20, Component.literal("Chunk Z"));
-            goZ.setHint(Component.literal("Chunk Z"));
-            addRenderableWidget(goX);
-            addRenderableWidget(goZ);
-            addRenderableWidget(button(compactX + 172, compactY, 72, "Go", Component.literal("Jump to chunk X/Z"), b -> jumpToFields()));
+            addRenderableWidget(button(goXStart + goW * 2 + gap * 2, goY, 72, "Go", Component.literal("Jump to chunk X/Z"), b -> jumpToFields()));
         }
 
         if (filtersOpen) {
-            int filterY = mapY() - 32;
-            int fw = width >= 980 ? 124 : 104;
+            int filterY = filterControlsY();
+            int fw = Math.max(82, Math.min(118, (width - margin * 2 - gap * 3) / 4));
             int fx = margin;
             missingFilterButton = filterButton(fx, filterY, fw, "Missing", Component.literal("Only show chunks that are not captured yet"), b -> { filterMissing = !filterMissing; updateFilterButtons(); });
             addRenderableWidget(missingFilterButton);
-            fx += fw + smallGap;
+            fx += fw + gap;
             incompleteFilterButton = filterButton(fx, filterY, fw, "Incomplete", Component.literal("Only show queued, partial or failed chunks"), b -> { filterIncomplete = !filterIncomplete; updateFilterButtons(); });
             addRenderableWidget(incompleteFilterButton);
-            fx += fw + smallGap;
-            entitiesFilterButton = filterButton(fx, filterY, fw, "Entities", Component.literal("Only show chunks containing captured entities"), b -> { filterEntities = !filterEntities; updateFilterButtons(); });
-            addRenderableWidget(entitiesFilterButton);
-            fx += fw + smallGap;
-            if (fx + fw + 24 < width - 18) {
-                blockEntitiesFilterButton = filterButton(fx, filterY, fw + 24, "BlockEntities", Component.literal("Only show chunks containing block entities"), b -> { filterBlockEntities = !filterBlockEntities; updateFilterButtons(); });
+            fx += fw + gap;
+            if (fx + fw <= rightLimit) {
+                entitiesFilterButton = filterButton(fx, filterY, fw, "Entities", Component.literal("Only show chunks containing captured entities"), b -> { filterEntities = !filterEntities; updateFilterButtons(); });
+                addRenderableWidget(entitiesFilterButton);
+                fx += fw + gap;
+            }
+            if (fx + fw <= rightLimit) {
+                blockEntitiesFilterButton = filterButton(fx, filterY, fw, "BlockEntities", Component.literal("Only show chunks containing block entities"), b -> { filterBlockEntities = !filterBlockEntities; updateFilterButtons(); });
                 addRenderableWidget(blockEntitiesFilterButton);
             }
         }
 
-        addRenderableWidget(button(width - 104, height - 30, 86, "Back", Component.literal("Back"), b -> onClose()));
-        addRenderableWidget(button(18, height - 30, 110, "Queue rescan", Component.literal("Rescan selected chunk"), b -> queueSelectedRescan()));
-        addRenderableWidget(button(136, height - 30, 96, "Clear filters", Component.literal("Disable all filters"), b -> clearFilters()));
+        int footerY = Math.max(controlsTop() + 28, height - 30);
+        int footerW = Math.max(78, Math.min(130, (width - margin * 2 - gap * 2) / 3));
+        addRenderableWidget(button(margin, footerY, footerW, "Queue rescan", Component.literal("Rescan selected chunk"), b -> queueSelectedRescan()));
+        addRenderableWidget(button(margin + footerW + gap, footerY, footerW, "Clear filters", Component.literal("Disable all filters"), b -> clearFilters()));
+        addRenderableWidget(button(width - margin - Math.min(86, footerW), footerY, Math.min(86, footerW), "Back", Component.literal("Back"), b -> onClose()));
         updateFilterButtons();
     }
 
@@ -165,11 +187,11 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private Button button(int x, int y, int w, String label, Component tooltip, Button.OnPress action) {
-        return Button.builder(Component.literal(label), action).bounds(x, y, w, 20).tooltip(Tooltip.create(tooltip)).build();
+        return WbTooltips.register(Button.builder(Component.literal(label), action).bounds(x, y, w, 20).build(), tooltip);
     }
 
     private Button filterButton(int x, int y, int w, String label, Component tooltip, Button.OnPress action) {
-        return Button.builder(Component.literal(filterButtonLabel(label, false)), action).bounds(x, y, w, 20).tooltip(Tooltip.create(tooltip)).build();
+        return WbTooltips.register(Button.builder(Component.literal(filterButtonLabel(label, false)), action).bounds(x, y, w, 20).build(), tooltip);
     }
 
     private void updateFilterButtons() {
@@ -191,27 +213,46 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
-        if (event.button() == 0) {
+        WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
+        MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        if (virtualEvent.button() == 0) {
+            offsetX = uiScale.toVirtualDelta(offsetX);
+            offsetY = uiScale.toVirtualDelta(offsetY);
             followPlayer = false;
             int chunkPixels = Math.max(16, 16 * zoom);
             panChunkX -= (int) Math.round(offsetX / Math.max(1.0D, chunkPixels));
             panChunkZ -= (int) Math.round(offsetY / Math.max(1.0D, chunkPixels));
             return true;
         }
-        return super.mouseDragged(event, offsetX, offsetY);
+        return super.mouseDragged(virtualEvent, offsetX, offsetY);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        long hovered = chunkAt(event.x(), event.y());
+        MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
+        long hovered = chunkAt(virtualEvent.x(), virtualEvent.y());
         if (hovered != Long.MIN_VALUE) {
             selectedChunk = hovered;
-            if (event.button() == 1) {
+            if (virtualEvent.button() == 1) {
                 WorldBinderClient.capture().queueChunkForRescan((int) hovered, (int) (hovered >> 32));
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(virtualEvent, doubleClick);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
     }
 
     @Override
@@ -221,6 +262,18 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        int realWidth = width;
+        int realHeight = height;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        int virtualMouseX = uiScale.toVirtualX(mouseX);
+        int virtualMouseY = uiScale.toVirtualY(mouseY);
+        context.fill(0, 0, realWidth, realHeight, 0xF005050C);
+        context.pose().pushMatrix();
+        context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
+        context.pose().scale(uiScale.scale(), uiScale.scale());
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         context.fill(0, 0, width, height, 0xF005050C);
         SceneCaptureService capture = WorldBinderClient.capture();
         boolean reducedUiDetail = shouldReduceUiDetail(capture);
@@ -261,6 +314,7 @@ public final class WorldBinderMapScreen extends Screen {
         int hoveredX = 0;
         int hoveredZ = 0;
 
+        context.enableScissor(mapX, mapY, mapX + mapW, mapY + mapH);
         for (int dz = -radiusZ; dz <= radiusZ; dz++) {
             for (int dx = -radiusX; dx <= radiusX; dx++) {
                 int cx = panChunkX + dx;
@@ -280,13 +334,14 @@ public final class WorldBinderMapScreen extends Screen {
                 if (cx == playerChunkX && cz == playerChunkZ) {
                     drawPlayerCross(context, chunkX, chunkY, chunkPixels);
                 }
-                if (mouseX >= chunkX && mouseX < chunkX + chunkPixels && mouseY >= chunkY && mouseY < chunkY + chunkPixels) {
+                if (virtualMouseX >= chunkX && virtualMouseX < chunkX + chunkPixels && virtualMouseY >= chunkY && virtualMouseY < chunkY + chunkPixels) {
                     hoveredKey = key;
                     hoveredX = cx;
                     hoveredZ = cz;
                 }
             }
         }
+        context.disableScissor();
 
         refreshPanelsIfNeeded(capture, hoveredKey != null ? hoveredKey : selectedChunk, snapshots, done, partial, queued, failed);
         if (leftPanelW > 0) {
@@ -298,10 +353,16 @@ public final class WorldBinderMapScreen extends Screen {
             drawInspectorPanel(context, width - rightPanelW - 18, 106, hoveredKey != null ? hoveredKey : selectedChunk, hoveredKey != null ? hoveredX : (int) selectedChunk, hoveredKey != null ? hoveredZ : (int) (selectedChunk >> 32));
         }
         if (hoveredKey != null) {
-            drawChunkTooltip(context, mouseX, mouseY, hoveredKey, hoveredX, hoveredZ, snapshots, done, partial, queued, failed);
+            drawChunkTooltip(context, virtualMouseX, virtualMouseY, hoveredKey, hoveredX, hoveredZ, snapshots, done, partial, queued, failed);
         }
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal("Center §f" + panChunkX + ", " + panChunkZ + " §7• Player §d" + playerChunkX + ", " + playerChunkZ + " §7• Zoom §f" + zoom + "x §7• " + (followPlayer ? "Following" : "Free pan")), mapX, mapY + mapH + 20, 0xFFE6E6F0);
-        super.extractRenderState(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+            context.pose().popMatrix();
+        }
+        WbTooltips.showHovered(this, context, font, virtualMouseX, virtualMouseY, mouseX, mouseY);
     }
 
 
@@ -350,32 +411,72 @@ public final class WorldBinderMapScreen extends Screen {
 
 
 
+    private int mapOuterMargin() {
+        return width < 520 ? 12 : 18;
+    }
+
+    private int controlsTop() {
+        return height < 390 ? 42 : 52;
+    }
+
+    private int toolbarRows() {
+        if (width < 360) {
+            return 4;
+        }
+        if (width < 520) {
+            return 3;
+        }
+        if (width < 760) {
+            return 2;
+        }
+        return 1;
+    }
+
+    private int statusY() {
+        return controlsTop() + toolbarRows() * 28 + 8;
+    }
+
+    private int statusChipRows() {
+        int available = Math.max(1, width - mapOuterMargin() * 2);
+        int fullWidth = 0;
+        String[] labels = {"Saved", "Partial", "Queued", "Errors"};
+        int[] values = {cachedSavedCount, cachedScanningCount, cachedQueuedCount, cachedErrorCount};
+        for (int i = 0; i < labels.length; i++) {
+            fullWidth += chipWidth(labels[i], values[i]) + (i == 0 ? 0 : 6);
+        }
+        if (hasActiveFilters()) {
+            fullWidth += chipWidth(filterStatusLine().replace("Filters:", "Filter"), -1) + 6;
+        }
+        return fullWidth > available ? 2 : 1;
+    }
+
+    private int filterControlsY() {
+        return statusY() + statusChipRows() * 20 + 6;
+    }
+
     private int leftPanelWidth() {
-        return width >= 980 ? Math.min(160, Math.max(126, width / 9)) : 0;
+        return width >= 1040 && height >= 520 ? Math.min(160, Math.max(126, width / 9)) : 0;
     }
 
     private int rightPanelWidth() {
-        return width >= 1120 ? 184 : 0;
+        return width >= 1220 && height >= 520 ? 184 : 0;
     }
 
     private int mapX(int leftPanelW) {
-        return leftPanelW > 0 ? leftPanelW + 18 : 18;
+        return leftPanelW > 0 ? leftPanelW + mapOuterMargin() : mapOuterMargin();
     }
 
     private int mapY() {
-        if (filtersOpen) {
-            return width < 760 ? 158 : 148;
-        }
-        return width < 760 ? 112 : 104;
+        return filterControlsY() + (filtersOpen ? 28 : 0) + 8;
     }
 
     private int mapWidth(int leftPanelW, int rightPanelW, int mapX) {
-        int reservedRight = rightPanelW > 0 ? rightPanelW + 36 : 18;
-        return Math.max(180, width - mapX - reservedRight);
+        int reservedRight = rightPanelW > 0 ? rightPanelW + mapOuterMargin() * 2 : mapOuterMargin();
+        return Math.max(80, width - mapX - reservedRight);
     }
 
     private int mapHeight(int mapY) {
-        return Math.max(120, height - mapY - 74);
+        return Math.max(70, height - mapY - 62);
     }
 
     private static int visibleChunkCount(int pixels, int chunkPixels) {
@@ -487,15 +588,35 @@ public final class WorldBinderMapScreen extends Screen {
 
 
     private void drawMapStatusChips(GuiGraphicsExtractor context) {
-        int y = filtersOpen ? mapY() - 56 : mapY() - 22;
-        int x = 18;
-        x = chip(context, x, y, "Saved", cachedSavedCount, 0xFF55FFAA);
-        x = chip(context, x + 6, y, "Partial", cachedScanningCount, 0xFFFFE066);
-        x = chip(context, x + 6, y, "Queued", cachedQueuedCount, 0xFFFFA12B);
-        x = chip(context, x + 6, y, "Errors", cachedErrorCount, 0xFFFF5555);
-        if (hasActiveFilters()) {
-            chip(context, x + 6, y, filterStatusLine().replace("Filters:", "Filter"), -1, 0xFF55A7FF);
+        int y = statusY();
+        int x = mapOuterMargin();
+        int startX = x;
+        int right = width - mapOuterMargin();
+        String[] labels = {"Saved", "Partial", "Queued", "Errors"};
+        int[] values = {cachedSavedCount, cachedScanningCount, cachedQueuedCount, cachedErrorCount};
+        int[] accents = {0xFF55FFAA, 0xFFFFE066, 0xFFFFA12B, 0xFFFF5555};
+        for (int i = 0; i < labels.length; i++) {
+            int chipWidth = chipWidth(labels[i], values[i]);
+            if (x > startX && x + chipWidth > right) {
+                x = startX;
+                y += 20;
+            }
+            x = chip(context, x, y, labels[i], values[i], accents[i]) + 6;
         }
+        if (hasActiveFilters()) {
+            String label = filterStatusLine().replace("Filters:", "Filter");
+            int chipWidth = chipWidth(label, -1);
+            if (x > startX && x + chipWidth > right) {
+                x = startX;
+                y += 20;
+            }
+            chip(context, x, y, label, -1, 0xFF55A7FF);
+        }
+    }
+
+    private int chipWidth(String label, int value) {
+        String text = value < 0 ? label : label + " " + value;
+        return font.width(text) + 18;
     }
 
     private int chip(GuiGraphicsExtractor context, int x, int y, String label, int value, int accent) {

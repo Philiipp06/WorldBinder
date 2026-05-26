@@ -18,9 +18,17 @@ public final class FileNames {
         return archiveFolderName(rawName) + ".json";
     }
 
+    public static String archiveFileName(String rawName, boolean appendTimestamp) {
+        return archiveFolderName(rawName, appendTimestamp) + ".json";
+    }
+
     public static String archiveFolderName(String rawName) {
+        return archiveFolderName(rawName, true);
+    }
+
+    public static String archiveFolderName(String rawName, boolean appendTimestamp) {
         String name = cleanBaseName(rawName);
-        return name + "_" + LocalDateTime.now().format(STAMP);
+        return appendTimestamp ? name + "_" + LocalDateTime.now().format(STAMP) : name;
     }
 
     public static String cleanBaseName(String rawName) {

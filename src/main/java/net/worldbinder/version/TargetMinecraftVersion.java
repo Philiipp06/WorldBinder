@@ -34,24 +34,28 @@ public final class TargetMinecraftVersion {
             return dataVersion > 0 ? dataVersion : SharedConstants.getCurrentVersion().dataVersion().version();
         }
 
-        public boolean usesGameRulesFile() {
-            return profile == GenerationProfile.CURRENT_26;
+        public VersionProfile versionProfile() {
+            return VersionRegistry.resolve(this);
         }
 
-        public boolean supportsModernItemComponents() {
-            return effectiveDataVersion() >= 3837;
+        public boolean usesGameRulesFile() {
+            return versionProfile().writesGameRulesFile();
         }
 
         public boolean usesModernDimensionFolders() {
-            return profile == GenerationProfile.CURRENT_26;
+            return versionProfile().writesModernDimensionFolders();
         }
 
-        public boolean usesSeparateEntityRegionFiles() {
-            return effectiveDataVersion() >= 2724;
+        public boolean usesPoiFiles() {
+            return versionProfile().writesPoiRegions();
         }
 
-        public boolean usesPoiRegionFiles() {
-            return effectiveDataVersion() >= 1952;
+        public boolean usesSeparateEntityFiles() {
+            return versionProfile().writesSeparateEntityRegions();
+        }
+
+        public boolean supportsModernItemComponents() {
+            return versionProfile().writesModernItemComponents();
         }
     }
 

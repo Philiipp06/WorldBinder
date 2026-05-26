@@ -3,7 +3,6 @@ package net.worldbinder.ui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
@@ -28,6 +27,7 @@ import net.worldbinder.ui.component.WbStatusChip;
 import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbWarningBox;
+import net.worldbinder.ui.component.WbTooltips;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -96,10 +96,24 @@ public final class WorldBinderScreen extends Screen {
 
     @Override
     protected void init() {
-        rebuildWidgets();
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
+            rebuildWidgets();
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
     }
 
     protected void rebuildWidgets() {
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         clearWidgets();
         archiveName = null;
         captureTargetVersion = null;
@@ -123,7 +137,7 @@ public final class WorldBinderScreen extends Screen {
             int archiveY = captureCardY + 54;
             archiveName = new EditBox(font, contentX + 18, archiveY, archiveW, 22, Component.literal("Archive name"));
             archiveName.setMaxLength(64);
-            archiveName.setTooltip(Tooltip.create(Component.literal("Name of the archive and exported save folder.")));
+            WbTooltips.register(archiveName, Component.translatable("worldbinder.tooltip.archive_name"));
             archiveName.setValue(WorldBinder.config().defaultArchiveName);
             clipContentWidget(archiveName);
             addRenderableWidget(archiveName);
@@ -133,7 +147,7 @@ public final class WorldBinderScreen extends Screen {
             int targetW = Math.min(narrowCapture ? 150 : 160, Math.max(104, contentW - 180));
             captureTargetVersion = new EditBox(font, targetX, targetY, targetW, 22, Component.literal("Target version"));
             captureTargetVersion.setMaxLength(12);
-            captureTargetVersion.setTooltip(Tooltip.create(Component.literal("Target Minecraft version for the exported world.")));
+            WbTooltips.register(captureTargetVersion, Component.translatable("worldbinder.tooltip.target_version"));
             captureTargetVersion.setValue(WorldBinder.config().targetMinecraftVersion);
             clipContentWidget(captureTargetVersion);
             addRenderableWidget(captureTargetVersion);
@@ -165,11 +179,18 @@ public final class WorldBinderScreen extends Screen {
 
         addRenderableWidget(button(left + panelWidth - 116, top + panelHeight - 32, 96, 22,
                 "Close", Component.translatable("worldbinder.tooltip.close"), b -> onClose()));
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
     }
     private void addSidebar(int left, int top) {
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
         int sidebarWidth = WbLayout.sidebarWidth(panelWidth);
+        if (sidebarWidth <= 0) {
+            return;
+        }
         int buttonX = left + 12;
         int buttonW = Math.max(68, sidebarWidth - 24);
         int buttonH = WbLayout.sidebarButtonHeight(panelHeight);
@@ -178,13 +199,13 @@ public final class WorldBinderScreen extends Screen {
         boolean compact = panelWidth < 520;
         for (Section target : Section.values()) {
             String label = compact ? compactSectionLabel(target) : target.title;
-            Button widget = Button.builder(Component.literal((section == target ? "◆ " : "") + label), button -> {
+            Button widget = WbTooltips.register(Button.builder(Component.literal((section == target ? "◆ " : "") + label), button -> {
                 section = target;
                 contentScroll = 0;
                 pendingDeletePath = null;
                 pendingDeleteMillis = 0L;
                 rebuildWidgets();
-            }).bounds(buttonX, y, buttonW, buttonH).tooltip(Tooltip.create(Component.literal(target.subtitle))).build();
+            }).bounds(buttonX, y, buttonW, buttonH).build(), Component.literal(target.subtitle));
             addRenderableWidget(widget);
             y += step;
         }
@@ -724,14 +745,20 @@ private void toolsWidgets(int x, int top, int width) {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         if (section == Section.ARCHIVES || section == Section.RECOVERY) {
             int panelWidth = panelWidth();
             int panelHeight = panelHeight();
             int left = WbLayout.left(width, panelWidth);
             int top = WbLayout.top(height, panelHeight);
             int contentX = contentX(left);
-            int x = (int) event.x();
-            int y = (int) event.y();
+            int x = (int) virtualEvent.x();
+            int y = (int) virtualEvent.y();
             List<Path> scenes = archiveRows();
             int count = Math.min(visibleArchiveRows(), scenes.size() - archiveListOffset);
             for (int i = 0; i < count; i++) {
@@ -746,11 +773,34 @@ private void toolsWidgets(int x, int top, int width) {
                 }
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(virtualEvent, doubleClick);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
+        WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
+        return super.mouseDragged(WbLayout.virtualMouseEvent(event, width, height), uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
+        double virtualMouseX = uiScale.toVirtualX(mouseX);
+        double virtualMouseY = uiScale.toVirtualY(mouseY);
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         if (section == Section.ARCHIVES || section == Section.RECOVERY) {
             List<Path> scenes = archiveRows();
             int maxOffset = Math.max(0, scenes.size() - visibleArchiveRows());
@@ -769,7 +819,11 @@ private void toolsWidgets(int x, int top, int width) {
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+        return super.mouseScrolled(virtualMouseX, virtualMouseY, horizontalAmount, verticalAmount);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
     }
 
     private int maxContentScroll() {
@@ -787,7 +841,8 @@ private void toolsWidgets(int x, int top, int width) {
     }
 
     private int contentViewportTop() {
-        return WbLayout.top(height, panelHeight()) + 68;
+        int panelWidth = panelWidth();
+        return WbLayout.top(height, panelHeight()) + (WbLayout.sidebarWidth(panelWidth) <= 0 ? 50 : 68);
     }
 
     private int contentViewportBottom() {
@@ -813,7 +868,19 @@ private void toolsWidgets(int x, int top, int width) {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        int realWidth = width;
+        int realHeight = height;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        int virtualMouseX = uiScale.toVirtualX(mouseX);
+        int virtualMouseY = uiScale.toVirtualY(mouseY);
         customTooltip = null;
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
+        context.pose().pushMatrix();
+        context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
+        context.pose().scale(uiScale.scale(), uiScale.scale());
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         context.fill(0, 0, width, height, WbTheme.BACKDROP);
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
@@ -824,11 +891,18 @@ private void toolsWidgets(int x, int top, int width) {
         drawSidebar(context, left, top);
         drawSectionHeader(context, contentX(left), top + 26, contentWidth(panelWidth));
         context.enableScissor(contentX(left), contentViewportTop(), contentX(left) + contentWidth(panelWidth), contentViewportBottom());
-        drawSectionContent(context, left, top - contentScroll, panelWidth, mouseX, mouseY);
+        drawSectionContent(context, left, top - contentScroll, panelWidth, virtualMouseX, virtualMouseY);
         context.disableScissor();
-        super.extractRenderState(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+            context.pose().popMatrix();
+        }
         if (customTooltip != null) {
             context.setTooltipForNextFrame(font, customTooltip, mouseX, mouseY);
+        } else {
+            WbTooltips.showHovered(this, context, font, virtualMouseX, virtualMouseY, mouseX, mouseY);
         }
     }
 
@@ -946,8 +1020,6 @@ private void drawCapture(GuiGraphicsExtractor context, int x, int top, int width
         WbText.drawClipped(context, font, "Archive name", x + 20, archiveFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
         WbText.drawClipped(context, font, "Target output version", x + 20, targetFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
         WbText.drawClipped(context, font, targetSummaryLine(), x + 20, actionY + 30, width - 40, WbTheme.INFO);
-        WbText.drawClipped(context, font, "Status: " + capture.modeName(), x + 20, actionY + 56, width / 2 - 28, WbTheme.TEXT_SOFT);
-        WbText.drawClipped(context, font, "Queue: " + capture.queuedChunks() + " chunks", x + Math.max(20, width / 2), actionY + 56, width / 2 - 28, capture.highQueuePressure() ? WbTheme.ERROR : WbTheme.TEXT_MUTED);
 
         int presetY = card1Y + (narrow ? 244 : 228);
         int presetH = width < 560 ? 190 : 164;
@@ -1164,6 +1236,9 @@ private void drawSidebar(GuiGraphicsExtractor context, int left, int top) {
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
         int sidebarWidth = WbLayout.sidebarWidth(panelWidth);
+        if (sidebarWidth <= 0) {
+            return;
+        }
         int buttonX = left + 12;
         int buttonW = Math.max(50, sidebarWidth - 24);
         int buttonH = WbLayout.sidebarButtonHeight(panelHeight);

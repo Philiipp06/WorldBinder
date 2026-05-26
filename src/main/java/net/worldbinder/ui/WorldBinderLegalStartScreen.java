@@ -5,6 +5,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.util.FileNames;
@@ -33,6 +35,19 @@ public final class WorldBinderLegalStartScreen extends Screen {
 
     @Override
     protected void init() {
+        int realWidth = width;
+        int realHeight = height;
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
+            initScaled();
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
+    }
+
+    private void initScaled() {
         int panelWidth = Math.min(580, Math.max(280, width - 32));
         int panelHeight = Math.min(236, Math.max(204, height - 32));
         int left = (width - panelWidth) / 2;
@@ -67,7 +82,18 @@ public final class WorldBinderLegalStartScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, 0xAA05050C);
+        int realWidth = width;
+        int realHeight = height;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        int virtualMouseX = uiScale.toVirtualX(mouseX);
+        int virtualMouseY = uiScale.toVirtualY(mouseY);
+        context.fill(0, 0, realWidth, realHeight, 0xAA05050C);
+        context.pose().pushMatrix();
+        context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
+        context.pose().scale(uiScale.scale(), uiScale.scale());
+        width = WbLayout.DESIGN_WIDTH;
+        height = WbLayout.DESIGN_HEIGHT;
+        try {
         int panelWidth = Math.min(580, Math.max(280, width - 32));
         int panelHeight = Math.min(236, Math.max(204, height - 32));
         int left = (width - panelWidth) / 2;
@@ -95,6 +121,23 @@ public final class WorldBinderLegalStartScreen extends Screen {
                 legalLeft + 8, y, legalWidth - 16, WbTheme.TEXT_SOFT, 3);
         WbText.drawClipped(context, font, Lang.string("worldbinder.legal.about_location"), legalLeft + 8, y + 4, legalWidth - 16, WbTheme.INFO);
 
-        super.extractRenderState(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+            context.pose().popMatrix();
+        }
+        WbTooltips.showHovered(this, context, font, virtualMouseX, virtualMouseY, mouseX, mouseY);
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        return super.mouseClicked(WbLayout.virtualMouseEvent(event, width, height), doubleClick);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
     }
 }
+

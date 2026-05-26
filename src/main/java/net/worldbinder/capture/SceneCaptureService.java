@@ -218,6 +218,7 @@ public final class SceneCaptureService {
     private void saveWorldDownloadNow() {
         Minecraft client = Minecraft.getInstance();
         if (client != null && client.level != null && client.player != null) {
+            updatePlayerSpawn(client.player);
             flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
         }
@@ -255,10 +256,16 @@ public final class SceneCaptureService {
 
 
     public String targetFolderName() {
-        return activeArchiveName == null ? "worldbinder_export" : FileNames.cleanBaseName(activeArchiveName);
+        String name = activeArchiveName == null ? "worldbinder_export" : activeArchiveName;
+        return WorldBinder.config().appendTimestampToArchiveName
+                ? FileNames.archiveFolderName(name)
+                : FileNames.cleanBaseName(name);
     }
 
     public boolean targetWorldExists() {
+        if (WorldBinder.config().appendTimestampToArchiveName) {
+            return false;
+        }
         return activeArchiveType != null && !"scene".equals(activeArchiveType)
                 && java.nio.file.Files.exists(WorldBinderPaths.MINECRAFT_SAVES.resolve(targetFolderName()));
     }
@@ -346,6 +353,7 @@ public final class SceneCaptureService {
         }
         Minecraft client = Minecraft.getInstance();
         if (client.level != null && client.player != null) {
+            updatePlayerSpawn(client.player);
             flushLoadedChunksForFinish(client);
             captureNearbyEntities(client, true);
         }
@@ -2340,7 +2348,9 @@ public final class SceneCaptureService {
         resetActiveJob();
         saving = true;
         OperationStatus.begin("WorldBinder Storage", "Writing archive to disk...");
-        Path target = "scene".equals(type) ? WorldBinderPaths.SCENES.resolve(FileNames.archiveFileName(name)) : WorldBinderPaths.newWorldFolder(name);
+        Path target = "scene".equals(type)
+                ? WorldBinderPaths.SCENES.resolve(FileNames.archiveFileName(name, WorldBinder.config().appendTimestampToArchiveName))
+                : WorldBinderPaths.newWorldFolder(name, WorldBinder.config().appendTimestampToArchiveName);
         StorageFlow.submit(library, scene, target, "scene".equals(type), savedPath -> {
             saving = false;
             String validation = library.validationLine(savedPath);

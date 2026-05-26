@@ -3,13 +3,13 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder Alpha 1.0 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery and export validation.",
+  "description": "WorldBinder Alpha V3 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery and target-version world export.",
   "authors": [
     "Philiipp06"
   ],
   "contact": {
-    "homepage": "https://github.com/Philiipp06/WorldBinder/releases",
-    "sources": "https://github.com/Philiipp06/WorldBinder",
+    "homepage": "https://discord.com/invite/V7h3vaXxDZ",
+    "sources": "https://github.com/Philiipp06/WorldBinder/releases",
     "issues": "https://github.com/Philiipp06/WorldBinder/issues"
   },
   "license": "MIT",
@@ -38,8 +38,8 @@
   "custom": {
     "modmenu": {
       "links": {
-        "Website": "https://github.com/Philiipp06/WorldBinder/releases",
-        "Source": "https://github.com/Philiipp06/WorldBinder",
+        "Website": "https://discord.com/invite/V7h3vaXxDZ",
+        "Source": "https://github.com/Philiipp06/WorldBinder/releases",
         "Issues": "https://github.com/Philiipp06/WorldBinder/issues"
       }
     }

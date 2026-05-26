@@ -34,7 +34,11 @@ public final class WorldBinderPaths {
     }
 
     public static Path newWorldFolder(String requestedName) {
-        return uniqueWorldFolder(FileNames.archiveFolderName(requestedName));
+        return newWorldFolder(requestedName, true);
+    }
+
+    public static Path newWorldFolder(String requestedName, boolean appendTimestamp) {
+        return uniqueWorldFolder(FileNames.archiveFolderName(requestedName, appendTimestamp));
     }
 
     private static Path uniqueWorldFolder(String baseName) {
