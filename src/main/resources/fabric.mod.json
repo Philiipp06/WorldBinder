@@ -3,7 +3,7 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder Alpha V3 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery and target-version world export.",
+  "description": "WorldBinder Beta 1 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery, validation and target-version world export.",
   "authors": [
     "Philiipp06"
   ],
@@ -30,7 +30,7 @@
     "fabric-api": "*"
   },
   "suggests": {
-    "modmenu": ">=18.0.0-alpha.8"
+    "modmenu": ">=18.0.0-beta.1"
   },
   "mixins": [
     "worldbinder.mixins.json"

@@ -27,6 +27,7 @@ public final class ExportValidator {
         report.missingChunks = Math.max(0, report.expectedChunks - report.snapshots);
 
         report.levelDat = Files.isRegularFile(folder.resolve("level.dat"));
+        report.levelDatOld = Files.isRegularFile(folder.resolve("level.dat_old"));
         report.sessionLock = Files.isRegularFile(folder.resolve("session.lock"));
         Path overworld = folder.resolve("dimensions").resolve("minecraft").resolve("overworld");
         report.regionFiles = hasFiles(overworld.resolve("region"), ".mca") || hasFiles(folder.resolve("region"), ".mca");
@@ -35,6 +36,9 @@ public final class ExportValidator {
         report.archiveJson = Files.isRegularFile(folder.resolve("worldbinder/worldbinder_archive.json"));
         report.manifestJson = Files.isRegularFile(folder.resolve("worldbinder/worldbinder_manifest.json"));
         report.metadataJson = Files.isRegularFile(folder.resolve("worldbinder/metadata.json"));
+        report.exportReadme = Files.isRegularFile(folder.resolve("README.md"));
+        report.modernSavedData = Files.isRegularFile(folder.resolve("data/minecraft/game_rules.dat"))
+                && Files.isRegularFile(folder.resolve("data/minecraft/world_gen_settings.dat"));
         report.resourcePack = Files.isRegularFile(folder.resolve("resources.zip"));
         report.zipFile = Files.isRegularFile(folder.resolveSibling(folder.getFileName().toString() + ".zip"));
         report.vanillaWorld = report.levelDat || report.sessionLock || report.regionFiles || report.entityFiles || report.poiFiles || report.metadataJson;
@@ -102,12 +106,15 @@ public final class ExportValidator {
         int score = 0;
         if (!r.vanillaWorld) { score += 28; r.passed.add("WorldBinder scene/archive metadata loaded"); }
         if (r.levelDat) { score += 14; r.passed.add("level.dat present"); } else if (r.vanillaWorld) r.warnings.add("level.dat missing");
+        if (r.levelDatOld) { score += 2; r.passed.add("level.dat_old present"); } else if (r.vanillaWorld) r.warnings.add("level.dat_old missing");
         if (r.sessionLock) { score += 4; r.passed.add("session.lock present"); } else if (r.vanillaWorld) r.warnings.add("session.lock missing");
         if (r.regionFiles) { score += 18; r.passed.add("overworld region files present"); } else if (r.vanillaWorld) r.warnings.add("No overworld region files were written");
         if (r.entityFiles || r.entities == 0 || !r.vanillaWorld) { score += 10; r.passed.add("entities region ready"); } else { r.entityDataMissing = true; r.warnings.add("Entities captured but no entity region files found"); }
         if (r.poiFiles) { score += 4; r.passed.add("poi folder present"); } else if (r.vanillaWorld) r.warnings.add("poi folder missing");
         if (r.archiveJson) { score += 7; r.passed.add("WorldBinder archive present"); } else r.warnings.add("WorldBinder archive missing");
         if (r.manifestJson) { score += 5; r.passed.add("manifest present"); } else r.warnings.add("manifest missing");
+        if (r.exportReadme) { score += 2; r.passed.add("export README present"); } else if (r.vanillaWorld) r.warnings.add("export README missing");
+        if (r.modernSavedData) { score += 3; r.passed.add("modern saved data present"); }
         if (r.blocks > 0) score += 12; else r.warnings.add("No blocks captured");
         if (r.snapshots > 0) score += 8; else r.warnings.add("No minimap/chunk snapshots captured");
         if (r.blockEntities > 0) score += 5; else r.warnings.add("No block entities captured or available");
@@ -187,7 +194,10 @@ public final class ExportValidator {
         builder.append("Active: ").append(r.activeSnapshots).append('\n');
         builder.append("Failed: ").append(r.failedSnapshots).append('\n');
         builder.append("Entity data missing: ").append(r.entityDataMissing).append('\n');
-        builder.append("Region write errors: ").append(r.regionWriteErrors).append("\n\n");
+        builder.append("Region write errors: ").append(r.regionWriteErrors).append('\n');
+        builder.append("level.dat_old: ").append(r.levelDatOld).append('\n');
+        builder.append("Export README: ").append(r.exportReadme).append('\n');
+        builder.append("Modern saved data: ").append(r.modernSavedData).append("\n\n");
         builder.append("Passed:\n");
         for (String value : r.passed) builder.append(" - ").append(value).append('\n');
         builder.append("\nWarnings:\n");

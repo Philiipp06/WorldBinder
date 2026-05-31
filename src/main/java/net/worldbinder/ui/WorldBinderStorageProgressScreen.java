@@ -36,9 +36,10 @@ public final class WorldBinderStorageProgressScreen extends Screen {
     }
 
     private void initScaled() {
-        int panelW = Math.max(260, Math.min(520, width - 24));
+        int panelW = 500;
+        int panelH = 206;
         int left = (width - panelW) / 2;
-        int y = height / 2 + 70;
+        int y = (height - panelH) / 2 + panelH - 36;
         int buttonW = Math.max(90, Math.min(170, (panelW - 40) / 2));
         addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.storage.open_folder"), button -> {
             Path target = StorageFlow.progress().target();
@@ -62,7 +63,7 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x00000000);
+        context.fill(0, 0, realWidth, realHeight, 0x5505050C);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
@@ -70,12 +71,11 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         height = WbLayout.DESIGN_HEIGHT;
         try {
         StorageProgress progress = StorageFlow.progress();
-        context.fill(0, 0, width, height, 0xD805050C);
-        int w = Math.max(260, Math.min(520, width - 24));
-        int h = Math.max(190, Math.min(210, height - 24));
+        int w = 500;
+        int h = 206;
         int left = (width - w) / 2;
         int top = (height - h) / 2;
-        context.fill(left, top, left + w, top + h, 0xF0121020);
+        context.fill(left, top, left + w, top + h, 0xEE121020);
         context.fill(left, top, left + w, top + 3, progress.isTerminal() ? 0xFF55FFAA : 0xFFFF55FF);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.storage.title"), width / 2, top + 16, 0xFFFFFFFF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.stage", progress.stage().label()), left + 28, top + 48, 0xFFEDE9FF);
@@ -92,14 +92,14 @@ public final class WorldBinderStorageProgressScreen extends Screen {
             net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.target", path), left + 28, top + 122, 0xFF8F86B8);
         }
         int barX = left + 28;
-        int barY = top + 146;
+        int barY = top + 138;
         int barW = w - 56;
         int barH = 12;
         context.fill(barX, barY, barX + barW, barY + barH, 0x77000000);
         int filled = (int) (barW * Math.max(0.0D, Math.min(1.0D, progress.progress())));
         context.fill(barX, barY, barX + filled, barY + barH, progress.isTerminal() ? 0xFF55FFAA : 0xFFFF55FF);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.literal((int) (progress.progress() * 100.0D) + "%"), width / 2, barY + 2, 0xFFFFFFFF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.storage.hint"), left + 28, top + 156, 0xFF8F86B8);
+        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.storage.hint"), left + 28, top + 154, 0xFF8F86B8);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {
             width = realWidth;

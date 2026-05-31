@@ -35,9 +35,11 @@ public final class WorldBinderFinishProgressScreen extends Screen {
 
     private void initScaled() {
         int buttonGap = 8;
-        int buttonW = Math.max(90, Math.min(170, (width - 40 - buttonGap) / 2));
-        int left = Math.max(12, (width - buttonW * 2 - buttonGap) / 2);
-        int y = Math.min(height - 36, height / 2 + 76);
+        int panelW = 460;
+        int panelH = 190;
+        int buttonW = Math.max(90, Math.min(170, (panelW - 40 - buttonGap) / 2));
+        int left = (width - buttonW * 2 - buttonGap) / 2;
+        int y = (height - panelH) / 2 + panelH - 36;
         addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.finish.save_now"), button -> {
             capture.abortQueueAndSaveNow();
             minecraft.setScreen(parent);
@@ -54,7 +56,7 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x00000000);
+        context.fill(0, 0, realWidth, realHeight, 0x5505050C);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
@@ -65,12 +67,11 @@ public final class WorldBinderFinishProgressScreen extends Screen {
             minecraft.setScreen(parent);
             return;
         }
-        context.fill(0, 0, width, height, 0xD905050C);
-        int w = Math.max(260, Math.min(460, width - 24));
-        int h = Math.max(180, Math.min(210, height - 42));
-        int left = Math.max(12, (width - w) / 2);
-        int top = Math.max(12, (height - h) / 2);
-        context.fill(left, top, left + w, top + h, 0xEE11101C);
+        int w = 460;
+        int h = 190;
+        int left = (width - w) / 2;
+        int top = (height - h) / 2;
+        context.fill(left, top, left + w, top + h, 0xEE121020);
         context.fill(left, top, left + w, top + 3, 0xFFFF55FF);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.finish.progress_title"), width / 2, top + 18, 0xFFFFFFFF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(capture.finishStatusLine()), left + 28, top + 50, 0xFFE6E6F0);

@@ -15,7 +15,7 @@
   "worldbinder.about.legal_title": "Allowed usage",
   "worldbinder.about.title": "About WorldBinder",
   "worldbinder.about.tooltip": "Version, controls, data paths and permitted usage.",
-  "worldbinder.about.version": "WorldBinder Alpha V3 • Minecraft/Fabric target 26.1.2 / 0.19.2",
+  "worldbinder.about.version": "WorldBinder Beta 1 • Fabric client mod • Minecraft 26.1.2",
   "worldbinder.activity.empty": "No activity yet.",
   "worldbinder.archive.archive_tag": "[ARCHIVE] ",
   "worldbinder.archive.delete_armed": "⚠ Delete armed: click Confirm Delete to remove selected archive.",

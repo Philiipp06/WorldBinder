@@ -14,8 +14,10 @@ public final class ExportPathUtil {
     public static List<String> serverImportKeys(WorldScene scene, Path worldFolder) {
         List<String> keys = new ArrayList<>();
         addServerImportKey(keys, scene == null ? null : scene.name);
-        Path folderName = worldFolder == null ? null : worldFolder.getFileName();
-        addServerImportKey(keys, folderName == null ? null : folderName.toString());
+        if (keys.isEmpty()) {
+            Path folderName = worldFolder == null ? null : worldFolder.getFileName();
+            addServerImportKey(keys, folderName == null ? null : folderName.toString());
+        }
         return keys;
     }
 

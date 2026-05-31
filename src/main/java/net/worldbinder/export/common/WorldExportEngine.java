@@ -36,7 +36,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -82,7 +81,7 @@ public final class WorldExportEngine {
         writePlayerDataFiles(scene, worldFolder, profile);
         writeSessionLock(worldFolder);
         writeBukkitCompatibilityFiles(scene, worldFolder);
-        writeIconPlaceholder(worldFolder);
+        ExportSavedDataWriter.writeReleaseFiles(worldFolder, profile);
 
         List<ExportLayoutSpec> layouts = module.layouts(context);
         int layoutIndex = 0;
@@ -91,8 +90,7 @@ public final class WorldExportEngine {
             writeLayout(scene, chunks, layout, progress, layoutIndex, layouts.size());
         }
 
-        writeWorldBinderInfo(scene, worldFolder, chunks.size());
-        writeServerImportNotes(scene, worldFolder);
+        ExportReadmeWriter.write(scene, worldFolder, chunks.size());
         return new VanillaWorldExporter.ExportResult(worldFolder, chunks.size(), scene.blockCount(), scene.blockEntityCount(), scene.entityCount());
     }
 
@@ -104,6 +102,9 @@ public final class WorldExportEngine {
                                     StorageProgress progress, int layoutIndex, int layoutCount) throws IOException {
         Files.createDirectories(layout.dimensionFolder());
         Files.createDirectories(layout.regionFolder());
+        if (isModernDimensionMirror(layout.dimensionFolder())) {
+            ExportSavedDataWriter.writeDimensionSavedData(layout.dimensionFolder(), targetVersion(scene).effectiveDataVersion());
+        }
         if (layout.writeEntities() && layout.entityFolder() != null) {
             Files.createDirectories(layout.entityFolder());
         }
@@ -156,6 +157,19 @@ public final class WorldExportEngine {
     }
 
     
+
+    private static boolean isModernDimensionMirror(Path folder) {
+        if (folder == null) {
+            return false;
+        }
+        Path parent = folder.getParent();
+        Path grandParent = parent == null ? null : parent.getParent();
+        return parent != null
+                && grandParent != null
+                && "minecraft".equals(parent.getFileName().toString())
+                && "dimensions".equals(grandParent.getFileName().toString());
+    }
+
     private static Map<ChunkKey, ChunkBuilder> collectChunks(WorldScene scene) {
         Map<ChunkKey, ChunkBuilder> chunks = new TreeMap<>();
         if (scene.blocks != null) {
@@ -253,13 +267,15 @@ public final class WorldExportEngine {
         data.putInt("thunderTime", 0);
         data.putBoolean("raining", false);
         data.putBoolean("thundering", false);
-        data.put("GameRules", gameRules(scene));
-        data.put("WorldGenSettings", worldGenSettings(scene));
-        data.put("DragonFight", new CompoundTag());
+        if (targetVersion.profile() != TargetMinecraftVersion.GenerationProfile.CURRENT_26) {
+            data.put("GameRules", gameRules(scene));
+            data.put("WorldGenSettings", worldGenSettings(scene));
+            data.put("DragonFight", new CompoundTag());
+            data.put("Player", playerNbt(scene));
+        }
         data.put("Version", versionInfo(targetVersion));
         data.put("DataPacks", dataPacks());
         data.put("ServerBrands", singleStringList("WorldBinder"));
-        data.put("Player", playerNbt(scene));
 
         CompoundTag root = new CompoundTag();
         root.put("Data", data);
@@ -286,6 +302,17 @@ public final class WorldExportEngine {
         if (!target.usesGameRulesFile()) {
             return;
         }
+
+        CompoundTag data = exportGameRulesData(scene, target);
+        CompoundTag root = new CompoundTag();
+        root.putInt("DataVersion", target.effectiveDataVersion());
+        root.put("data", data);
+        Path targetFile = worldFolder.resolve("data").resolve("minecraft").resolve("game_rules.dat");
+        Files.createDirectories(targetFile.getParent());
+        NbtIo.writeCompressed(root, targetFile);
+    }
+
+    private static CompoundTag exportGameRulesData(WorldScene scene, TargetMinecraftVersion.Entry target) {
         CompoundTag data = new CompoundTag();
         CompoundTag exported = gameRules(scene);
         for (String key : exported.keySet()) {
@@ -295,17 +322,22 @@ public final class WorldExportEngine {
             }
             String value = exported.getString(key).orElse("false");
             GameRuleExport gameRule = exportGameRule(target, legacyKey, value);
-            if (gameRule == null) {
+            if (gameRule == null || !isAllowedGameRuleOutput(target, gameRule.key())) {
                 continue;
             }
             putTypedGameRule(data, gameRule.key(), gameRule.value());
         }
-        CompoundTag root = new CompoundTag();
-        root.putInt("DataVersion", target.effectiveDataVersion());
-        root.put("data", data);
-        Path targetFile = worldFolder.resolve("data").resolve("minecraft").resolve("game_rules.dat");
-        Files.createDirectories(targetFile.getParent());
-        NbtIo.writeCompressed(root, targetFile);
+        return data;
+    }
+
+    private static boolean isAllowedGameRuleOutput(TargetMinecraftVersion.Entry target, String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        if (target != null && target.profile() == TargetMinecraftVersion.GenerationProfile.CURRENT_26) {
+            return key.startsWith("minecraft:") && GAME_RULE_26X_REGISTRY_KEYS.values().stream().anyMatch(mapping -> mapping.registryKey().equals(key));
+        }
+        return key.startsWith("minecraft:");
     }
 
     private static void putTypedGameRule(CompoundTag tag, String key, String value) {
@@ -670,9 +702,15 @@ public final class WorldExportEngine {
     private static SpawnPoint resolveSpawnPoint(WorldScene scene) {
         if (scene != null && scene.hasPlayerSpawn) {
             double x = finiteOr(scene.playerSpawnX, scene.originX + 0.5D);
-            double y = finiteOr(scene.playerSpawnY, Math.max(-64, scene.originY + 2.0D));
+            double y = finiteOr(scene.playerSpawnY, Math.max(64, scene.originY + 2.0D));
             double z = finiteOr(scene.playerSpawnZ, scene.originZ + 0.5D);
-            return new SpawnPoint(x, y, z, scene.playerSpawnYaw, scene.playerSpawnPitch);
+            SpawnPoint safe = nearestSafeCapturedSpawn(scene, x, y, z, scene.playerSpawnYaw, scene.playerSpawnPitch);
+            if (safe != null) {
+                return safe;
+            }
+            if (y > -60.0D) {
+                return new SpawnPoint(x, y, z, scene.playerSpawnYaw, scene.playerSpawnPitch);
+            }
         }
 
         BlockRecord fallback = nearestCapturedBlock(scene);
@@ -680,17 +718,45 @@ public final class WorldExportEngine {
             double x = scene.originX + fallback.x + 0.5D;
             double y = scene.originY + fallback.y + 1.5D;
             double z = scene.originZ + fallback.z + 0.5D;
-            return new SpawnPoint(x, Math.max(-64.0D, y), z, 0.0F, 0.0F);
+            return new SpawnPoint(x, Math.max(-63.0D, y), z, 0.0F, 0.0F);
         }
 
         int originX = scene == null ? 0 : scene.originX;
         int originY = scene == null ? 64 : scene.originY;
         int originZ = scene == null ? 0 : scene.originZ;
-        return new SpawnPoint(originX + 0.5D, Math.max(-64.0D, originY + 2.0D), originZ + 0.5D, 0.0F, 0.0F);
+        return new SpawnPoint(originX + 0.5D, Math.max(64.0D, originY + 2.0D), originZ + 0.5D, 0.0F, 0.0F);
     }
 
     private static double finiteOr(double value, double fallback) {
         return Double.isFinite(value) ? value : fallback;
+    }
+
+    private static SpawnPoint nearestSafeCapturedSpawn(WorldScene scene, double preferredX, double preferredY, double preferredZ, float yaw, float pitch) {
+        if (scene == null || scene.blocks == null || scene.blocks.isEmpty()) {
+            return null;
+        }
+        BlockRecord best = null;
+        long bestScore = Long.MAX_VALUE;
+        int preferredBlockX = (int) Math.floor(preferredX) - scene.originX;
+        int preferredBlockZ = (int) Math.floor(preferredZ) - scene.originZ;
+        int preferredBlockY = (int) Math.floor(preferredY) - scene.originY;
+        for (BlockRecord block : scene.blocks) {
+            if (!isSolidSpawnSupport(block)) {
+                continue;
+            }
+            long dx = block.x - preferredBlockX;
+            long dz = block.z - preferredBlockZ;
+            long dy = Math.max(0L, Math.abs(block.y - preferredBlockY) - 8L);
+            long score = dx * dx + dz * dz + dy * dy;
+            if (best == null || score < bestScore || (score == bestScore && block.y > best.y)) {
+                best = block;
+                bestScore = score;
+            }
+        }
+        if (best == null) {
+            return null;
+        }
+        return new SpawnPoint(scene.originX + best.x + 0.5D, scene.originY + best.y + 1.5D, scene.originZ + best.z + 0.5D, yaw, pitch);
     }
 
     private static BlockRecord nearestCapturedBlock(WorldScene scene) {
@@ -700,7 +766,7 @@ public final class WorldExportEngine {
         BlockRecord best = null;
         long bestDistance = Long.MAX_VALUE;
         for (BlockRecord block : scene.blocks) {
-            if (block == null || block.state == null || block.state.contains("minecraft:air")) {
+            if (!isSolidSpawnSupport(block)) {
                 continue;
             }
             long dx = block.x;
@@ -712,6 +778,20 @@ public final class WorldExportEngine {
             }
         }
         return best;
+    }
+
+    private static boolean isSolidSpawnSupport(BlockRecord block) {
+        if (block == null || block.state == null) {
+            return false;
+        }
+        String state = block.state;
+        if (state.contains("minecraft:air") || state.contains("minecraft:cave_air") || state.contains("minecraft:void_air")) {
+            return false;
+        }
+        if (state.contains("minecraft:water") || state.contains("minecraft:lava") || state.contains("minecraft:fire")) {
+            return false;
+        }
+        return true;
     }
 
 
@@ -767,35 +847,6 @@ public final class WorldExportEngine {
             output.writeLong(uuid.getMostSignificantBits());
             output.writeLong(uuid.getLeastSignificantBits());
         }
-    }
-
-    private static void writeServerImportNotes(WorldScene scene, Path worldFolder) throws IOException {
-        TargetMinecraftVersion.Entry target = targetVersion(scene);
-        if (!target.usesModernDimensionFolders()) {
-            return;
-        }
-        List<String> keys = ExportPathUtil.serverImportKeys(scene, worldFolder);
-        String keyText = keys.isEmpty() ? "<world-name>" : String.join(", ", keys);
-        Files.writeString(worldFolder.resolve("SERVER_IMPORT_NOTES.txt"),
-                Lang.string("worldbinder.export.notes.server_import", keyText));
-    }
-
-    private static void writeIconPlaceholder(Path worldFolder) throws IOException {
-        // Keep this intentionally empty for now. Minecraft does not require icon.png.
-    }
-
-    private static void writeWorldBinderInfo(WorldScene scene, Path worldFolder, int chunkCount) throws IOException {
-        Files.writeString(worldFolder.resolve("WORLD_BINDER_VANILLA_EXPORT.txt"),
-                Lang.string("worldbinder.export.notes.vanilla_export",
-                        Instant.now(),
-                        scene.name,
-                        scene.minecraftVersion,
-                        targetVersion(scene).name(),
-                        targetVersion(scene).profile().label(),
-                        chunkCount,
-                        scene.blockCount(),
-                        scene.blockEntityCount(),
-                        scene.entityCount()));
     }
 
     private static TargetMinecraftVersion.Entry targetVersion(WorldScene scene) {

@@ -17,6 +17,7 @@ public final class ExportValidationReport {
     public int snapshots;
     public int mapIds;
     public boolean levelDat;
+    public boolean levelDatOld;
     public boolean sessionLock;
     public boolean regionFiles;
     public boolean entityFiles;
@@ -24,6 +25,8 @@ public final class ExportValidationReport {
     public boolean archiveJson;
     public boolean manifestJson;
     public boolean metadataJson;
+    public boolean exportReadme;
+    public boolean modernSavedData;
     public boolean resourcePack;
     public boolean zipFile;
     public boolean vanillaWorld;

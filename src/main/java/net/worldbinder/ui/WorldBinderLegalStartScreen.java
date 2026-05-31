@@ -48,8 +48,8 @@ public final class WorldBinderLegalStartScreen extends Screen {
     }
 
     private void initScaled() {
-        int panelWidth = Math.min(580, Math.max(280, width - 32));
-        int panelHeight = Math.min(236, Math.max(204, height - 32));
+        int panelWidth = 520;
+        int panelHeight = 220;
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
         int fieldY = top + 64;
@@ -87,15 +87,15 @@ public final class WorldBinderLegalStartScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0xAA05050C);
+        context.fill(0, 0, realWidth, realHeight, 0x6605050C);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
         width = WbLayout.DESIGN_WIDTH;
         height = WbLayout.DESIGN_HEIGHT;
         try {
-        int panelWidth = Math.min(580, Math.max(280, width - 32));
-        int panelHeight = Math.min(236, Math.max(204, height - 32));
+        int panelWidth = 520;
+        int panelHeight = 220;
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
 

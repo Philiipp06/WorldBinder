@@ -1,128 +1,134 @@
-# WorldBinder Alpha V3
+# WorldBinder Beta 1
 
-**Client-side world capture, archive management, live chunk mapping, recovery, validation and server-friendly export for Minecraft Java / Fabric.**
+WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
-WorldBinder is built for Minecraft **26.1.2** and gives permitted world archival workflows a proper in-game control center. It focuses on data your client can actually see, then helps you organize, validate and export that data into local world folders for review, backup or approved offline use.
+It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. WorldBinder does not provide combat advantages, movement advantages, X-ray features, hidden server bypasses or permission bypasses. It focuses on responsible world preservation and local export workflows.
 
-> **Alpha notice:** WorldBinder Alpha V3 is intended for testing and validation. Exports can still require checking, especially on unusual servers, modded setups, older target versions or large entity-heavy scenes.
+> **Beta notice:** WorldBinder Beta 1 is intended for public testing. The interface, capture workflow and export structure are now much closer to release quality, but exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
 
----
+## Supported loader
 
-## Legal Use Notice
+WorldBinder is built and released for **Fabric**.
 
-Use WorldBinder only on worlds, maps, builds, servers and resource packs that you own, administer, created yourself, or where you have explicit permission.
+Quilt and NeoForge are not supported in this release. They may be considered in the future only if the shared WorldBinder core is separated cleanly from the Fabric-specific client layer and each loader can be tested properly.
 
-Do **not** use WorldBinder to copy, redistribute, extract or reproduce third-party servers, maps, builds, resource packs, models or protected content without permission. You are responsible for how you use exported data.
+## Main features
 
----
+- HotCache-first client-side chunk capture
+- Vanilla world folder export
+- Target output version selection
+- Block, block entity and entity export where available
+- Server resource pack export as `resources.zip`
+- Recovery and autosave tools
+- Configurable performance presets
+- F9 Control Center
+- F10 live chunk map with coverage colors, filters and inspector tooltips
+- Queue Dashboard / Profiler for capture and export telemetry
+- Export validation reports
+- Responsive Beta GUI scaling across different window sizes and GUI scales
+- Dedicated WorldBinder keybind category in Minecraft Controls
+- German and English language support
 
-## Alpha V3 Highlights
+## Default keybinds
 
-- **F9 Control Center** with Overview, Capture, Map, Archives & Validation, Recovery, Settings, Tools and About.
-- **F10 Map** for captured, partial, queued and failed chunk states with filters and live navigation.
-- **Responsive virtual GUI canvas** so WorldBinder screens keep a stable fullscreen-style layout across small windows, large windows and different GUI scales.
-- **Client-visible capture** for chunks, block entities, entities, maps, stats and advancements where available.
-- **Recovery sessions** for interrupted captures, disconnects and crash-safe workflows.
-- **Target output version selection** with generation-family exporters behind the scenes.
-- **26.x server-import fixes** for Paper/Multiverse-style world keys, modern dimension mirrors and safe gamerule registry output.
-- **Resource-pack export support** when the client can access the server pack.
-- **Profiler and diagnostics** for capture state, StorageFlow progress, queue timing and export stages.
-- **English and German localization** with English fallback.
+| Key | Action |
+| --- | --- |
+| F6 | Start/stop world download |
+| F7 | Set position 1 |
+| F8 | Set position 2 |
+| F9 | Open WorldBinder Control Center |
+| F10 | Open WorldBinder Map |
 
----
+All keybinds can be changed in Minecraft Controls under the `WorldBinder` category.
 
-## Controls
+## Export output
 
-Default keys:
+WorldBinder exports into a normal Minecraft save folder. A typical export may contain:
 
-- **F9** — Open WorldBinder Control Center
-- **F10** — Open WorldBinder Map
+```text
+level.dat
+level.dat_old
+session.lock
+icon.png
+resources.zip
+README.md
+region/
+entities/
+poi/
+data/minecraft/
+dimensions/minecraft/overworld/
+worldbinder/
+```
 
-Keybinds can be changed in Minecraft's Controls menu.
+The `worldbinder/` folder contains metadata, validation output and archive information used by WorldBinder itself. The generated world save can still be opened or imported without reading those files.
 
----
+## 26.x export layout
 
-## Basic Workflow
+For Minecraft 26.x targets, WorldBinder writes a compatibility-oriented layout:
 
-1. Join a world or server you are allowed to capture.
-2. Press **F9** to open the WorldBinder Control Center.
-3. Open **Capture**, choose an archive name and target output version.
-4. Start capture and move through the area you want to archive.
-5. Use **Pause** if you want capture work to stop temporarily.
-6. Use **Finish** when you are ready to process the queued data.
-7. Open **Archives & Validation** to preview, validate, continue, duplicate or export.
-8. Open the exported world in the selected Minecraft version and check the result.
+- root-level `region/`, `entities/` and `poi/` folders for Bukkit/Paper/Multiverse-style imports
+- `dimensions/minecraft/overworld/` mirrors for modern 26.x world loading
+- one optional `dimensions/minecraft/<world-key>/` mirror for server world keys when a clean world name is available
+- modern saved-data files under `data/minecraft/`
+- a single export `README.md` instead of multiple loose note files
 
-WorldBinder only stores data your client receives. It cannot reconstruct hidden server-side data, unloaded chunks, commands, plugins, scripts, private storage or content that was never sent to the client.
+This keeps the exported folder usable for both local testing and common server import workflows while avoiding timestamp-based duplicate dimension keys.
 
----
+## Target output versions
 
-## Target Output Versions
+WorldBinder can export captured data for different target Minecraft versions.
 
-WorldBinder can export metadata for a selected Minecraft target version while running on the current mod version. The UI displays final release versions, while internally the exporter groups compatible versions by broader generation profiles.
+This allows capturing with a newer client and selecting an older output version, for example 1.20.4. WorldBinder applies version-aware handling for folder layout, gamerules, entities, item data, POI data and world metadata.
 
-Downgrades are conservative. Newer blocks and data that do not exist in older targets may be simplified or replaced so the world can load more safely. Always validate and test exports, especially when targeting older versions.
+Downgrades may still be imperfect when captured data contains blocks, entities, items, resource pack content or world features that did not exist in the selected target version.
 
----
+## Important limitations
 
-## Server Import Notes
+WorldBinder can only save data that the client actually receives.
 
-Alpha V3 improves exported world folders for server-side imports. Exports keep normal root-level `region/`, `entities/` and `poi/` folders for Bukkit/Paper/Multiverse-style loaders while also writing modern 26.x dimension mirrors.
+Exports may be incomplete if the server never sent certain chunks, entities, inventories, block entity data, dimensions, maps, scoreboards, resource pack files or server-side logic to the client. Some server-side-only systems cannot be reconstructed from client data alone.
 
-For Paper/Multiverse imports, use a lowercase world name such as `worldbinderexport`. Modern Paper loads custom worlds with that world key, for example `minecraft:worldbinderexport`, so WorldBinder mirrors 26.x exports to `dimensions/minecraft/<world-name>/` as well.
+Heavy custom servers, modded content, datapack-driven worlds and resource-pack-only models may require manual review after export.
 
-WorldBinder writes vanilla-safe gamerules for 26.x exports. Known legacy gamerules are mapped to supported 26.x registry keys, inverted rules are normalized, and unknown or modded gamerules are skipped so Paper does not reject `game_rules.dat`.
+## Responsible use
 
-If Paper logs `java.nio.file.AccessDeniedException` for `.mca` files, the world data is probably present but the server process cannot read it. Stop the server and fix file ownership/permissions through your panel or host before importing again. A restart alone usually does not fix wrong ownership.
+Use WorldBinder only on worlds, servers, maps, builds and resource packs that you own, administer, created yourself, or where you have explicit permission to archive or export the content.
 
----
+You are responsible for how exported data is used. WorldBinder does not grant rights to copy, redistribute or publish content owned by other people, servers or projects.
 
-## Resource Packs
+## Feedback and bug reports
 
-When the server resource pack can be accessed by the client, WorldBinder can copy it into the exported world as `resources.zip`. Minecraft should then offer the pack when opening the exported save.
+WorldBinder is actively being improved.
 
-If a server blocks, changes or fails resource-pack delivery, WorldBinder can only include what the client was able to receive or cache.
-
----
-
-## Performance Notes
-
-WorldBinder is designed to be polite to both the client and server:
-
-- Capture work is budgeted per tick.
-- Visible nearby chunks are prioritized.
-- Pause stops capture work.
-- Adaptive throttling can reduce work under load.
-- Presets can be changed between Safe, Balanced, Fast and Extreme.
-- The Profiler shows capture, queue and StorageFlow telemetry while testing.
-
-For large areas, Balanced or Fast is recommended. Extreme is for short tests or strong machines only.
-
----
-
-## Data Location
-
-WorldBinder stores captures, recoveries and exports in the mod data folder inside your Minecraft instance. The About page shows the exact path used by your installation.
-
----
-
-## Feedback and Bug Reports
-
-Found a bug, export issue, missing translation or have an idea for WorldBinder?
-
-Please report it on GitHub:
+Please report bugs, ideas and feedback on GitHub:
 
 - Repository: https://github.com/Philiipp06/WorldBinder
 - Issues: https://github.com/Philiipp06/WorldBinder/issues
 
-or on Discord:
+Helpful reports include:
 
-- Discord: https://discord.com/invite/V7h3vaXxDZ
+- Minecraft version
+- WorldBinder version
+- Fabric Loader and Fabric API version
+- Selected target output version
+- Window mode and GUI scale if the issue is UI-related
+- What was captured
+- What went wrong
+- Whether the export was opened in singleplayer, Paper or Multiverse
+- Screenshots, logs or exported test worlds if possible
 
-Include your Minecraft version, WorldBinder version, selected target output version, screenshots/logs and a short description of what happened.
+## Build from source
 
----
+WorldBinder requires Java 25 and Fabric Loom.
 
-## Release Status
+```bash
+./gradlew clean build
+```
 
-WorldBinder Alpha V3 is a test release for capture, recovery, validation, responsive UI and server-friendly export workflows. Expect edge cases with unusual servers, modded clients, older target versions, heavy entity scenes and large captures.
+The official release artifact is the Fabric jar from `build/libs/`.
+
+## Status
+
+WorldBinder Beta 1 is a public testing release.
+
+The goal of this Beta is to validate real-world capture accuracy, export compatibility, recovery behavior, performance and usability before a future stable 1.0 release.

@@ -47,46 +47,65 @@ public final class WorldBinderHud {
 
     private static void drawBossbar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
         Font renderer = client.font;
-        int scale = Math.max(1, WorldBinder.config().bossbarScalePercent);
-        int barWidth = 420 * scale / 100;
+        int requestedScale = Math.max(1, WorldBinder.config().bossbarScalePercent);
         int screenWidth = client.getWindow().getGuiScaledWidth();
+        int screenHeight = client.getWindow().getGuiScaledHeight();
+        float responsiveScale = hudScale(screenWidth, screenHeight);
+        int maxWidth = Math.max(170, screenWidth - 32);
+        int designWidth = Math.round(520 * responsiveScale * requestedScale / 100.0F);
+        int barWidth = clamp(designWidth, Math.min(260, maxWidth), maxWidth);
+        boolean verySmall = screenWidth < 740 || screenHeight < 270;
+        if (verySmall) {
+            barWidth = Math.min(barWidth, Math.max(170, screenWidth - 48));
+        }
         int x = (screenWidth - barWidth) / 2;
-        int y = WorldBinder.config().bossbarOffsetY;
+        int y = Math.max(4, Math.round(WorldBinder.config().bossbarOffsetY * responsiveScale));
         StorageProgress storage = StorageFlow.progress();
-        double shownProgress = storage.isRunning() ? storage.progress() : OperationStatus.progress();
-        int fill = (int) ((barWidth - 4) * shownProgress);
+        boolean storageMode = storage.isRunning();
+        boolean captureMode = capture != null && capture.isCapturing();
+        boolean compact = verySmall || barWidth < 360 || screenHeight < 170;
+        int overlayHeight = storageMode ? compact ? 44 : 58 : captureMode && !compact ? 76 : 42;
+        y = Math.min(y, Math.max(4, screenHeight - overlayHeight - 4));
 
-        if (storage.isRunning()) {
-            context.fill(x - 5, y - 5, x + barWidth + 5, y + 64, 0xAA10182A);
+        double shownProgress = storageMode ? storage.progress() : OperationStatus.progress();
+        int fill = (int) ((barWidth - 4) * Math.max(0.0D, Math.min(1.0D, shownProgress)));
+
+        if (storageMode) {
+            context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x8810182A);
             context.fill(x, y, x + barWidth, y + 18, 0xFF1A1128);
             context.fill(x + 2, y + 2, x + 2 + fill, y + 16, 0xFFFF55FF);
             context.fill(x, y, x + barWidth, y + 1, 0xFFFF55FF);
             net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.title"), screenWidth / 2, y + 5, 0xFFFFFFFF);
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(storage.stage().label() + " • " + (int) (storage.progress() * 100.0D) + "%"), screenWidth / 2, y + 28, 0xFFE6E6F0);
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.elapsed_remaining", StorageProgress.formatMillis(storage.elapsedMillis()), storage.etaText()), screenWidth / 2, y + 44, 0xFFBDB6D9);
+            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(storage.stage().label() + " • " + (int) (storage.progress() * 100.0D) + "%", Math.max(18, barWidth / 6))), screenWidth / 2, y + 28, 0xFFE6E6F0);
+            if (!compact) {
+                net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.elapsed_remaining", StorageProgress.formatMillis(storage.elapsedMillis()), storage.etaText()), screenWidth / 2, y + 44, 0xFFBDB6D9);
+            }
             return;
         }
 
-        context.fill(x - 5, y - 5, x + barWidth + 5, y + 76, 0xAA080810);
+        context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x88080810);
         context.fill(x, y, x + barWidth, y + 18, 0xFF1A1128);
         context.fill(x + 2, y + 2, x + 2 + fill, y + 16, OperationStatus.active() ? 0xFFFF55FF : 0xFF55FFAA);
         context.fill(x, y, x + barWidth, y + 1, 0xFFFF55FF);
         context.fill(x, y + 17, x + barWidth, y + 18, 0xFF5E03FC);
 
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(OperationStatus.title()), screenWidth / 2, y + 5, 0xFFFFFFFF);
-        if (capture != null && capture.isCapturing()) {
+        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.title(), Math.max(20, barWidth / 6))), screenWidth / 2, y + 5, 0xFFFFFFFF);
+        if (captureMode) {
             net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text(capture.isPaused() ? "worldbinder.common.paused" : "worldbinder.hud.downloading"), screenWidth / 2, y + 25, 0xFFE6E6F0);
-            int chipY = y + 43;
-            int done = capture.scannedChunks();
-            int scanning = capture.partialChunks();
-            int queued = capture.queuedChunks();
-            int total = Math.max(1, done + scanning + queued);
-            int meterW = Math.max(86, (barWidth - 36) / 3);
-            drawMeter(context, renderer, x, chipY, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, 0xFF55FFAA);
-            drawMeter(context, renderer, x + meterW + 12, chipY, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), 0xFFFF55FF);
-            drawMeter(context, renderer, x + (meterW + 12) * 2, chipY, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? 0xFFFF5555 : 0xFFFFD166);
+            if (!compact) {
+                int chipY = y + 43;
+                int done = capture.scannedChunks();
+                int scanning = capture.partialChunks();
+                int queued = capture.queuedChunks();
+                int total = Math.max(1, done + scanning + queued);
+                int gap = 8;
+                int meterW = Math.max(64, (barWidth - gap * 2) / 3);
+                drawMeter(context, renderer, x, chipY, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, 0xFF55FFAA);
+                drawMeter(context, renderer, x + meterW + gap, chipY, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), 0xFFFF55FF);
+                drawMeter(context, renderer, x + (meterW + gap) * 2, chipY, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? 0xFFFF5555 : 0xFFFFD166);
+            }
         } else {
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.detail(), 70)), screenWidth / 2, y + 25, 0xFFE6E6F0);
+            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.detail(), Math.max(24, barWidth / 6))), screenWidth / 2, y + 25, 0xFFE6E6F0);
         }
     }
 
@@ -96,23 +115,34 @@ public final class WorldBinderHud {
         int fill = (int) ((w - 6) * Math.max(0.0D, Math.min(1.0D, progress)));
         context.fill(x + 3, y + 15, x + w - 3, y + 20, 0x33000000);
         context.fill(x + 3, y + 15, x + 3 + fill, y + 20, color);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, renderer, Component.literal(label + ": §f" + value), x + 5, y + 4, 0xFFBDB6D9);
+        String text = shorten(label + ": §f" + value, Math.max(8, (w - 10) / 6));
+        net.worldbinder.util.GuiText.drawTextWithShadow(context, renderer, Component.literal(text), x + 5, y + 4, 0xFFBDB6D9);
     }
 
     private static void drawChunkRadar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
         WorldBinderConfig config = WorldBinder.config();
-        int requestedSize = Math.max(1, config.chunkRadarSize | 1);
-        int size = cappedOddSize(requestedSize, config.effectiveRadarMaxRenderedChunks());
-        int cell = Math.max(1, config.chunkRadarCellSize * Math.max(1, config.chunkRadarScalePercent) / 100);
-        int grid = size * cell;
-        int panelW = Math.max(92, grid + 18);
-        int panelH = grid + 34;
         int screenW = client.getWindow().getGuiScaledWidth();
         int screenH = client.getWindow().getGuiScaledHeight();
+        float responsiveScale = hudScale(screenW, screenH);
+        int requestedSize = Math.max(1, config.chunkRadarSize | 1);
+        int size = cappedOddSize(requestedSize, config.effectiveRadarMaxRenderedChunks());
+        int requestedCell = Math.max(1, Math.round(config.chunkRadarCellSize * Math.max(1, config.chunkRadarScalePercent) / 100.0F * responsiveScale));
+        int maxPanelW = Math.max(64, Math.min(screenW / 3, 210));
+        int maxPanelH = Math.max(64, Math.min(screenH / 3, 210));
+        int maxGrid = Math.max(24, Math.min(maxPanelW - 18, maxPanelH - 34));
+        int cell = Math.max(1, Math.min(requestedCell, maxGrid / Math.max(1, size)));
+        while (size > 3 && size * cell > maxGrid) {
+            size -= 2;
+        }
+        int grid = size * cell;
+        int panelW = Math.max(72, grid + 18);
+        int panelH = grid + 34;
         int x = config.chunkRadarRightAligned
-                ? screenW - panelW - config.chunkRadarOffsetX
-                : config.chunkRadarOffsetX;
-        int y = config.chunkRadarOffsetY;
+                ? screenW - panelW - Math.round(config.chunkRadarOffsetX * responsiveScale)
+                : Math.round(config.chunkRadarOffsetX * responsiveScale);
+        int y = Math.round(config.chunkRadarOffsetY * responsiveScale);
+        int bossbarClearance = OperationStatus.visible() ? Math.min(screenH - panelH - 4, Math.round(92 * responsiveScale)) : 4;
+        y = Math.max(y, bossbarClearance);
         x = Math.max(4, Math.min(screenW - panelW - 4, x));
         y = Math.max(4, Math.min(screenH - panelH - 4, y));
 
@@ -136,6 +166,15 @@ public final class WorldBinderHud {
             int py = gridY + (radarCell.dz + center) * cell;
             drawRadarCell(context, radarCell, px, py, cell, frame.detailCells, config.radarLayerMode);
         }
+    }
+
+    private static float hudScale(int screenWidth, int screenHeight) {
+        float scale = Math.min(screenWidth / 960.0F, screenHeight / 540.0F);
+        return Math.max(0.55F, Math.min(1.0F, scale));
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static int cappedOddSize(int requestedSize, int maxRenderedChunks) {

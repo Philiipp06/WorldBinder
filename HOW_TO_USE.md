@@ -1,190 +1,169 @@
-# WorldBinder Alpha V3 — How to Use
+# WorldBinder Beta 1 — How to Use
 
-WorldBinder is a client-side Fabric tool for permitted world capture, archive management, recovery, validation and export. It records data that your Minecraft client receives and can export that data into a local world folder.
+This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
-> Use WorldBinder only on worlds, maps, builds or servers you own, administer, created yourself, or where you have explicit permission. Do not use it to copy, archive, redistribute or extract third-party content without permission.
+WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, builds and resource packs that you own, administer, created yourself, or where you have explicit permission to archive or export the content.
 
----
+## 1. Install WorldBinder
 
-## 1. Install
+1. Install Minecraft 26.1.2 with Fabric Loader.
+2. Install Fabric API.
+3. Place the WorldBinder jar into your `mods` folder.
+4. Start the game.
+5. Open Minecraft Controls and check the `WorldBinder` keybind category.
 
-1. Use Minecraft Java **26.1.2**.
-2. Install Fabric Loader **0.19.2** or newer for the matching Minecraft version.
-3. Install the matching Fabric API.
-4. Put the WorldBinder jar into your `mods` folder.
-5. Start Minecraft.
+Default keybinds:
 
-WorldBinder is client-side. It does not need to be installed on the server.
+| Key | Action |
+| --- | --- |
+| F6 | Start/stop world download |
+| F7 | Set position 1 |
+| F8 | Set position 2 |
+| F9 | Open WorldBinder Control Center |
+| F10 | Open WorldBinder Map |
 
----
+## 2. Open the Control Center
 
-## 2. Open WorldBinder
+Press **F9** to open the WorldBinder Control Center.
 
-Press **F9** to open the Control Center.
+The Control Center provides access to:
 
-The Control Center contains:
-
-- Overview
-- Capture
-- Map
-- Archives & Validation
-- Recovery
+- Capture controls
+- Archive status
+- Recent activity
+- Validation results
+- Recovery tools
 - Settings
-- Tools
-- About
+- F10 map
+- Queue Dashboard / Profiler
 
-Press **F10** to open the map directly.
+WorldBinder Beta 1 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
 
-WorldBinder Alpha V3 uses a virtual responsive GUI canvas. Menus are designed to keep the same layout across fullscreen, smaller windows and different GUI scales.
+## 3. Choose capture settings
 
----
+Open **Settings** from the Control Center and review:
 
-## 3. Start a Capture
+- target output version
+- performance preset
+- capture radius
+- autosave behavior
+- recovery behavior
+- resource pack export
+- gamerule export
+- HUD and map options
 
-1. Open **Capture**.
-2. Enter an archive name.
-3. Select the target output version.
-4. Choose a performance preset if needed.
-5. Press **Start**.
+Recommended presets:
 
-Move through the area you want to save. WorldBinder prioritizes chunks around your player and records data as it becomes visible to the client.
+| Preset | Recommended use |
+| --- | --- |
+| Safe | Large servers, low-end systems or cautious capture |
+| Balanced | Normal use |
+| Fast | Stronger systems and smaller captures |
+| Extreme | Testing only; may increase client/server load |
 
-Use **Pause** when you want capture work to stop temporarily. Use **Finish** when you are ready to process the queue and export or validate the archive.
+## 4. Start a capture
 
----
+You can start a world download from the Capture screen or with **F6**.
 
-## 4. Choose a Target Version
+WorldBinder will collect chunks, block states, block entities, visible entities, chunk coverage and available metadata while you move through the world. The client can only save what the server actually sends to it.
 
-The target version controls the version metadata used for the exported world. You can type a final release version or cycle with Prev/Next.
+Use **F10** to open the live map. Captured, partial, queued and errored chunks are displayed with different colors.
 
-Examples:
+## 5. Finish and export
 
-- `26.1.2`
-- `1.21.1`
-- `1.20.1`
+When you are done capturing:
 
-Older targets may require block/data simplification. Always open and validate the result in the selected version.
+1. Open the Control Center with **F9**.
+2. Open the Capture screen.
+3. Choose finish/export.
+4. Let WorldBinder process the remaining queue.
+5. Wait until the export is complete.
 
----
+The exported folder is written as a local Minecraft save. It may include:
 
-## 5. Validate and Preview
+```text
+level.dat
+level.dat_old
+session.lock
+icon.png
+resources.zip
+README.md
+region/
+entities/
+poi/
+data/minecraft/
+dimensions/minecraft/overworld/
+worldbinder/
+```
 
-Open **Archives & Validation** after a capture.
+The export `README.md` explains what was captured and how to review the result.
 
-Useful actions:
+## 6. Open or import an export
 
-- **Preview** — inspect the archive.
-- **Validate** — check for missing or suspicious data.
-- **Continue** — resume a previous archive.
-- **Duplicate** — create a copy before experimenting.
-- **Delete** — remove an archive you no longer need.
-- **Export Preview** — generate a testable world folder from the selected archive.
+For local testing, place the exported folder in your Minecraft `saves` folder and open it from singleplayer.
 
----
+For Paper or Multiverse testing, copy the exported world folder to your server world directory and import it with your server tools. WorldBinder writes a compatibility layout with root-level region folders and modern 26.x dimension folders to make server imports easier.
 
-## 6. F10 Map
+Always check the imported world before using it publicly.
 
-Use the **F10 Map** to inspect saved, partial, queued and failed chunks.
+## 7. Use recovery
 
-Helpful controls:
+WorldBinder can save recovery data while capturing.
 
-- **Follow** — keep the map centered on your player.
-- **Player / Origin** — jump to useful reference positions.
-- **View** — switch visible map/chunk layers.
-- **Filters** — focus on specific capture states.
-- **Queue rescan** — re-check visible chunks when testing capture quality.
+If Minecraft closes, the server disconnects you or you leave before finishing an export:
 
----
+1. Reopen Minecraft.
+2. Join a world if needed.
+3. Open WorldBinder with **F9**.
+4. Go to Archives/Recovery.
+5. Continue or finalize the recovery entry.
 
-## 7. Recovery
+Recovery can only preserve data that had already been captured or cached.
 
-If Minecraft disconnects, crashes or closes during capture, WorldBinder can keep recovery data.
+## 8. Validate exports
 
-Open **Recovery** from the Control Center to inspect and continue available recovery sessions.
+WorldBinder writes validation information into the `worldbinder/` folder of an export.
 
----
+Review validation if:
 
-## 8. Settings
+- chunks are missing
+- entities did not export
+- the spawn is wrong
+- the export appears empty
+- the server import prints warnings
+- the target output version is older than the captured client version
 
-The Settings screen is split into sections:
+A warning does not always mean the export is unusable. It means the result should be checked before sharing or importing it permanently.
 
-- **General** — archive name, target output, capture radius and export toggles.
-- **Performance** — tick budgets, queue limits and capture pacing.
-- **HUD & Map** — bossbar, radar, map layers and overlay details.
-- **Safety** — recovery, resource-pack fallback, export extras and gamerules.
+## 9. Resource packs
 
-The Safety tab contains subpages so larger settings such as gamerules stay readable. Scroll when a page has more content than fits on screen.
+If the server sent a resource pack and WorldBinder could access it, the pack is exported as:
 
----
+```text
+resources.zip
+```
 
-## 9. Gamerules
+Minecraft can use this file as the world resource pack when opening the save locally. Server-specific resource packs, protected downloads or packs that were never fully received by the client may not be available.
 
-Gamerules can be configured from the Safety settings.
+## 10. Responsible use
 
-You can use presets or toggle individual rules. `randomTickSpeed` is controlled with a slider.
+WorldBinder is a preservation and export tool. It does not give permission to copy, redistribute or publish other people's work.
 
-For 26.x exports, WorldBinder writes vanilla-safe gamerules only. Known legacy names are mapped to supported 26.x registry keys, unsupported or modded rules are skipped, and inverted rules are normalized before writing `game_rules.dat`.
+Use it only when you own the content, administer the server, created the build yourself, or have explicit permission.
 
----
+## 11. Reporting bugs
 
-## 10. Resource Packs
+Please report issues here:
 
-When possible, WorldBinder places the captured server resource pack into the exported world as `resources.zip`.
+- Repository: https://github.com/Philiipp06/WorldBinder
+- Issues: https://github.com/Philiipp06/WorldBinder/issues
 
-Minecraft should offer that pack when opening the world. If the pack was never successfully received by the client, it may not be available for export.
+Useful reports include:
 
----
-
-## 11. Profiler
-
-Open the **Profiler** from Tools or the Map screen while testing larger captures.
-
-It shows:
-
-- current capture mode
-- queue size
-- StorageFlow stage and progress
-- completed/failed jobs
-- stage timing bars
-
-This is mainly for Alpha testing, performance tuning and bug reports.
-
----
-
-## 12. Good Testing Checklist
-
-Before sharing an Alpha V3 result, test:
-
-- Capture start, pause, resume and finish.
-- Export with the current target version.
-- Export with an older target version.
-- Validation result.
-- Resource-pack prompt in the exported world.
-- Loading the world in the selected Minecraft version.
-- F9/F10 UI behavior in fullscreen and smaller windows.
-- Paper/Multiverse import in a separate test environment if the export is meant for a server.
-
----
-
-## Server Imports
-
-For Bukkit/Paper/Multiverse-style imports, export with the same target version as the server and use a lowercase world name, for example `worldbinderexport`.
-
-For 26.x targets, WorldBinder writes multiple compatible layouts:
-
-- root `region/`, `entities/`, `poi/` for classic world-folder checks
-- `dimensions/minecraft/overworld/` for local 26.x clients
-- `dimensions/minecraft/<world-name>/` for Paper/Multiverse custom-world keys
-
-If the server logs `AccessDeniedException` while loading `.mca` files, the folder structure is not the main issue. The server process cannot read the files. Stop the server and fix ownership/permissions through your panel or host, then import again.
-
----
-
-## Feedback, Ideas and Bugs
-
-Please report issues or ideas on GitHub:
-
-- https://github.com/Philiipp06/WorldBinder
-- https://github.com/Philiipp06/WorldBinder/issues
-
-For bug reports, include the Minecraft version, WorldBinder version, selected target output version, screenshots/logs and what you expected to happen.
+- Minecraft version
+- WorldBinder version
+- Fabric Loader and Fabric API version
+- selected target output version
+- capture mode and performance preset
+- whether the issue happened in singleplayer, Paper or Multiverse
+- screenshots, logs and the export validation report if possible

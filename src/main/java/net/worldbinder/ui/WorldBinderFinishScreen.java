@@ -58,14 +58,13 @@ public final class WorldBinderFinishScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x00000000);
+        context.fill(0, 0, realWidth, realHeight, 0x6605050C);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
         width = WbLayout.DESIGN_WIDTH;
         height = WbLayout.DESIGN_HEIGHT;
         try {
-        context.fill(0, 0, width, height, 0xD905050C);
         int w = Math.max(260, Math.min(420, width - 24));
         int h = Math.max(160, Math.min(178, height - 24));
         int left = (width - w) / 2;

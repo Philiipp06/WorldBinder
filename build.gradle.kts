@@ -37,3 +37,9 @@ tasks.processResources {
         expand("version" to project.version)
     }
 }
+
+tasks.register("buildFabric") {
+    group = "build"
+    description = "Builds the official Fabric WorldBinder jar. Fabric is the only supported loader for this release."
+    dependsOn("build")
+}

@@ -26,6 +26,7 @@ public final class V261Exporter extends AbstractWorldExportModule {
             if (!"overworld".equals(key)) {
                 Path serverDimension = context.worldFolder().resolve("dimensions").resolve("minecraft").resolve(key);
                 layouts.add(modernDimension("server/" + key, serverDimension));
+                break;
             }
         }
     }
