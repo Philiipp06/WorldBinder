@@ -17,6 +17,7 @@ public final class ChunkSnapshot {
     public boolean hasBiomeData = true;
     public boolean lightEstimated = true;
     public boolean hasSnapshot;
+    public boolean verifiedEmpty;
     public boolean exportError;
     public String lastError;
     public long lastScannedAtMillis;
@@ -51,6 +52,29 @@ public final class ChunkSnapshot {
         scannedBlocks += Math.max(0, scanned);
         savedBlocks += Math.max(0, saved);
         blockEntityCount += Math.max(0, blockEntities);
+        touchMetadata();
+    }
+
+    public void beginBlockScan() {
+        scannedBlocks = 0;
+        savedBlocks = 0;
+        blockEntityCount = 0;
+        hasSnapshot = false;
+        verifiedEmpty = false;
+        exportError = false;
+        lastError = null;
+        if (colors != null && colors.length == 256) {
+            Arrays.fill(colors, 0);
+        }
+        if (heights != null && heights.length == 256) {
+            Arrays.fill(heights, Integer.MIN_VALUE);
+        }
+        states = null;
+        touchVisual();
+    }
+
+    public void markVerifiedEmpty() {
+        verifiedEmpty = true;
         touchMetadata();
     }
 

@@ -34,6 +34,7 @@ public final class WorldScene {
     public boolean includesAdvancements;
     public boolean includesStats;
     public boolean compressedZip;
+    public String chunkCacheFolder;
     public List<Integer> mapIds = new ArrayList<>();
     public List<String> storageNotes = new ArrayList<>();
     public List<BlockRecord> blocks = new ArrayList<>();

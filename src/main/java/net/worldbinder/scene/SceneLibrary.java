@@ -10,6 +10,7 @@ import net.worldbinder.validation.ExportValidationReport;
 import net.worldbinder.validation.ExportValidator;
 import net.minecraft.client.Minecraft;
 import net.worldbinder.status.WorldBinderActivityLog;
+import net.worldbinder.util.Lang;
 
 import java.io.IOException;
 import java.io.BufferedWriter;
@@ -201,7 +202,7 @@ public final class SceneLibrary {
             writeRecoveryManifest(folder.resolve(WORLDBINDER_FOLDER), null, "failed", error);
             refresh();
         } catch (IOException exception) {
-            WorldBinder.LOGGER.warn("Failed to mark recovery as failed", exception);
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.mark_recovery_failed"), exception);
         }
     }
 
@@ -315,6 +316,7 @@ public final class SceneLibrary {
         safeScene.storageNotes.add("Finalized from recovery. Active/queued/scanning/error chunks were not exported as safe final chunks.");
         Path target = uniqueFinalizedFolder(base);
         saveWorldFolder(safeScene, target);
+        deleteChunkCacheFolder(recovered == null ? null : recovered.chunkCacheFolder);
         if (Files.exists(recoveryFolder)) {
             deleteRecursive(recoveryFolder);
         }
@@ -382,6 +384,7 @@ public final class SceneLibrary {
         copy.includesAdvancements = source.includesAdvancements;
         copy.includesStats = source.includesStats;
         copy.compressedZip = false;
+        copy.chunkCacheFolder = source.chunkCacheFolder;
         copy.mapIds = source.mapIds == null ? new ArrayList<>() : new ArrayList<>(source.mapIds);
         copy.storageNotes = source.storageNotes == null ? new ArrayList<>() : new ArrayList<>(source.storageNotes);
 
@@ -424,9 +427,42 @@ public final class SceneLibrary {
         if (archiveOrFolder == null || !Files.exists(archiveOrFolder)) {
             return;
         }
+        String cacheFolder = null;
+        if (isRecovery(archiveOrFolder)) {
+            try {
+                WorldScene scene = read(archiveOrFolder);
+                cacheFolder = scene == null ? null : scene.chunkCacheFolder;
+            } catch (IOException ignored) {
+            }
+        }
         deleteRecursive(archiveOrFolder);
+        deleteChunkCacheFolder(cacheFolder);
         WorldBinderActivityLog.add("Archive deleted: " + archiveOrFolder.getFileName());
         refresh();
+    }
+
+    private void deleteChunkCacheFolder(String cacheFolder) {
+        if (cacheFolder == null || cacheFolder.isBlank()) {
+            return;
+        }
+        String name = cacheFolder.trim().replace('\\', '/');
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) {
+            name = name.substring(slash + 1);
+        }
+        name = name.replaceAll("[^a-zA-Z0-9_.-]", "");
+        if (name.isBlank() || name.equals(".") || name.equals("..")) {
+            return;
+        }
+        Path cacheRoot = WorldBinderPaths.CACHE_ROOT.resolve(name).normalize();
+        if (!Files.isDirectory(cacheRoot)) {
+            return;
+        }
+        try {
+            deleteRecursive(cacheRoot);
+        } catch (IOException exception) {
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.chunk_cache.clean_failed", cacheRoot), exception);
+        }
     }
 
     private Path uniqueFinalizedFolder(String baseName) {
@@ -487,7 +523,7 @@ public final class SceneLibrary {
         }
         if (report == null || !Files.isRegularFile(report)) {
             String manifestLine = readManifestValidationLine(path);
-            return manifestLine == null ? "No validation report" : manifestLine;
+            return manifestLine == null ? Lang.string("worldbinder.validation.no_report") : manifestLine;
         }
         try {
             String json = Files.readString(report);
@@ -568,7 +604,8 @@ public final class SceneLibrary {
                 "  \"name\": \"" + escape(scene == null ? "" : scene.name) + "\",\n" +
                 "  \"chunks\": " + (scene == null ? 0 : scene.chunkSnapshotCount()) + ",\n" +
                 "  \"blocks\": " + (scene == null ? 0 : scene.blockCount()) + ",\n" +
-                "  \"entities\": " + (scene == null ? 0 : scene.entityCount()) +
+                "  \"entities\": " + (scene == null ? 0 : scene.entityCount()) + ",\n" +
+                "  \"chunkCacheFolder\": \"" + escape(scene == null ? "" : scene.chunkCacheFolder) + "\"" +
                 (error == null || error.isBlank() ? "\n" : ",\n  \"error\": \"" + escape(error) + "\"\n") +
                 "}\n";
         writeStringAtomic(metadataFolder.resolve(MANIFEST_FILE), manifest);
@@ -651,7 +688,7 @@ public final class SceneLibrary {
                         }
                     });
         } catch (IOException exception) {
-            WorldBinder.LOGGER.error("Failed to refresh archive library", exception);
+            WorldBinder.LOGGER.error(Lang.string("worldbinder.log.scene.refresh_library_failed"), exception);
         }
     }
 
@@ -749,7 +786,7 @@ public final class SceneLibrary {
                 Files.writeString(stats.resolve(client.player.getUUID().toString() + ".json"), "{\n  \"worldbinder\": true,\n  \"DataVersion\": 4440,\n  \"stats\": {},\n  \"note\": \"Stats folder prepared by WorldBinder.\"\n}\n");
             }
         } catch (IOException exception) {
-            WorldBinder.LOGGER.warn("Failed to write player metadata", exception);
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.player_metadata_failed"), exception);
         }
     }
 
@@ -772,7 +809,7 @@ public final class SceneLibrary {
                     "  \"chunks\": " + export.chunks() + "\n" +
                     "}\n");
         } catch (IOException exception) {
-            WorldBinder.LOGGER.warn("Failed to write capture metadata", exception);
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.capture_metadata_failed"), exception);
         }
     }
 
@@ -793,39 +830,15 @@ public final class SceneLibrary {
         if (!WorldBinder.config().includeServerResourcePack) {
             return;
         }
-        List<Path> roots = List.of(
-                WorldBinderPaths.GAME_DIR.resolve("server-resource-packs"),
-                WorldBinderPaths.GAME_DIR.resolve("downloads"),
-                WorldBinderPaths.GAME_DIR.resolve("resourcepacks")
-        );
         try {
-            Optional<Path> latest = Optional.empty();
-            for (Path root : roots) {
-                if (!Files.isDirectory(root)) continue;
-                try (Stream<Path> stream = Files.walk(root, 3)) {
-                    Optional<Path> candidate = stream
-                            .filter(Files::isRegularFile)
-                            .filter(path -> isLikelyPack(path))
-                            .max(Comparator.comparing(this::lastModified));
-                    if (candidate.isPresent() && (latest.isEmpty() || lastModified(candidate.get()) > lastModified(latest.get()))) {
-                        latest = candidate;
-                    }
-                }
-            }
-            if (latest.isPresent()) {
-                Files.copy(latest.get(), worldFolder.resolve("resources.zip"), StandardCopyOption.REPLACE_EXISTING);
+            Optional<Path> pack = ServerResourcePackLocator.findBestPack();
+            if (pack.isPresent()) {
+                Files.copy(pack.get(), worldFolder.resolve("resources.zip"), StandardCopyOption.REPLACE_EXISTING);
+                WorldBinderActivityLog.add("Server resource pack copied");
             }
         } catch (IOException exception) {
-            WorldBinder.LOGGER.warn("Failed to copy server resource pack into WorldBinder save", exception);
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.resource_pack_copy_failed"), exception);
         }
-    }
-
-    private boolean isLikelyPack(Path path) {
-        String name = path.getFileName().toString().toLowerCase();
-        if (name.endsWith(".json") || name.endsWith(".txt") || name.endsWith(".log") || name.endsWith(".png")) {
-            return false;
-        }
-        return name.endsWith(".zip") || !name.contains(".");
     }
 
     private void deleteRecoveryFolders() {
@@ -833,7 +846,7 @@ public final class SceneLibrary {
             try {
                 deleteRecursive(recovery);
             } catch (IOException exception) {
-                WorldBinder.LOGGER.warn("Failed to delete old recovery folder {}", recovery, exception);
+                WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.old_recovery_delete_failed", recovery), exception);
             }
         }
     }

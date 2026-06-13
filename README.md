@@ -1,31 +1,35 @@
-# WorldBinder Beta 1
+# WorldBinder 1.0.0
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. WorldBinder does not provide combat advantages, movement advantages, X-ray features, hidden server bypasses or permission bypasses. It focuses on responsible world preservation and local export workflows.
 
-> **Beta notice:** WorldBinder Beta 1 is intended for public testing. The interface, capture workflow and export structure are now much closer to release quality, but exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
+> **Release notice:** WorldBinder 1.0.0 is the first stable public release of WorldBinder. It includes the durable chunk cache system introduced during Beta testing and is intended for real-world Fabric use on Minecraft 26.1.2. Exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
 
 ## Supported loader
 
 WorldBinder is built and released for **Fabric**.
 
-Quilt and NeoForge are not supported in this release. They may be considered in the future only if the shared WorldBinder core is separated cleanly from the Fabric-specific client layer and each loader can be tested properly.
+Forge, NeoForge and Quilt are not supported at this time. WorldBinder is developed and released as a native Fabric mod.
 
 ## Main features
 
 - HotCache-first client-side chunk capture
+- Durable chunk block cache for large captures
 - Vanilla world folder export
 - Target output version selection
 - Block, block entity and entity export where available
 - Server resource pack export as `resources.zip`
 - Recovery and autosave tools
+- Recovery cache reuse after crashes
+- Automatic temporary cache cleanup after successful exports
 - Configurable performance presets
 - F9 Control Center
 - F10 live chunk map with coverage colors, filters and inspector tooltips
+- Ctrl+C chunk center coordinate copying
 - Queue Dashboard / Profiler for capture and export telemetry
 - Export validation reports
-- Responsive Beta GUI scaling across different window sizes and GUI scales
+- Responsive GUI scaling across different window sizes and GUI scales
 - Dedicated WorldBinder keybind category in Minecraft Controls
 - German and English language support
 
@@ -74,6 +78,16 @@ For Minecraft 26.x targets, WorldBinder writes a compatibility-oriented layout:
 
 This keeps the exported folder usable for both local testing and common server import workflows while avoiding timestamp-based duplicate dimension keys.
 
+## Temporary capture cache
+
+Large captures use a temporary chunk cache while WorldBinder is running. The cache is stored inside the current Minecraft profile at:
+
+```text
+saves/WorldBinder/.cache/
+```
+
+This cache keeps captured block data durable during long sessions without keeping every chunk only in memory. WorldBinder removes the temporary cache automatically after a successful export. If Minecraft crashes or an export fails, the cache may remain so recovery data can still be used.
+
 ## Target output versions
 
 WorldBinder can export captured data for different target Minecraft versions.
@@ -100,10 +114,11 @@ You are responsible for how exported data is used. WorldBinder does not grant ri
 
 WorldBinder is actively being improved.
 
-Please report bugs, ideas and feedback on GitHub:
+Please report bugs, ideas and feedback on GitHub or Discord:
 
 - Repository: https://github.com/Philiipp06/WorldBinder
 - Issues: https://github.com/Philiipp06/WorldBinder/issues
+- Discord: https://discord.com/invite/V7h3vaXxDZ
 
 Helpful reports include:
 
@@ -129,6 +144,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder Beta 1 is a public testing release.
+WorldBinder 1.0.0 is the first stable public release.
 
-The goal of this Beta is to validate real-world capture accuracy, export compatibility, recovery behavior, performance and usability before a future stable 1.0 release.
+The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

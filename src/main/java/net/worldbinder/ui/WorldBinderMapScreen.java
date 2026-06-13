@@ -3,6 +3,7 @@ package net.worldbinder.ui;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -17,6 +18,8 @@ import net.worldbinder.scene.ChunkCaptureStatus;
 import net.worldbinder.render.ChunkMapTileCache;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTooltips;
+import net.worldbinder.util.Chat;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Map;
 import java.util.Set;
@@ -239,7 +242,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (hovered != Long.MIN_VALUE) {
             selectedChunk = hovered;
             if (virtualEvent.button() == 1) {
-                WorldBinderClient.capture().queueChunkForRescan((int) hovered, (int) (hovered >> 32));
+                WorldBinderClient.capture().queueChunkForRescan(chunkXFromKey(hovered), chunkZFromKey(hovered));
                 return true;
             }
         }
@@ -253,6 +256,20 @@ public final class WorldBinderMapScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        if (getFocused() == goX || getFocused() == goZ) {
+            return super.keyPressed(event);
+        }
+        boolean copyPressed = event.key() == GLFW.GLFW_KEY_C
+                && (event.modifiers() & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0;
+        if (copyPressed && selectedChunk != Long.MIN_VALUE) {
+            copySelectedChunkCenter();
+            return true;
+        }
+        return super.keyPressed(event);
     }
 
     @Override
@@ -350,7 +367,8 @@ public final class WorldBinderMapScreen extends Screen {
             drawFilterPanel(context, 16, Math.min(height - 150, mapY + 260));
         }
         if (rightPanelW > 0) {
-            drawInspectorPanel(context, width - rightPanelW - 18, 106, hoveredKey != null ? hoveredKey : selectedChunk, hoveredKey != null ? hoveredX : (int) selectedChunk, hoveredKey != null ? hoveredZ : (int) (selectedChunk >> 32));
+            long inspectorKey = hoveredKey != null ? hoveredKey : selectedChunk;
+            drawInspectorPanel(context, width - rightPanelW - 18, 106, inspectorKey, hoveredKey != null ? hoveredX : chunkXFromKey(inspectorKey), hoveredKey != null ? hoveredZ : chunkZFromKey(inspectorKey));
         }
         if (hoveredKey != null) {
             drawChunkTooltip(context, virtualMouseX, virtualMouseY, hoveredKey, hoveredX, hoveredZ, snapshots, done, partial, queued, failed);
@@ -368,9 +386,15 @@ public final class WorldBinderMapScreen extends Screen {
 
     private void drawChunkTooltip(GuiGraphicsExtractor context, int mouseX, int mouseY, long key, int cx, int cz, Map<Long, ChunkSnapshot> snapshots, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed) {
         ChunkSnapshot snapshot = snapshots.get(key);
+        int exactChunkX = chunkXFromKey(key);
+        int exactChunkZ = chunkZFromKey(key);
         ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, false);
+        int centerX = chunkMiddleBlock(exactChunkX);
+        int centerZ = chunkMiddleBlock(exactChunkZ);
         String[] lines = new String[]{
-                "Chunk: " + cx + " / " + cz,
+                "Chunk: " + exactChunkX + " / " + exactChunkZ,
+                "Center: X " + centerX + " / Z " + centerZ,
+                "Ctrl+C: copy center coordinate",
                 "Status: " + statusLabel(status),
                 "Blocks: " + (snapshot == null ? "0" : snapshot.savedBlocks + " / " + snapshot.scannedBlocks),
                 "Entities: " + (snapshot == null ? "0" : Integer.toString(snapshot.entityCount)),
@@ -389,6 +413,26 @@ public final class WorldBinderMapScreen extends Screen {
         for (int i = 0; i < lines.length; i++) {
             net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(lines[i]), x + 10, y + 10 + i * 12, i == 1 ? 0xFFE6E6F0 : 0xFFBDB6D9);
         }
+    }
+
+    private static int chunkXFromKey(long key) {
+        return key == Long.MIN_VALUE ? 0 : (int) key;
+    }
+
+    private static int chunkZFromKey(long key) {
+        return key == Long.MIN_VALUE ? 0 : (int) (key >> 32);
+    }
+
+    private static int chunkMinBlock(int chunk) {
+        return chunk << 4;
+    }
+
+    private static int chunkMiddleBlock(int chunk) {
+        return (chunk << 4) + 8;
+    }
+
+    private static int chunkMaxBlock(int chunk) {
+        return (chunk << 4) + 15;
     }
 
     private long chunkAt(double mouseX, double mouseY) {
@@ -697,7 +741,7 @@ public final class WorldBinderMapScreen extends Screen {
 
     private void drawInspectorPanel(GuiGraphicsExtractor context, int x, int y, long key, int cx, int cz) {
         int w = 184;
-        int h = WorldBinder.config().queueDebugDiagnostics ? 262 : 208;
+        int h = WorldBinder.config().queueDebugDiagnostics ? 294 : 240;
         context.fill(x, y, x + w, y + h, 0xDD080810);
         context.fill(x, y, x + w, y + 2, 0xFFFF55FF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal("Chunk Inspector"), x + 10, y + 10, 0xFFFF55FF);
@@ -709,6 +753,8 @@ public final class WorldBinderMapScreen extends Screen {
         String status = cachedInspectorStatus;
         int yy = y + 32;
         line(context, x, yy, "Chunk", cx + " / " + cz); yy += 16;
+        line(context, x, yy, "Block X", chunkMinBlock(cx) + " .. " + chunkMaxBlock(cx)); yy += 16;
+        line(context, x, yy, "Block Z", chunkMinBlock(cz) + " .. " + chunkMaxBlock(cz)); yy += 16;
         line(context, x, yy, "Status", status); yy += 16;
         line(context, x, yy, "Blocks", snapshot == null ? "0" : snapshot.scannedBlocks + " scanned"); yy += 16;
         line(context, x, yy, "Entities", snapshot == null ? "0" : Integer.toString(snapshot.entityCount)); yy += 16;
@@ -840,8 +886,23 @@ public final class WorldBinderMapScreen extends Screen {
 
     private void queueSelectedRescan() {
         if (selectedChunk != Long.MIN_VALUE) {
-            WorldBinderClient.capture().queueChunkForRescan((int) selectedChunk, (int) (selectedChunk >> 32));
+            WorldBinderClient.capture().queueChunkForRescan(chunkXFromKey(selectedChunk), chunkZFromKey(selectedChunk));
         }
+    }
+
+    private void copySelectedChunkCenter() {
+        int x = chunkMiddleBlock(chunkXFromKey(selectedChunk));
+        int z = chunkMiddleBlock(chunkZFromKey(selectedChunk));
+        int y = 80;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.player != null) {
+            y = mc.player.blockPosition().getY();
+        }
+        String coordinate = x + " " + y + " " + z;
+        if (mc != null) {
+            mc.keyboardHandler.setClipboard(coordinate);
+        }
+        Chat.info("Copied chunk center coordinate: §f" + coordinate);
     }
 
     private void clearFilters() {

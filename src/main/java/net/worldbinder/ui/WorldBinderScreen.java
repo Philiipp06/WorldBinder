@@ -15,6 +15,7 @@ import net.worldbinder.selection.SelectionManager;
 import net.worldbinder.status.OperationStatus;
 import net.worldbinder.status.WorldBinderActivityLog;
 import net.worldbinder.util.Chat;
+import net.worldbinder.util.Lang;
 import net.worldbinder.version.TargetMinecraftVersion;
 import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbCard;
@@ -431,7 +432,6 @@ private void toolsWidgets(int x, int top, int width) {
     private void startRoamingCaptureWithLegalReminder() {
         if (capture.isRoamingCapture()) {
             capture.finishActiveCapture();
-            rebuildWidgets();
             return;
         }
         applyCaptureInputs();
@@ -1130,7 +1130,7 @@ private void drawAboutSection(GuiGraphicsExtractor context, int x, int top, int 
         drawCard(context, x, cardY, width, cardH, Component.literal("About / Legal"), Component.literal("Project information, default keys, data paths and allowed usage."), mouseX, mouseY);
         int y = cardY + 36;
         int textW = width - 40;
-        WbText.drawClipped(context, font, "WorldBinder • ALPHA Release • Minecraft/Fabric target 26.1.2 / 0.19.2", x + 20, y, textW, WbTheme.ACCENT);
+        WbText.drawClipped(context, font, Lang.string("worldbinder.about.version"), x + 20, y, textW, WbTheme.ACCENT);
         y += 22;
         y += WbText.drawWrapped(context, font, "Author: Philiipp06. Client-side world capture, archive, preview and validation tool.", x + 20, y, textW, WbTheme.TEXT_SOFT, 2);
         y += 6;

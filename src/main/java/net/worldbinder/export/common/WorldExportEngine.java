@@ -196,47 +196,16 @@ public final class WorldExportEngine {
                 int chunkX = Math.floorDiv((int) Math.floor(absX), 16);
                 int chunkZ = Math.floorDiv((int) Math.floor(absZ), 16);
                 ChunkKey key = new ChunkKey(chunkX, chunkZ);
-                chunks.computeIfAbsent(key, ChunkBuilder::new).addEntity(record);
+                ChunkBuilder builder = chunks.get(key);
+                if (builder != null && builder.hasBlockSections()) {
+                    builder.addEntity(record);
+                }
             }
         }
-        addSnapshotFallbackChunks(scene, chunks);
         return chunks;
     }
 
 
-    private static void addSnapshotFallbackChunks(WorldScene scene, Map<ChunkKey, ChunkBuilder> chunks) {
-        if (scene.chunkSnapshots == null || scene.chunkSnapshots.isEmpty()) {
-            return;
-        }
-        for (ChunkSnapshot snapshot : scene.chunkSnapshots.values()) {
-            if (snapshot == null) {
-                continue;
-            }
-            ChunkKey key = new ChunkKey(snapshot.chunkX, snapshot.chunkZ);
-            ChunkBuilder builder = chunks.computeIfAbsent(key, ChunkBuilder::new);
-            if (builder.hasBlockSections()) {
-                continue;
-            }
-            int added = 0;
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    int index = z * 16 + x;
-                    if (snapshot.heights == null || index >= snapshot.heights.length || snapshot.heights[index] == Integer.MIN_VALUE) {
-                        continue;
-                    }
-                    int y = snapshot.heights[index];
-                    String state = snapshot.states != null && index < snapshot.states.length && snapshot.states[index] != null && !snapshot.states[index].isBlank()
-                            ? snapshot.states[index]
-                            : "minecraft:stone";
-                    builder.addSyntheticBlock((snapshot.chunkX << 4) + x, y, (snapshot.chunkZ << 4) + z, state);
-                    added++;
-                }
-            }
-            if (added == 0 && snapshot.hasSnapshot) {
-                builder.addSyntheticBlock((snapshot.chunkX << 4) + 8, Math.max(-64, scene.originY), (snapshot.chunkZ << 4) + 8, "minecraft:stone");
-            }
-        }
-    }
     private static void writeLevelDat(WorldScene scene, Path worldFolder) throws IOException {
         CompoundTag data = new CompoundTag();
         TargetMinecraftVersion.Entry targetVersion = targetVersion(scene);

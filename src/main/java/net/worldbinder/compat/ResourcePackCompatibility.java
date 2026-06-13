@@ -5,6 +5,7 @@ import net.minecraft.network.protocol.Packet;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.config.WorldBinderConfig;
 import net.worldbinder.util.Chat;
+import net.worldbinder.util.Lang;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -100,7 +101,7 @@ public final class ResourcePackCompatibility {
             constructor.setAccessible(true);
             return (Packet<?>) constructor.newInstance(id, success);
         } catch (Throwable throwable) {
-            WorldBinder.LOGGER.warn("Failed to create fake resource-pack success packet", throwable);
+            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.resource_pack.success_packet_failed"), throwable);
             return null;
         }
     }

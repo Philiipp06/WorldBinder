@@ -1,6 +1,7 @@
 package net.worldbinder.io;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.worldbinder.util.Lang;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.util.FileNames;
 
@@ -15,6 +16,7 @@ public final class WorldBinderPaths {
     public static final Path GAME_DIR = FabricLoader.getInstance().getGameDir();
     public static final Path MINECRAFT_SAVES = GAME_DIR.resolve("saves");
     public static final Path RECOVERY_ROOT = MINECRAFT_SAVES.resolve("WorldBinder");
+    public static final Path CACHE_ROOT = RECOVERY_ROOT.resolve(".cache");
     public static final Path WORLDS = RECOVERY_ROOT;
     public static final Path CONFIG_FILE = BASE.resolve("config.json");
 
@@ -28,8 +30,9 @@ public final class WorldBinderPaths {
             Files.createDirectories(SCENES);
             Files.createDirectories(MINECRAFT_SAVES);
             Files.createDirectories(RECOVERY_ROOT);
+            Files.createDirectories(CACHE_ROOT);
         } catch (IOException exception) {
-            WorldBinder.LOGGER.error("Failed to create WorldBinder folders", exception);
+            WorldBinder.LOGGER.error(Lang.string("worldbinder.log.paths.create_folders_failed"), exception);
         }
     }
 

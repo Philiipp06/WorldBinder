@@ -1,4 +1,4 @@
-# WorldBinder Beta 1 — How to Use
+# WorldBinder 1.0.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -37,7 +37,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder Beta 1 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.0.0 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
 
 ## 3. Choose capture settings
 
@@ -119,6 +119,14 @@ If Minecraft closes, the server disconnects you or you leave before finishing an
 5. Continue or finalize the recovery entry.
 
 Recovery can only preserve data that had already been captured or cached.
+
+WorldBinder stores temporary chunk cache data in:
+
+```text
+saves/WorldBinder/.cache/
+```
+
+Successful exports clean up their temporary cache automatically. If Minecraft crashes or an export fails, cache data may remain so recovery has the best possible chance of preserving the capture.
 
 ## 8. Validate exports
 

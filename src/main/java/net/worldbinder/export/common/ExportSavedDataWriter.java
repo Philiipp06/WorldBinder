@@ -33,7 +33,7 @@ public final class ExportSavedDataWriter {
         Path data = dimensionFolder.resolve("data").resolve("minecraft");
         Files.createDirectories(data);
         writeSimpleSavedData(data.resolve("chunk_tickets.dat"), dataVersion, new CompoundTag());
-        writeSimpleSavedData(data.resolve("raids.dat"), dataVersion, new CompoundTag());
+        writeSimpleSavedData(data.resolve("raids.dat"), dataVersion, raidsData());
         writeSimpleSavedData(data.resolve("world_border.dat"), dataVersion, worldBorderData());
     }
 
@@ -41,10 +41,10 @@ public final class ExportSavedDataWriter {
         Path data = worldFolder.resolve("data").resolve("minecraft");
         Files.createDirectories(data);
         writeSimpleSavedData(data.resolve("custom_boss_events.dat"), dataVersion, new CompoundTag());
-        writeSimpleSavedData(data.resolve("random_sequences.dat"), dataVersion, new CompoundTag());
-        writeSimpleSavedData(data.resolve("scheduled_events.dat"), dataVersion, new CompoundTag());
+        writeSimpleSavedData(data.resolve("random_sequences.dat"), dataVersion, randomSequencesData());
+        writeSimpleSavedData(data.resolve("scheduled_events.dat"), dataVersion, scheduledEventsData());
         writeSimpleSavedData(data.resolve("scoreboard.dat"), dataVersion, scoreboardData());
-        writeSimpleSavedData(data.resolve("stopwatches.dat"), dataVersion, new CompoundTag());
+        writeSimpleSavedData(data.resolve("stopwatches.dat"), dataVersion, stopwatchesData());
         writeSimpleSavedData(data.resolve("weather.dat"), dataVersion, weatherData());
         writeSimpleSavedData(data.resolve("world_clocks.dat"), dataVersion, new CompoundTag());
     }
@@ -69,11 +69,38 @@ public final class ExportSavedDataWriter {
         return data;
     }
 
+    private static CompoundTag randomSequencesData() {
+        CompoundTag data = new CompoundTag();
+        data.put("sequences", new CompoundTag());
+        data.putLong("salt", 0L);
+        return data;
+    }
+
+    private static CompoundTag scheduledEventsData() {
+        CompoundTag data = new CompoundTag();
+        data.put("events", new ListTag());
+        return data;
+    }
+
+    private static CompoundTag stopwatchesData() {
+        CompoundTag data = new CompoundTag();
+        data.put("stopwatches", new ListTag());
+        return data;
+    }
+
+    private static CompoundTag raidsData() {
+        CompoundTag data = new CompoundTag();
+        data.putInt("tick", 0);
+        data.putInt("next_id", 1);
+        data.put("raids", new ListTag());
+        return data;
+    }
+
     private static CompoundTag weatherData() {
         CompoundTag data = new CompoundTag();
-        data.putInt("clearWeatherTime", 0);
-        data.putInt("rainTime", 0);
-        data.putInt("thunderTime", 0);
+        data.putInt("clear_weather_time", 0);
+        data.putInt("rain_time", 0);
+        data.putInt("thunder_time", 0);
         data.putBoolean("raining", false);
         data.putBoolean("thundering", false);
         return data;
@@ -81,15 +108,15 @@ public final class ExportSavedDataWriter {
 
     private static CompoundTag worldBorderData() {
         CompoundTag data = new CompoundTag();
-        data.putDouble("BorderCenterX", 0.0D);
-        data.putDouble("BorderCenterZ", 0.0D);
-        data.putDouble("BorderSize", 59999968.0D);
-        data.putDouble("BorderSafeZone", 5.0D);
-        data.putDouble("BorderDamagePerBlock", 0.2D);
-        data.putDouble("BorderSizeLerpTarget", 59999968.0D);
-        data.putLong("BorderSizeLerpTime", 0L);
-        data.putInt("BorderWarningBlocks", 5);
-        data.putInt("BorderWarningTime", 15);
+        data.putDouble("center_x", 0.0D);
+        data.putDouble("center_z", 0.0D);
+        data.putDouble("size", 59999968.0D);
+        data.putDouble("lerp_target", 59999968.0D);
+        data.putLong("lerp_time", 0L);
+        data.putDouble("safe_zone", 5.0D);
+        data.putDouble("damage_per_block", 0.2D);
+        data.putInt("warning_blocks", 5);
+        data.putInt("warning_time", 15);
         return data;
     }
 
