@@ -1,5 +1,7 @@
 package net.worldbinder.scene;
 
+import net.worldbinder.version.TargetMinecraftVersion;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,8 +13,8 @@ public final class WorldScene {
     public String archiveType = "world";
     public String name;
     public String createdAt = Instant.now().toString();
-    public String minecraftVersion = "26.1.2";
-    public String targetMinecraftVersion = "26.1.2";
+    public String minecraftVersion = TargetMinecraftVersion.CURRENT;
+    public String targetMinecraftVersion = TargetMinecraftVersion.CURRENT;
     public String targetGenerationProfile = "CURRENT_26";
     public String dimension;
     public int originX;

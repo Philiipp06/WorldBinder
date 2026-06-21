@@ -48,7 +48,7 @@ public final class WorldBinderStorageProgressScreen extends Screen {
             }
         }).bounds(left + 10, y, buttonW, 22).build(), Component.translatable("worldbinder.storage.open_folder.tooltip")));
         addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("gui.done"), button -> {
-            minecraft.setScreen(parent);
+            minecraft.gui.setScreen(parent);
         }).bounds(left + panelW - buttonW - 10, y, buttonW, 22).build(), Component.translatable("worldbinder.storage.done.tooltip")));
     }
 

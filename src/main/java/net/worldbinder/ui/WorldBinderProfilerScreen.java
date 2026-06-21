@@ -47,14 +47,14 @@ public final class WorldBinderProfilerScreen extends Screen {
         addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.gui.back"), b -> onClose())
                 .bounds(Math.max(18, width - 108), Math.max(18, height - 32), 90, 22)
                 .build(), Lang.text("worldbinder.profiler.back.tooltip")));
-        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.section.map"), b -> minecraft.setScreen(new WorldBinderMapScreen(this)))
+        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.section.map"), b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this)))
                 .bounds(18, Math.max(18, height - 32), 90, 22)
                 .build(), Lang.text("worldbinder.profiler.map.tooltip")));
     }
 
     @Override
     public void onClose() {
-        minecraft.setScreen(parent);
+        minecraft.gui.setScreen(parent);
     }
 
     @Override

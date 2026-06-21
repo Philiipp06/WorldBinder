@@ -150,9 +150,9 @@ public final class WorldBinderConfigScreen extends Screen {
         int bottomY = top + panelHeight - 32;
         addRenderableWidget(button(left + panelWidth - buttonW * 2 - 26, bottomY, buttonW, 22, "worldbinder.config.save", "worldbinder.tooltip.config.save", button -> {
             saveConfig();
-            minecraft.setScreen(parent);
+            minecraft.gui.setScreen(parent);
         }));
-        addRenderableWidget(button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22, "worldbinder.config.cancel", "worldbinder.tooltip.config.back", button -> minecraft.setScreen(parent)));
+        addRenderableWidget(button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22, "worldbinder.config.cancel", "worldbinder.tooltip.config.back", button -> minecraft.gui.setScreen(parent)));
     }
 
     private void initGeneral(WorldBinderConfig config, int x, int y, int w) {
@@ -279,9 +279,9 @@ public final class WorldBinderConfigScreen extends Screen {
 
     private void initGameRules(WorldBinderConfig config, int x, int y, int w) {
         int presetW = Math.max(72, (w - 16) / 3);
-        addIfVisible(button(x, y + 6, presetW, 20, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;keepInventory=true;randomTickSpeed=0"; WorldBinder.config().save(); minecraft.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
-        addIfVisible(button(x + presetW + 8, y + 6, presetW, 20, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=true;doWeatherCycle=true;doMobSpawning=true;keepInventory=false;randomTickSpeed=3"; WorldBinder.config().save(); minecraft.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
-        addIfVisible(button(x + (presetW + 8) * 2, y + 6, presetW, 20, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;doFireTick=false;randomTickSpeed=0"; WorldBinder.config().save(); minecraft.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
+        addIfVisible(button(x, y + 6, presetW, 20, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;keepInventory=true;randomTickSpeed=0"; WorldBinder.config().save(); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
+        addIfVisible(button(x + presetW + 8, y + 6, presetW, 20, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=true;doWeatherCycle=true;doMobSpawning=true;keepInventory=false;randomTickSpeed=3"; WorldBinder.config().save(); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
+        addIfVisible(button(x + (presetW + 8) * 2, y + 6, presetW, 20, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase", b -> { WorldBinder.config().gameRulesOverride = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;doFireTick=false;randomTickSpeed=0"; WorldBinder.config().save(); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.GAMERULES, scrollOffset)); }), y + 6, 20);
 
         int sliderY = y + 44;
         addIfVisible(new GameRuleSlider(x, sliderY, Math.min(w, 360), 22), sliderY, 22);
@@ -335,18 +335,18 @@ public final class WorldBinderConfigScreen extends Screen {
 
     private Button tabButton(int x, int y, int w, String labelKey, Tab target) {
         Component label = Component.literal(tab == target ? "◆ " : "").append(Component.translatable(labelKey));
-        return WbTooltips.register(Button.builder(label, b -> minecraft.setScreen(new WorldBinderConfigScreen(parent, target, safetyPage)))
+        return WbTooltips.register(Button.builder(label, b -> minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, target, safetyPage)))
                 .bounds(x, y, w, 22).build(), Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(labelKey)));
     }
 
     private Button safetyPageButton(int x, int y, int w, String labelKey, SafetyPage target) {
         Component label = Component.literal(safetyPage == target ? "◆ " : "").append(Component.translatable(labelKey));
-        return WbTooltips.register(Button.builder(label, b -> minecraft.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, target)))
+        return WbTooltips.register(Button.builder(label, b -> minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, target)))
                 .bounds(x, y, w, 22).build(), Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(labelKey)));
     }
 
     private Button preset(int x, int y, int w, String labelKey, WorldBinderConfig.PerformancePreset preset, String tooltipKey) {
-        return WbTooltips.register(Button.builder(Component.translatable(labelKey), b -> { WorldBinder.config().setPreset(preset); minecraft.setScreen(new WorldBinderConfigScreen(parent, Tab.PERFORMANCE)); })
+        return WbTooltips.register(Button.builder(Component.translatable(labelKey), b -> { WorldBinder.config().setPreset(preset); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.PERFORMANCE)); })
                 .bounds(x, y, w, 22).build(), Component.translatable(tooltipKey));
     }
 
@@ -822,7 +822,7 @@ public final class WorldBinderConfigScreen extends Screen {
 
     @Override
     public void onClose() {
-        minecraft.setScreen(parent);
+        minecraft.gui.setScreen(parent);
     }
 
     private final class GameRuleSlider extends AbstractSliderButton {

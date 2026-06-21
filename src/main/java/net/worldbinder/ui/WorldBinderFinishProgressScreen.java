@@ -42,11 +42,11 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         int y = (height - panelH) / 2 + panelH - 36;
         addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.finish.save_now"), button -> {
             if (capture.abortQueueAndSaveNow()) {
-                minecraft.setScreen(new WorldBinderStorageProgressScreen(parent));
+                minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
             }
         }).bounds(left, y, buttonW, 22).build(), Component.translatable("worldbinder.finish.save_now.tooltip")));
         addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.gui.open_map"), button -> {
-            minecraft.setScreen(new WorldBinderMapScreen(this));
+            minecraft.gui.setScreen(new WorldBinderMapScreen(this));
         }).bounds(left + buttonW + buttonGap, y, buttonW, 22).build(), Component.translatable("worldbinder.tooltip.open_map")));
     }
 
@@ -65,7 +65,7 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         height = WbLayout.DESIGN_HEIGHT;
         try {
         if (!capture.isCapturing()) {
-            minecraft.setScreen(parent);
+            minecraft.gui.setScreen(parent);
             return;
         }
         int w = 460;

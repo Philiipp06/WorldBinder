@@ -72,12 +72,12 @@ public final class WorldBinderKeybinds {
                     storagePopupOpenedForCurrentJob = false;
                 }
             }
-            if (client.player == null && StorageFlow.progress().isRunning() && !storagePopupOpenedForCurrentJob && !(client.screen instanceof WorldBinderStorageProgressScreen)) {
+            if (client.player == null && StorageFlow.progress().isRunning() && !storagePopupOpenedForCurrentJob && !(client.gui.screen() instanceof WorldBinderStorageProgressScreen)) {
                 storagePopupOpenedForCurrentJob = true;
-                client.setScreen(new WorldBinderStorageProgressScreen(client.screen));
+                client.gui.setScreen(new WorldBinderStorageProgressScreen(client.gui.screen()));
             }
             while (openMenu.consumeClick()) {
-                Minecraft.getInstance().setScreen(new WorldBinderScreen(selections, capture, placement, library));
+                Minecraft.getInstance().gui.setScreen(new WorldBinderScreen(selections, capture, placement, library));
             }
             while (setFirst.consumeClick()) {
                 selections.setFirstFromCrosshair();
@@ -90,14 +90,14 @@ public final class WorldBinderKeybinds {
                 if (capture.isRoamingCapture()) {
                     capture.finishActiveCapture();
                 } else {
-                    mc.setScreen(new WorldBinderLegalStartScreen(mc.screen,
+                    mc.gui.setScreen(new WorldBinderLegalStartScreen(mc.gui.screen(),
                             name -> capture.toggleRoamingCapture(name),
                             "Start saving",
                             WorldBinder.config().defaultArchiveName));
                 }
             }
             while (openMap.consumeClick()) {
-                Minecraft.getInstance().setScreen(new WorldBinderMapScreen(Minecraft.getInstance().screen));
+                Minecraft.getInstance().gui.setScreen(new WorldBinderMapScreen(Minecraft.getInstance().gui.screen()));
             }
             capture.tick();
             placement.tick();

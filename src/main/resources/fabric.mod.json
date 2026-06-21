@@ -3,7 +3,7 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder 1.0.0 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery, validation and target-version world export.",
+  "description": "WorldBinder 1.1.0 is a client-side Fabric tool for permitted world capture, chunk mapping, archive management, recovery, validation and target-version world export.",
   "authors": [
     "Philiipp06"
   ],
@@ -25,7 +25,7 @@
   },
   "depends": {
     "fabricloader": ">=0.19.2",
-    "minecraft": "~26.1.2",
+    "minecraft": "~26.2",
     "java": ">=25",
     "fabric-api": "*"
   },

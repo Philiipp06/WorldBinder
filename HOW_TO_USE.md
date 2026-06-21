@@ -1,4 +1,4 @@
-# WorldBinder 1.0.0 — How to Use
+# WorldBinder 1.1.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -6,8 +6,8 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 ## 1. Install WorldBinder
 
-1. Install Minecraft 26.1.2 with Fabric Loader.
-2. Install Fabric API.
+1. Install Minecraft 26.2 with Fabric Loader 0.19.2 or newer.
+2. Install Fabric API 0.152.0+26.2 or newer.
 3. Place the WorldBinder jar into your `mods` folder.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
@@ -37,7 +37,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.0.0 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.1.0 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
 
 ## 3. Choose capture settings
 
@@ -171,6 +171,7 @@ Useful reports include:
 - Minecraft version
 - WorldBinder version
 - Fabric Loader and Fabric API version
+- whether Fabric API 0.152.0+26.2 or newer is installed
 - selected target output version
 - capture mode and performance preset
 - whether the issue happened in singleplayer, Paper or Multiverse

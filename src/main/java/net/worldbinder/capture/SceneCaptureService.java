@@ -205,19 +205,19 @@ public final class SceneCaptureService {
         if (roamingCapture) {
             Minecraft client = Minecraft.getInstance();
             if (client != null) {
-                client.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.screen, this));
+                client.gui.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.gui.screen(), this));
             }
             return;
         }
         if (hasPendingWork()) {
             Minecraft client = Minecraft.getInstance();
             if (client != null) {
-                client.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.screen, this));
+                client.gui.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.gui.screen(), this));
             }
             return;
         }
         Minecraft client = Minecraft.getInstance();
-        requestSaveNowWithConfirm(client == null ? null : client.screen);
+        requestSaveNowWithConfirm(client == null ? null : client.gui.screen());
     }
 
     private void saveWorldDownloadNow() {
@@ -252,7 +252,7 @@ public final class SceneCaptureService {
 
     public boolean abortQueueAndSaveNow() {
         Minecraft client = Minecraft.getInstance();
-        return requestSaveNowWithConfirm(client == null ? null : client.screen);
+        return requestSaveNowWithConfirm(client == null ? null : client.gui.screen());
     }
 
     public boolean hasPendingWork() {
@@ -283,7 +283,7 @@ public final class SceneCaptureService {
         Minecraft client = Minecraft.getInstance();
         if (WorldBinder.config().confirmExistingWorld && targetWorldExists()) {
             if (client != null) {
-                client.setScreen(new net.worldbinder.ui.WorldBinderExistingWorldScreen(parent, this));
+                client.gui.setScreen(new net.worldbinder.ui.WorldBinderExistingWorldScreen(parent, this));
             }
             return false;
         }
@@ -553,7 +553,7 @@ public final class SceneCaptureService {
 
     public boolean multiplayerSafetyActive() {
         Minecraft client = Minecraft.getInstance();
-        return WorldBinder.config().serverSafetyMode && client.level != null && !client.isSingleplayer();
+        return WorldBinder.config().serverSafetyMode && client.level != null && !!client.isMultiplayerServer();
     }
 
     public String safetySummary() {
@@ -1964,7 +1964,7 @@ public final class SceneCaptureService {
     }
 
     private void maybeWarnServerSafety(Minecraft client) {
-        if (serverSafetyWarningSent || !WorldBinder.config().serverSafetyMode || client.isSingleplayer()) {
+        if (serverSafetyWarningSent || !WorldBinder.config().serverSafetyMode || !client.isMultiplayerServer()) {
             return;
         }
         serverSafetyWarningSent = true;
@@ -2485,10 +2485,10 @@ public final class SceneCaptureService {
         if (client == null) {
             return;
         }
-        if (client.screen instanceof net.worldbinder.ui.WorldBinderStorageProgressScreen) {
+        if (client.gui.screen() instanceof net.worldbinder.ui.WorldBinderStorageProgressScreen) {
             return;
         }
-        client.setScreen(new net.worldbinder.ui.WorldBinderStorageProgressScreen(client.screen));
+        client.gui.setScreen(new net.worldbinder.ui.WorldBinderStorageProgressScreen(client.gui.screen()));
     }
 
     private void resetActiveJob() {

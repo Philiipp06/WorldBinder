@@ -67,7 +67,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
                 b -> startWithName()));
         addRenderableWidget(WbButton.create(left + 16 + buttonW + gap, buttonY, buttonW, 24, Lang.string("worldbinder.gui.cancel"),
                 Lang.text("worldbinder.legal.cancel.tooltip"),
-                b -> minecraft.setScreen(parent)));
+                b -> minecraft.gui.setScreen(parent)));
     }
 
     private void startWithName() {
@@ -76,7 +76,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
         if (name.isBlank()) {
             name = FileNames.cleanBaseName(WorldBinder.config().defaultArchiveName);
         }
-        minecraft.setScreen(parent);
+        minecraft.gui.setScreen(parent);
         startAction.accept(name);
     }
 

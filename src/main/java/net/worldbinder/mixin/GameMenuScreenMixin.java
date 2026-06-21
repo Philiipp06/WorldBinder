@@ -22,7 +22,7 @@ public class GameMenuScreenMixin {
         boolean paused = running && WorldBinderClient.capture().isPaused();
 
         Button openButton = Button.builder(Component.translatable("worldbinder.pause.open"), b ->
-                client.setScreen(new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(), WorldBinderClient.placement(), WorldBinderClient.scenes()))
+                client.gui.setScreen(new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(), WorldBinderClient.placement(), WorldBinderClient.scenes()))
         ).bounds(10, self.height - 54, 204, 20)
           .tooltip(Tooltip.create(Component.translatable("worldbinder.tooltip.pause_open")))
           .build();
@@ -31,7 +31,7 @@ public class GameMenuScreenMixin {
         if (running) {
             Button pauseButton = Button.builder(Component.translatable(paused ? "worldbinder.gui.resume_capture" : "worldbinder.gui.pause_capture"), b -> {
                 WorldBinderClient.capture().togglePause();
-                client.setScreen(null);
+                client.gui.setScreen(null);
             }).bounds(10, self.height - 30, 98, 20)
               .tooltip(Tooltip.create(Component.translatable("worldbinder.tooltip.pause_capture")))
               .build();

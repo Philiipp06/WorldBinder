@@ -32,7 +32,7 @@ public final class WorldBinderHud {
     public static void register() {
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("worldbinder", "hud"), (context, tickCounter) -> {
             Minecraft client = Minecraft.getInstance();
-            if (client.player == null || client.options.hideGui) {
+            if (client.player == null || client.gui.hud.isHidden()) {
                 return;
             }
             SceneCaptureService capture = WorldBinderClient.capture();

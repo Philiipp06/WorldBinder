@@ -246,7 +246,7 @@ private void overviewWidgets(int x, int top, int width) {
         if (cols == 3) {
             addRenderableWidget(button(x + 18 + (buttonW + gap) * 2, y, buttonW, rowH,
                     "Open F10 Map", Component.translatable("worldbinder.tooltip.open_map"),
-                    b -> minecraft.setScreen(new WorldBinderMapScreen(this))));
+                    b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
             y += rowH + 6;
             addRenderableWidget(button(x + 18, y, buttonW, rowH,
                     "Place Latest", Component.translatable("worldbinder.tooltip.place_latest"),
@@ -261,7 +261,7 @@ private void overviewWidgets(int x, int top, int width) {
         } else {
             addRenderableWidget(button(x + 18, y + rowH + 6, buttonW, rowH,
                     "F10 Map", Component.translatable("worldbinder.tooltip.open_map"),
-                    b -> minecraft.setScreen(new WorldBinderMapScreen(this))));
+                    b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
             addRenderableWidget(button(x + 18 + (buttonW + gap), y + rowH + 6, buttonW, rowH,
                     "Archives", Component.literal("Open archive manager."),
                     b -> { section = Section.ARCHIVES; rebuildWidgets(); }));
@@ -315,7 +315,7 @@ private void captureWidgets(int x, int top, int width) {
                 b -> captureSceneWithLegalReminder());
         Button settings = button(actionCols == 1 ? x + 18 : x + 38 + capW * 2, actionCols == 1 ? actionRowY + 56 : actionRowY, capW, 22,
                 "Custom Settings", Component.literal("Open performance settings for custom capture speed values."),
-                b -> minecraft.setScreen(WorldBinderConfigScreen.performance(this)));
+                b -> minecraft.gui.setScreen(WorldBinderConfigScreen.performance(this)));
         clipContentWidget(pos);
         clipContentWidget(scene);
         clipContentWidget(settings);
@@ -328,9 +328,9 @@ private void mapWidgets(int x, int top, int width) {
         int y = Math.min(top + 328, top + panelHeight() - 70);
         int buttonW = Math.max(104, Math.min(150, (width - 44) / 2));
         addRenderableWidget(button(x + 18, y, buttonW, 25, "Open F10 Map", Component.translatable("worldbinder.tooltip.open_map"),
-                b -> minecraft.setScreen(new WorldBinderMapScreen(this))));
+                b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
         addRenderableWidget(button(x + 30 + buttonW, y, buttonW, 25, "Profiler", Component.translatable("worldbinder.tooltip.profiler"),
-                b -> minecraft.setScreen(new WorldBinderProfilerScreen(this))));
+                b -> minecraft.gui.setScreen(new WorldBinderProfilerScreen(this))));
     }
 private void archiveWidgets(int x, int top, boolean recoveryOnly) {
         normalizeArchiveSelection(recoveryOnly);
@@ -396,7 +396,7 @@ private void settingsWidgets(int x, int top) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
         int w = Math.min(170, Math.max(110, contentWidth(panelWidth()) - 36));
         addRenderableWidget(button(x + 18, bottom - 28, w, 23, "Open Full Settings", Component.translatable("worldbinder.tooltip.settings"),
-                b -> minecraft.setScreen(new WorldBinderConfigScreen(this))));
+                b -> minecraft.gui.setScreen(new WorldBinderConfigScreen(this))));
     }
 private void toolsWidgets(int x, int top, int width) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
@@ -404,8 +404,8 @@ private void toolsWidgets(int x, int top, int width) {
         int cols = width < 460 ? 2 : 4;
         int buttonW = Math.max(70, (width - 36 - gap * (cols - 1)) / cols);
         int y = bottom - (cols == 2 ? 52 : 26);
-        addRenderableWidget(button(x + 18, y, buttonW, 23, "Map", Component.translatable("worldbinder.tooltip.open_map"), b -> minecraft.setScreen(new WorldBinderMapScreen(this))));
-        addRenderableWidget(button(x + 18 + (buttonW + gap), y, buttonW, 23, "Profiler", Component.translatable("worldbinder.tooltip.profiler"), b -> minecraft.setScreen(new WorldBinderProfilerScreen(this))));
+        addRenderableWidget(button(x + 18, y, buttonW, 23, "Map", Component.translatable("worldbinder.tooltip.open_map"), b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
+        addRenderableWidget(button(x + 18 + (buttonW + gap), y, buttonW, 23, "Profiler", Component.translatable("worldbinder.tooltip.profiler"), b -> minecraft.gui.setScreen(new WorldBinderProfilerScreen(this))));
         if (cols == 4) {
             addRenderableWidget(button(x + 18 + (buttonW + gap) * 2, y, buttonW, 23, "Open Saves", Component.translatable("worldbinder.tooltip.open_saves_folder"),
                     b -> net.worldbinder.util.PathOpener.open(net.worldbinder.io.WorldBinderPaths.WORLDS)));
@@ -461,7 +461,7 @@ private void toolsWidgets(int x, int top, int width) {
     }
 
     private void runWithCapturePrompt(java.util.function.Consumer<String> action, String label) {
-        minecraft.setScreen(new WorldBinderLegalStartScreen(this, action, label, currentArchiveName()));
+        minecraft.gui.setScreen(new WorldBinderLegalStartScreen(this, action, label, currentArchiveName()));
     }
 
     private Button button(int x, int y, int width, int height, String label, Component tooltip, Button.OnPress action) {

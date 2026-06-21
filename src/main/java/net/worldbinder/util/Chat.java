@@ -62,7 +62,7 @@ public final class Chat {
         Minecraft client = Minecraft.getInstance();
         client.execute(() -> {
             if (client.player != null) {
-                client.gui.getChat().addClientSystemMessage(message);
+                client.gui.hud.getChat().addClientSystemMessage(message);
             }
         });
     }

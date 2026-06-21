@@ -43,11 +43,11 @@ public final class WorldBinderExistingWorldScreen extends Screen {
         int buttonX = left + 30;
         addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.existing.overwrite"), b -> {
             if (capture.saveNowConfirmed()) {
-                minecraft.setScreen(new WorldBinderStorageProgressScreen(parent));
+                minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
             }
         }).bounds(buttonX, y, buttonW, 22).build(), Lang.text("worldbinder.existing.overwrite.tooltip")));
         addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.gui.cancel"), b -> {
-            minecraft.setScreen(parent);
+            minecraft.gui.setScreen(parent);
         }).bounds(buttonX + buttonW + gap, y, buttonW, 22).build(), Lang.text("worldbinder.existing.cancel.tooltip")));
     }
 
