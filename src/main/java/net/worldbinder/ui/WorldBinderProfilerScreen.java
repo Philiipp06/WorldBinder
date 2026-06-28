@@ -10,6 +10,8 @@ import net.worldbinder.profiling.StorageProfiler;
 import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.storage.StorageProgress;
 import net.worldbinder.storage.StorageStage;
+import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTheme;
@@ -44,12 +46,10 @@ public final class WorldBinderProfilerScreen extends Screen {
     }
 
     private void initScaled() {
-        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.gui.back"), b -> onClose())
-                .bounds(Math.max(18, width - 108), Math.max(18, height - 32), 90, 22)
-                .build(), Lang.text("worldbinder.profiler.back.tooltip")));
-        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.section.map"), b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this)))
-                .bounds(18, Math.max(18, height - 32), 90, 22)
-                .build(), Lang.text("worldbinder.profiler.map.tooltip")));
+        addRenderableWidget(WbButton.create(Math.max(18, width - 108), Math.max(18, height - 32), 90, 22,
+                Lang.text("worldbinder.gui.back"), Lang.text("worldbinder.profiler.back.tooltip"), b -> onClose()));
+        addRenderableWidget(WbButton.create(18, Math.max(18, height - 32), 90, 22,
+                Lang.text("worldbinder.section.map"), Lang.text("worldbinder.profiler.map.tooltip"), b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
     }
 
     @Override
@@ -77,14 +77,14 @@ public final class WorldBinderProfilerScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x00000000);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
         width = WbLayout.DESIGN_WIDTH;
         height = WbLayout.DESIGN_HEIGHT;
         try {
-            context.fill(0, 0, width, height, 0xD805050C);
+            WbChrome.drawBackdrop(context, width, height);
             int panelW = Math.max(300, Math.min(860, width - 28));
             int panelH = Math.max(260, Math.min(500, height - 42));
             int left = (width - panelW) / 2;
@@ -169,31 +169,22 @@ public final class WorldBinderProfilerScreen extends Screen {
     }
 
     private void drawPanel(GuiGraphicsExtractor c, int x, int y, int w, int h) {
-        c.fill(x, y, x + w, y + h, 0xEE090914);
-        c.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xCC121225);
-        c.fill(x, y, x + w, y + 3, WbTheme.ACCENT);
-        c.fill(x, y + h - 3, x + w, y + h, WbTheme.ACCENT_DARK);
-        c.fill(x, y, x + 3, y + h, WbTheme.ACCENT_DARK);
-        c.fill(x + w - 3, y, x + w, y + h, WbTheme.ACCENT);
+        WbChrome.drawPanel(c, x, y, w, h);
     }
 
     private void drawCard(GuiGraphicsExtractor c, int x, int y, int w, int h, String title) {
-        c.fill(x, y, x + w, y + h, 0xAA090914);
-        c.fill(x, y, x + w, y + 1, WbTheme.ACCENT);
-        WbText.drawClipped(c, font, title, x + 12, y + 10, w - 24, WbTheme.ACCENT);
+        WbChrome.drawCard(c, font, x, y, w, h, Component.literal(title), WbTheme.ACCENT, false);
     }
 
     private void drawMetricChip(GuiGraphicsExtractor c, int x, int y, int w, String label, String value, int accent) {
-        c.fill(x, y, x + w, y + 42, 0xAA090914);
-        c.fill(x, y, x + w, y + 2, accent);
+        WbChrome.drawInset(c, x, y, w, 42, accent, true);
         WbText.drawClipped(c, font, label, x + 10, y + 9, w - 20, WbTheme.TEXT_DIM);
         WbText.drawClipped(c, font, value, x + 10, y + 24, w - 20, WbTheme.TEXT);
     }
 
     private void drawProgress(GuiGraphicsExtractor c, int x, int y, int w, double progress, int accent) {
         int clamped = Math.max(0, Math.min(w, (int) Math.round(w * progress)));
-        c.fill(x, y, x + w, y + 8, 0x66000000);
-        c.fill(x, y, x + clamped, y + 8, accent);
+        WbChrome.drawProgressTrack(c, x, y, w, 8, clamped, accent);
     }
 
     private void line(GuiGraphicsExtractor c, int x, int y, String label, String value) {

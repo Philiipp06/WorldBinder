@@ -10,11 +10,11 @@ public final class WbCard {
     }
 
     public static boolean draw(GuiGraphicsExtractor context, Font font, int x, int y, int width, int height, Component title, int mouseX, int mouseY) {
-        context.fill(x, y, x + width, y + height, WbTheme.CARD);
-        context.fill(x, y, x + width, y + 1, WbTheme.ACCENT);
-        context.fill(x, y + height - 1, x + width, y + height, WbTheme.ACCENT_SOFT);
-        String text = title == null ? "" : title.getString();
-        GuiText.drawTextWithShadow(context, font, Component.literal(WbText.ellipsize(font, text, Math.max(1, width - 24))), x + 12, y + 10, WbTheme.ACCENT);
-        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        return draw(context, font, x, y, width, height, title, WbTheme.ACCENT, mouseX, mouseY);
+    }
+
+    public static boolean draw(GuiGraphicsExtractor context, Font font, int x, int y, int width, int height, Component title, int accent, int mouseX, int mouseY) {
+        boolean hover = WbChrome.contains(x, y, width, height, mouseX, mouseY);
+        return WbChrome.drawCard(context, font, x, y, width, height, title, accent, hover);
     }
 }

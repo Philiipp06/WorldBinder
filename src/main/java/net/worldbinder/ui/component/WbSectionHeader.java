@@ -8,8 +8,13 @@ public final class WbSectionHeader {
     }
 
     public static void draw(GuiGraphicsExtractor context, Font font, int x, int y, int width, String title, String subtitle) {
+        draw(context, font, x, y, width, title, subtitle, WbTheme.ACCENT);
+    }
+
+    public static void draw(GuiGraphicsExtractor context, Font font, int x, int y, int width, String title, String subtitle, int accent) {
+        context.fill(x, y + 36, x + width, y + 37, WbTheme.PANEL_BORDER);
+        context.fill(x, y + 36, x + Math.min(x + width, x + 132), y + 38, accent);
         WbText.drawClipped(context, font, title, x, y, width, WbTheme.TEXT);
         WbText.drawClipped(context, font, subtitle, x, y + 16, width, WbTheme.TEXT_MUTED);
-        context.fill(x, y + 40, x + width, y + 41, WbTheme.ACCENT_SOFT);
     }
 }

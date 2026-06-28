@@ -8,9 +8,8 @@ public final class WbStatusChip {
     }
 
     public static void draw(GuiGraphicsExtractor context, Font font, int x, int y, int width, String label, String value, int accent) {
-        context.fill(x, y, x + width, y + 38, WbTheme.CARD_ALT);
-        context.fill(x, y, x + width, y + 2, accent);
-        WbText.drawClipped(context, font, label, x + 8, y + 7, width - 16, WbTheme.TEXT_DIM);
-        WbText.drawClipped(context, font, "§f" + value, x + 8, y + 21, width - 16, WbTheme.TEXT);
+        WbChrome.drawInset(context, x, y, width, 40, accent, true);
+        WbText.drawClipped(context, font, label, x + 9, y + 7, width - 18, WbTheme.TEXT_DIM);
+        WbText.drawClipped(context, font, "§f" + value, x + 9, y + 22, width - 18, WbTheme.TEXT);
     }
 }

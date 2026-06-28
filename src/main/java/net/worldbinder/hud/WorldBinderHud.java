@@ -16,6 +16,7 @@ import net.worldbinder.scene.ChunkCaptureStatus;
 import net.worldbinder.status.OperationStatus;
 import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.storage.StorageProgress;
+import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.util.Lang;
 
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public final class WorldBinderHud {
             if (WorldBinder.config().showBossbarOverlay && OperationStatus.visible()) {
                 drawBossbar(context, client, capture);
             }
+            WorldBinderNotificationOverlay.draw(context, client);
             if (capture != null && capture.isRoamingCapture() && WorldBinder.config().chunkRadarRightAligned) {
                 drawChunkRadar(context, client, capture);
             }
@@ -72,9 +74,9 @@ public final class WorldBinderHud {
 
         if (storageMode) {
             context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x8810182A);
-            context.fill(x, y, x + barWidth, y + 18, 0xFF1A1128);
-            context.fill(x + 2, y + 2, x + 2 + fill, y + 16, 0xFFFF55FF);
-            context.fill(x, y, x + barWidth, y + 1, 0xFFFF55FF);
+            context.fill(x, y, x + barWidth, y + 18, 0xFF16202C);
+            context.fill(x + 2, y + 2, x + 2 + fill, y + 16, WbTheme.ACCENT);
+            context.fill(x, y, x + barWidth, y + 1, WbTheme.ACCENT);
             net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.title"), screenWidth / 2, y + 5, 0xFFFFFFFF);
             net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(storage.stage().label() + " • " + (int) (storage.progress() * 100.0D) + "%", Math.max(18, barWidth / 6))), screenWidth / 2, y + 28, 0xFFE6E6F0);
             if (!compact) {
@@ -84,10 +86,10 @@ public final class WorldBinderHud {
         }
 
         context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x88080810);
-        context.fill(x, y, x + barWidth, y + 18, 0xFF1A1128);
-        context.fill(x + 2, y + 2, x + 2 + fill, y + 16, OperationStatus.active() ? 0xFFFF55FF : 0xFF55FFAA);
-        context.fill(x, y, x + barWidth, y + 1, 0xFFFF55FF);
-        context.fill(x, y + 17, x + barWidth, y + 18, 0xFF5E03FC);
+        context.fill(x, y, x + barWidth, y + 18, 0xFF16202C);
+        context.fill(x + 2, y + 2, x + 2 + fill, y + 16, OperationStatus.active() ? WbTheme.ACCENT : WbTheme.OK);
+        context.fill(x, y, x + barWidth, y + 1, WbTheme.ACCENT);
+        context.fill(x, y + 17, x + barWidth, y + 18, WbTheme.INFO);
 
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.title(), Math.max(20, barWidth / 6))), screenWidth / 2, y + 5, 0xFFFFFFFF);
         if (captureMode) {
@@ -100,9 +102,9 @@ public final class WorldBinderHud {
                 int total = Math.max(1, done + scanning + queued);
                 int gap = 8;
                 int meterW = Math.max(64, (barWidth - gap * 2) / 3);
-                drawMeter(context, renderer, x, chipY, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, 0xFF55FFAA);
-                drawMeter(context, renderer, x + meterW + gap, chipY, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), 0xFFFF55FF);
-                drawMeter(context, renderer, x + (meterW + gap) * 2, chipY, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? 0xFFFF5555 : 0xFFFFD166);
+                drawMeter(context, renderer, x, chipY, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, WbTheme.OK);
+                drawMeter(context, renderer, x + meterW + gap, chipY, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), WbTheme.ACCENT);
+                drawMeter(context, renderer, x + (meterW + gap) * 2, chipY, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? WbTheme.ERROR : WbTheme.WARN);
             }
         } else {
             net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.detail(), Math.max(24, barWidth / 6))), screenWidth / 2, y + 25, 0xFFE6E6F0);
@@ -111,7 +113,7 @@ public final class WorldBinderHud {
 
     private static void drawMeter(net.minecraft.client.gui.GuiGraphicsExtractor context, Font renderer, int x, int y, int w, String label, String value, double progress, int color) {
         context.fill(x, y, x + w, y + 24, 0x77000000);
-        context.fill(x, y, x + w, y + 1, 0x885E03FC);
+        context.fill(x, y, x + w, y + 1, WbTheme.ACCENT_SOFT);
         int fill = (int) ((w - 6) * Math.max(0.0D, Math.min(1.0D, progress)));
         context.fill(x + 3, y + 15, x + w - 3, y + 20, 0x33000000);
         context.fill(x + 3, y + 15, x + 3 + fill, y + 20, color);
@@ -135,8 +137,8 @@ public final class WorldBinderHud {
             size -= 2;
         }
         int grid = size * cell;
-        int panelW = Math.max(72, grid + 18);
-        int panelH = grid + 34;
+        int panelW = Math.max(92, grid + 22);
+        int panelH = grid + 38;
         int x = config.chunkRadarRightAligned
                 ? screenW - panelW - Math.round(config.chunkRadarOffsetX * responsiveScale)
                 : Math.round(config.chunkRadarOffsetX * responsiveScale);
@@ -146,8 +148,11 @@ public final class WorldBinderHud {
         x = Math.max(4, Math.min(screenW - panelW - 4, x));
         y = Math.max(4, Math.min(screenH - panelH - 4, y));
 
-        context.fill(x, y, x + panelW, y + panelH, 0xAA10182A);
-        context.fill(x, y, x + panelW, y + 2, 0xFFFF55FF);
+        context.fill(x + 3, y + 4, x + panelW + 3, y + panelH + 4, 0x88000000);
+        context.fill(x, y, x + panelW, y + panelH, 0xE6111822);
+        context.fill(x + 1, y + 1, x + panelW - 1, y + panelH - 1, 0x332B3A4A);
+        context.fill(x, y, x + panelW, y + 2, WbTheme.ACCENT);
+        context.fill(x, y + 20, x + panelW, y + 21, 0x5534485A);
 
         int playerChunkX = client.player.blockPosition().getX() >> 4;
         int playerChunkZ = client.player.blockPosition().getZ() >> 4;
@@ -155,12 +160,13 @@ public final class WorldBinderHud {
         if (size != requestedSize) {
             title += " • capped";
         }
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, client.font, Component.literal(shorten(title, Math.max(8, (panelW - 12) / 6))), x + 7, y + 6, 0xFFFFFFFF);
+        net.worldbinder.util.GuiText.drawTextWithShadow(context, client.font, Component.literal(shorten(title, Math.max(10, (panelW - 14) / 6))), x + 7, y + 6, WbTheme.TEXT);
 
         RadarRenderFrame frame = RADAR_CACHE.frame(capture, config, playerChunkX, playerChunkZ, size, cell);
         int center = size / 2;
-        int gridX = x + 8;
-        int gridY = y + 22;
+        int gridX = x + (panelW - grid) / 2;
+        int gridY = y + 25;
+        context.fill(gridX - 3, gridY - 3, gridX + grid + 3, gridY + grid + 3, 0xBB060A10);
         for (RadarCell radarCell : frame.cells) {
             int px = gridX + (radarCell.dx + center) * cell;
             int py = gridY + (radarCell.dz + center) * cell;
@@ -210,7 +216,7 @@ public final class WorldBinderHud {
             context.fill(x + cell - 2, y, x + cell - 1, y + cell - 1, cellData.borderColor);
         }
         if (cellData.player) {
-            int c = 0xFFFF55FF;
+            int c = WbTheme.ACCENT_RIGHT;
             int mid = Math.max(1, cell / 2);
             context.fill(x, y + mid, x + cell - 1, y + mid + 1, c);
             context.fill(x + mid, y, x + mid + 1, y + cell - 1, c);
@@ -227,23 +233,23 @@ public final class WorldBinderHud {
 
     private static int statusFill(ChunkCaptureStatus status) {
         return switch (status) {
-            case DONE -> 0x66336644;
-            case SCANNING -> 0x66305666;
-            case PARTIAL, RECOVERY -> 0x665A4A10;
-            case QUEUED -> 0x665A3A10;
-            case FAILED -> 0x663C1010;
-            case UNKNOWN -> 0x55303A4E;
+            case DONE -> 0xAA2D6B4E;
+            case SCANNING -> 0xAA24506D;
+            case PARTIAL, RECOVERY -> 0xAA6B5A21;
+            case QUEUED -> 0xAA67441F;
+            case FAILED -> 0xAA642330;
+            case UNKNOWN -> 0xAA202A3A;
         };
     }
 
     private static int statusBorder(ChunkCaptureStatus status) {
         return switch (status) {
-            case DONE -> 0xFF55FFAA;
-            case SCANNING -> 0xFF55A7FF;
-            case PARTIAL, RECOVERY -> 0xFFFFE066;
-            case QUEUED -> 0xFFFFD166;
-            case FAILED -> 0xFFFF5555;
-            case UNKNOWN -> 0x55444466;
+            case DONE -> WbTheme.OK;
+            case SCANNING -> WbTheme.INFO;
+            case PARTIAL, RECOVERY -> WbTheme.WARN;
+            case QUEUED -> WbTheme.ACCENT_RIGHT;
+            case FAILED -> WbTheme.ERROR;
+            case UNKNOWN -> 0x775B6B80;
         };
     }
 

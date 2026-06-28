@@ -8,6 +8,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.config.WorldBinderConfig;
+import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTheme;
@@ -59,6 +61,7 @@ public final class WorldBinderConfigScreen extends Screen {
     private final Map<String, Boolean> gameRuleValues = new LinkedHashMap<>();
     private int scrollOffset;
     private int maxScroll;
+    private boolean targetVersionDropdownOpen;
 
     private static final String[] BOOLEAN_GAMERULES = {
             "announceAdvancements", "commandBlockOutput", "disableElytraMovementCheck", "disableRaids",
@@ -80,6 +83,14 @@ public final class WorldBinderConfigScreen extends Screen {
 
     public static WorldBinderConfigScreen general(Screen parent) {
         return new WorldBinderConfigScreen(parent, Tab.GENERAL, SafetyPage.CORE);
+    }
+
+    public static WorldBinderConfigScreen hud(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.HUD, SafetyPage.CORE);
+    }
+
+    public static WorldBinderConfigScreen safety(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.CORE);
     }
 
     private WorldBinderConfigScreen(Screen parent, Tab tab) {
@@ -120,19 +131,6 @@ public final class WorldBinderConfigScreen extends Screen {
         int panelHeight = panelHeight();
         int left = WbLayout.left(width, panelWidth);
         int top = WbLayout.top(height, panelHeight);
-        int tabY = top + (compact() ? 44 : 54);
-        int tabGap = 6;
-        int tabW = Math.max(44, (panelWidth - 48 - tabGap * 3) / 4);
-        int tabX = left + 18;
-
-        addRenderableWidget(tabButton(tabX, tabY, tabW, "worldbinder.config.tab.general", Tab.GENERAL));
-        addRenderableWidget(tabButton(tabX + (tabW + tabGap), tabY, tabW, "worldbinder.config.tab.performance", Tab.PERFORMANCE));
-        addRenderableWidget(tabX + (tabW + tabGap) * 2 + tabW > left + panelWidth - 18
-                ? tabButton(tabX, tabY + 28, tabW, "worldbinder.config.tab.hud", Tab.HUD)
-                : tabButton(tabX + (tabW + tabGap) * 2, tabY, tabW, "worldbinder.config.tab.hud", Tab.HUD));
-        addRenderableWidget(tabX + (tabW + tabGap) * 3 + tabW > left + panelWidth - 18
-                ? tabButton(tabX + (tabW + tabGap), tabY + 28, tabW, "worldbinder.config.tab.safety", Tab.SAFETY)
-                : tabButton(tabX + (tabW + tabGap) * 3, tabY, tabW, "worldbinder.config.tab.safety", Tab.SAFETY));
 
         int contentX = left + 24;
         int contentBaseY = contentBaseY(top, panelWidth);
@@ -153,26 +151,68 @@ public final class WorldBinderConfigScreen extends Screen {
             minecraft.gui.setScreen(parent);
         }));
         addRenderableWidget(button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22, "worldbinder.config.cancel", "worldbinder.tooltip.config.back", button -> minecraft.gui.setScreen(parent)));
+        addSettingsNavigation(left, top, panelWidth);
+    }
+
+    private void addSettingsNavigation(int left, int top, int panelWidth) {
+        int y = top + (compact() ? 42 : 52);
+        int cols = navColumns(panelWidth);
+        int gap = 6;
+        int tabW = Math.max(72, (panelWidth - 36 - gap * (cols - 1)) / cols);
+        int tabX = left + 18;
+        int index = 0;
+        for (Tab target : Tab.values()) {
+            int col = index % cols;
+            int row = index / cols;
+            String label = (tab == target ? "◆ " : "") + Lang.string(tabLabelKey(target));
+            addRenderableWidget(WbButton.create(tabX + col * (tabW + gap), y + row * 26, tabW, 22, label,
+                    Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(tabLabelKey(target))),
+                    button -> minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, target, target == Tab.SAFETY ? safetyPage : SafetyPage.CORE))));
+            index++;
+        }
+        if (tab != Tab.SAFETY) {
+            return;
+        }
+        int safetyY = y + navRows(panelWidth) * 26 + 6;
+        int safetyCols = panelWidth < 560 ? 2 : 4;
+        int safetyW = Math.max(90, (panelWidth - 36 - gap * (safetyCols - 1)) / safetyCols);
+        int safetyIndex = 0;
+        for (SafetyPage target : SafetyPage.values()) {
+            int col = safetyIndex % safetyCols;
+            int row = safetyIndex / safetyCols;
+            String label = (safetyPage == target ? "◆ " : "") + Lang.string(safetyLabelKey(target));
+            addRenderableWidget(WbButton.create(tabX + col * (safetyW + gap), safetyY + row * 24, safetyW, 20, label,
+                    Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(safetyLabelKey(target))),
+                    button -> minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.SAFETY, target))));
+            safetyIndex++;
+        }
     }
 
     private void initGeneral(WorldBinderConfig config, int x, int y, int w) {
         int fullW = Math.max(120, Math.min(w, 520));
         defaultName = field(x, y + 48, fullW, config.defaultArchiveName, 64); addContentWidget(defaultName);
 
-        int versionW = Math.max(80, Math.min(110, fullW / 3));
-        int buttonW = Math.max(58, Math.min(76, (fullW - versionW - 24) / 2));
-        targetVersion = field(x, y + 100, versionW, config.targetMinecraftVersion, 12); addContentWidget(targetVersion);
-        addContentWidget(button(x + versionW + 10, y + 100, buttonW, 22, "worldbinder.gui.prev", "worldbinder.tooltip.prev_version", b -> { config.targetMinecraftVersion = TargetMinecraftVersion.previous(targetVersion.getValue()); targetVersion.setValue(config.targetMinecraftVersion); }));
-        addContentWidget(button(x + versionW + buttonW + 18, y + 100, buttonW, 22, "worldbinder.gui.next", "worldbinder.tooltip.next_version", b -> { config.targetMinecraftVersion = TargetMinecraftVersion.next(targetVersion.getValue()); targetVersion.setValue(config.targetMinecraftVersion); }));
+        targetVersion = null;
+        int targetW = Math.min(fullW, Math.max(180, w / 2));
+        addContentWidget(WbButton.create(x, y + 100, targetW, 23,
+                Component.translatable("worldbinder.config.target_dropdown_value", config.targetMinecraftVersion),
+                Component.translatable("worldbinder.tooltip.target_version"), b -> {
+                    targetVersionDropdownOpen = !targetVersionDropdownOpen;
+                    rebuildConfigWidgets();
+                }));
+        if (targetVersionDropdownOpen) {
+            addTargetVersionOptions(config, x, y + 128, fullW);
+        }
 
+        int targetDropdownOffset = targetVersionDropdownOpen ? targetVersionDropdownHeight(fullW) + 10 : 0;
         int numericW = Math.max(90, Math.min(130, (fullW - 48) / 3));
         int numericGap = Math.max(18, Math.min(28, (fullW - numericW * 3) / 2));
-        int numericY = y + 164;
+        int numericY = y + 164 + targetDropdownOffset;
         radiusChunks = field(x, numericY, numericW, Integer.toString(config.roamingRadiusChunks), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radiusChunks);
         minY = field(x + numericW + numericGap + 8, numericY, numericW, Integer.toString(config.captureMinY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(minY);
         maxY = field(x + (numericW + numericGap) * 2 + 8, numericY, numericW, Integer.toString(config.captureMaxY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxY);
 
-        int gridY = y + 218;
+        int gridY = y + 218 + targetDropdownOffset;
         addToggleGrid(x, gridY, w, 2,
                 toggleSpec("worldbinder.config.capture_entities", "worldbinder.tooltip.config.entities", () -> config.captureEntities, v -> config.captureEntities = v),
                 toggleSpec("worldbinder.config.capture_block_entities", "worldbinder.tooltip.config.blockentities", () -> config.captureBlockEntities, v -> config.captureBlockEntities = v),
@@ -180,6 +220,25 @@ public final class WorldBinderConfigScreen extends Screen {
                 toggleSpec("worldbinder.config.server_resource_pack", "worldbinder.tooltip.config.server_resource_pack", () -> config.includeServerResourcePack, v -> config.includeServerResourcePack = v),
                 toggleSpec("worldbinder.config.gamerules", "worldbinder.tooltip.config.gamerules", () -> config.exportGameRules, v -> config.exportGameRules = v),
                 toggleSpec("worldbinder.config.append_timestamp", "worldbinder.tooltip.config.append_timestamp", () -> config.appendTimestampToArchiveName, v -> config.appendTimestampToArchiveName = v));
+    }
+
+    private void addTargetVersionOptions(WorldBinderConfig config, int x, int y, int w) {
+        int cols = targetVersionColumns(w);
+        int gap = 5;
+        int optionW = Math.max(58, (w - gap * (cols - 1)) / cols);
+        int i = 0;
+        for (TargetMinecraftVersion.Entry entry : TargetMinecraftVersion.FINAL_RELEASES) {
+            int col = i % cols;
+            int row = i / cols;
+            String label = (entry.name().equals(TargetMinecraftVersion.normalize(config.targetMinecraftVersion)) ? "◆ " : "") + entry.name();
+            addContentWidget(WbButton.create(x + col * (optionW + gap), y + row * 22, optionW, 19, label,
+                    Component.translatable("worldbinder.tooltip.target_version"), b -> {
+                        config.targetMinecraftVersion = entry.name();
+                        targetVersionDropdownOpen = false;
+                        rebuildConfigWidgets();
+                    }));
+            i++;
+        }
     }
 
     private void initPerformance(WorldBinderConfig config, int x, int y, int w) {
@@ -234,16 +293,7 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private void initSafety(WorldBinderConfig config, int x, int y, int w) {
-        int cols = w < 520 ? 2 : 4;
-        int gap = 8;
-        int buttonW = Math.max(70, (w - gap * (cols - 1)) / cols);
-        int pageY = y + 28;
-        addContentWidget(safetyPageButton(x, pageY, buttonW, "worldbinder.config.safety.page.core", SafetyPage.CORE));
-        addContentWidget(safetyPageButton(x + (buttonW + gap), pageY, buttonW, "worldbinder.config.safety.page.export", SafetyPage.EXPORT));
-        addContentWidget(safetyPageButton(x + (buttonW + gap) * (cols == 2 ? 0 : 2), pageY + (cols == 2 ? 30 : 0), buttonW, "worldbinder.config.safety.page.pack", SafetyPage.RESOURCE_PACK));
-        addContentWidget(safetyPageButton(x + (buttonW + gap) * (cols == 2 ? 1 : 3), pageY + (cols == 2 ? 30 : 0), buttonW, "worldbinder.config.safety.page.gamerules", SafetyPage.GAMERULES));
-
-        int contentY = y + (cols == 2 ? 94 : 68);
+        int contentY = y + 28;
         if (safetyPage == SafetyPage.CORE) initSafetyCore(config, x, contentY, w);
         if (safetyPage == SafetyPage.EXPORT) initSafetyExport(config, x, contentY, w);
         if (safetyPage == SafetyPage.RESOURCE_PACK) initSafetyResourcePack(config, x, contentY, w);
@@ -346,15 +396,16 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private Button preset(int x, int y, int w, String labelKey, WorldBinderConfig.PerformancePreset preset, String tooltipKey) {
-        return WbTooltips.register(Button.builder(Component.translatable(labelKey), b -> { WorldBinder.config().setPreset(preset); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.PERFORMANCE)); })
-                .bounds(x, y, w, 22).build(), Component.translatable(tooltipKey));
+        return WbButton.create(x, y, w, 22, Component.translatable(labelKey), Component.translatable(tooltipKey),
+                b -> { WorldBinder.config().setPreset(preset); minecraft.gui.setScreen(new WorldBinderConfigScreen(parent, Tab.PERFORMANCE)); });
     }
 
     private Button resourcePackFallbackButton(int x, int y, int w, WorldBinderConfig config) {
-        return WbTooltips.register(Button.builder(Component.translatable("worldbinder.config.resource_pack_fallback.value", fallbackLabel(config.resourcePackFallbackMode)), b -> {
+        return WbButton.create(x, y, w, 22, Component.translatable("worldbinder.config.resource_pack_fallback.value", fallbackLabel(config.resourcePackFallbackMode)),
+                Component.translatable("worldbinder.tooltip.config.resource_pack_fallback"), b -> {
             config.resourcePackFallbackMode = nextFallbackMode(config.resourcePackFallbackMode);
-            b.setMessage(Component.translatable("worldbinder.config.resource_pack_fallback.value", fallbackLabel(config.resourcePackFallbackMode)));
-        }).bounds(x, y, w, 22).build(), Component.translatable("worldbinder.tooltip.config.resource_pack_fallback"));
+            b.setMessage(fit(Component.translatable("worldbinder.config.resource_pack_fallback.value", fallbackLabel(config.resourcePackFallbackMode)), b.getWidth()));
+        });
     }
 
     private static WorldBinderConfig.ResourcePackFallbackMode nextFallbackMode(WorldBinderConfig.ResourcePackFallbackMode mode) {
@@ -375,11 +426,12 @@ public final class WorldBinderConfigScreen extends Screen {
 
     private Button modeButton(int x, int y, int w, String label, ModeGetter getter, ModeSetter setter) {
         WorldBinderConfig.MapLayerMode current = getter.get();
-        return WbTooltips.register(Button.builder(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), modeLabel(current)), b -> {
+        return WbButton.create(x, y, w, 22, Component.translatable("worldbinder.config.mode_value", Component.translatable(label), modeLabel(current)),
+                Component.translatable("worldbinder.tooltip.config.map_mode"), b -> {
             WorldBinderConfig.MapLayerMode next = nextMode(getter.get());
             setter.set(next);
-            b.setMessage(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), modeLabel(next)));
-        }).bounds(x, y, w, 22).build(), Component.translatable("worldbinder.tooltip.config.map_mode"));
+            b.setMessage(fit(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), modeLabel(next)), b.getWidth()));
+        });
     }
 
     private static WorldBinderConfig.MapLayerMode nextMode(WorldBinderConfig.MapLayerMode mode) {
@@ -392,11 +444,12 @@ public final class WorldBinderConfigScreen extends Screen {
 
     private Button radarDetailButton(int x, int y, int w, String label, RadarDetailGetter getter, RadarDetailSetter setter) {
         WorldBinderConfig.RadarDetailMode current = getter.get();
-        return WbTooltips.register(Button.builder(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), radarDetailLabel(current)), b -> {
+        return WbButton.create(x, y, w, 22, Component.translatable("worldbinder.config.mode_value", Component.translatable(label), radarDetailLabel(current)),
+                Component.translatable("worldbinder.tooltip.config.radar_detail"), b -> {
             WorldBinderConfig.RadarDetailMode next = nextRadarDetail(getter.get());
             setter.set(next);
-            b.setMessage(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), radarDetailLabel(next)));
-        }).bounds(x, y, w, 22).build(), Component.translatable("worldbinder.tooltip.config.radar_detail"));
+            b.setMessage(fit(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), radarDetailLabel(next)), b.getWidth()));
+        });
     }
 
     private static String modeLabel(WorldBinderConfig.MapLayerMode mode) {
@@ -427,11 +480,12 @@ public final class WorldBinderConfigScreen extends Screen {
 
     private Button gameRuleButton(int x, int y, int w, String rule) {
         boolean enabled = gameRuleValues.getOrDefault(rule, defaultGameRule(rule));
-        return WbTooltips.register(Button.builder(Component.literal(rule + " " + Lang.string(enabled ? "worldbinder.common.on" : "worldbinder.common.off")), b -> {
+        return WbButton.create(x, y, w, 22, Component.literal(rule + " " + Lang.string(enabled ? "worldbinder.common.on" : "worldbinder.common.off")),
+                Component.literal(rule), b -> {
             boolean next = !gameRuleValues.getOrDefault(rule, defaultGameRule(rule));
             gameRuleValues.put(rule, next);
-            b.setMessage(Component.literal(rule + " " + Lang.string(next ? "worldbinder.common.on" : "worldbinder.common.off")));
-        }).bounds(x, y, w, 22).build(), Component.literal(rule));
+            b.setMessage(fit(Component.literal(rule + " " + Lang.string(next ? "worldbinder.common.on" : "worldbinder.common.off")), b.getWidth()));
+        });
     }
 
     private void addToggleGrid(int x, int y, int w, int requestedCols, ToggleSpec... specs) {
@@ -477,19 +531,23 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private Button button(int x, int y, int w, int h, String key, String tooltipKey, Button.OnPress action) {
-        return WbTooltips.register(Button.builder(Component.translatable(key), action).bounds(x, y, w, h).build(), Component.translatable(tooltipKey));
+        return WbButton.create(x, y, w, h, Component.translatable(key), Component.translatable(tooltipKey), action);
     }
 
     private Button toggle(int x, int y, int w, int h, String labelKey, String tooltipKey, BoolGetter getter, BoolSetter setter) {
-        return WbTooltips.register(Button.builder(toggleLabel(labelKey, getter.get()), b -> {
+        return WbButton.create(x, y, w, h, toggleLabel(labelKey, getter.get()), Component.translatable(tooltipKey), b -> {
             boolean n = !getter.get();
             setter.set(n);
-            b.setMessage(toggleLabel(labelKey, n));
-        }).bounds(x, y, w, h).build(), Component.translatable(tooltipKey));
+            b.setMessage(fit(toggleLabel(labelKey, n), b.getWidth()));
+        });
     }
 
     private Component toggleLabel(String labelKey, boolean enabled) {
         return Component.translatable("worldbinder.config.toggle_value", Component.translatable(labelKey), Component.translatable(enabled ? "worldbinder.common.on" : "worldbinder.common.off"));
+    }
+
+    private Component fit(Component label, int width) {
+        return Component.literal(WbButton.fitLabel(label.getString(), width));
     }
 
     private int panelWidth() {
@@ -505,9 +563,33 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private int contentBaseY(int top, int panelWidth) {
-        int tabW = Math.max(44, (panelWidth - 48 - 6 * 3) / 4);
-        boolean twoRows = 18 + (tabW + 6) * 4 - 6 > panelWidth - 18;
-        return top + (compact() ? 82 : 98) + (twoRows ? 28 : 0);
+        int navHeight = navRows(panelWidth) * 26;
+        int safetyHeight = tab == Tab.SAFETY ? (panelWidth < 560 ? 54 : 28) : 0;
+        return top + (compact() ? 52 : 62) + navHeight + safetyHeight + 20;
+    }
+
+    private int navColumns(int panelWidth) {
+        return panelWidth < 500 ? 2 : 4;
+    }
+
+    private int navRows(int panelWidth) {
+        return (Tab.values().length + navColumns(panelWidth) - 1) / navColumns(panelWidth);
+    }
+
+    private int targetVersionColumns(int width) {
+        if (width < 260) {
+            return 2;
+        }
+        if (width < 430) {
+            return 3;
+        }
+        return 4;
+    }
+
+    private int targetVersionDropdownHeight(int width) {
+        int cols = targetVersionColumns(width);
+        int rows = (TargetMinecraftVersion.FINAL_RELEASES.size() + cols - 1) / cols;
+        return rows * 22 + 2;
     }
 
     private int labelWidth(int contentW) {
@@ -521,14 +603,14 @@ public final class WorldBinderConfigScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0xEE05050C);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
         width = WbLayout.DESIGN_WIDTH;
         height = WbLayout.DESIGN_HEIGHT;
         try {
-        context.fill(0, 0, width, height, 0xEE05050C);
+        WbChrome.drawBackdrop(context, width, height);
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
         int left = WbLayout.left(width, panelWidth);
@@ -546,11 +628,13 @@ public final class WorldBinderConfigScreen extends Screen {
             GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.config.subheader"), left + panelWidth / 2, top + 32, 0xFFBDB6D9);
         }
         int cardBottom = top + panelHeight - 48;
-        drawCard(context, contentX - 8, contentBaseY - 10, contentW + 16, Math.max(120, cardBottom - contentBaseY + 10), Component.translatable(tabTitle()));
+        drawCard(context, contentX - 8, contentBaseY - 10, contentW + 16, Math.max(120, cardBottom - contentBaseY + 10), Component.translatable(tabTitle()), tabAccent(tab));
         if (tab == Tab.GENERAL) drawGeneralLabels(context, contentX, contentY, contentW);
         if (tab == Tab.PERFORMANCE) drawPerformanceLabels(context, contentX, contentY, contentW);
         if (tab == Tab.HUD) drawHudLabels(context, contentX, contentY, contentW);
         if (tab == Tab.SAFETY) drawSafetyLabels(context, contentX, contentY, contentW);
+        drawSettingsNavigationChrome(context, left, top, panelWidth, virtualMouseX, virtualMouseY);
+        drawTargetVersionDropdown(context, contentX, contentY, contentW, virtualMouseX, virtualMouseY);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {
             width = realWidth;
@@ -569,6 +653,24 @@ public final class WorldBinderConfigScreen extends Screen {
         };
     }
 
+    private int tabAccent(Tab value) {
+        return switch (value) {
+            case GENERAL -> WbTheme.ACCENT;
+            case PERFORMANCE -> WbTheme.ACCENT_RIGHT;
+            case HUD -> WbTheme.INFO;
+            case SAFETY -> WbTheme.WARN;
+        };
+    }
+
+    private String tabLabelKey(Tab value) {
+        return switch (value) {
+            case GENERAL -> "worldbinder.config.tab.general";
+            case PERFORMANCE -> "worldbinder.config.tab.performance";
+            case HUD -> "worldbinder.config.tab.hud";
+            case SAFETY -> "worldbinder.config.tab.safety";
+        };
+    }
+
     private String safetyTitle() {
         return switch (safetyPage) {
             case CORE -> "worldbinder.config.safety.page.core";
@@ -578,16 +680,26 @@ public final class WorldBinderConfigScreen extends Screen {
         };
     }
 
+    private String safetyLabelKey(SafetyPage value) {
+        return switch (value) {
+            case CORE -> "worldbinder.config.safety.page.core";
+            case EXPORT -> "worldbinder.config.safety.page.export";
+            case RESOURCE_PACK -> "worldbinder.config.safety.page.pack";
+            case GAMERULES -> "worldbinder.config.safety.page.gamerules";
+        };
+    }
+
     private void drawGeneralLabels(GuiGraphicsExtractor c, int x, int y, int w) {
         int fullW = Math.max(120, Math.min(w, 520));
+        int targetDropdownOffset = targetVersionDropdownOpen ? targetVersionDropdownHeight(fullW) + 10 : 0;
         int numericW = Math.max(90, Math.min(130, (fullW - 48) / 3));
         int numericGap = Math.max(18, Math.min(28, (fullW - numericW * 3) / 2));
         label(c, x, y + 34, "worldbinder.gui.archive_name");
         label(c, x, y + 86, "worldbinder.gui.target_output_version");
-        clippedLabel(c, x, y + 150, numericW, "worldbinder.config.radius");
-        clippedLabel(c, x + numericW + numericGap + 8, y + 150, numericW, "worldbinder.config.y_min");
-        clippedLabel(c, x + (numericW + numericGap) * 2 + 8, y + 150, numericW, "worldbinder.config.y_max");
-        wrapped(c, x, y + 128, w, "worldbinder.config.target_value", WorldBinder.config().targetVersionLabel());
+        clippedLabel(c, x, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.radius");
+        clippedLabel(c, x + numericW + numericGap + 8, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.y_min");
+        clippedLabel(c, x + (numericW + numericGap) * 2 + 8, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.y_max");
+        wrapped(c, x, y + 128 + targetDropdownOffset, w, "worldbinder.config.target_value", WorldBinder.config().targetVersionLabel());
     }
 
     private void drawPerformanceLabels(GuiGraphicsExtractor c, int x, int y, int w) {
@@ -633,7 +745,7 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private void drawSafetyLabels(GuiGraphicsExtractor c, int x, int y, int w) {
-        int subY = y + (w < 520 ? 94 : 68);
+        int subY = y + 28;
         if (safetyPage == SafetyPage.CORE) {
             label(c, x, subY + 30, "worldbinder.config.recovery_interval");
         } else if (safetyPage == SafetyPage.RESOURCE_PACK) {
@@ -657,18 +769,73 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private void drawPanel(GuiGraphicsExtractor c, int x, int y, int w, int h) {
-        c.fill(x, y, x + w, y + h, 0xF00A0A15);
-        c.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xDD121225);
-        c.fill(x, y, x + w, y + 3, 0xFFFF55FF);
-        c.fill(x, y + h - 3, x + w, y + h, 0xFF5E03FC);
-        c.fill(x, y, x + 3, y + h, 0xFF5E03FC);
-        c.fill(x + w - 3, y, x + w, y + h, 0xFFF803FC);
+        WbChrome.drawPanel(c, x, y, w, h);
     }
 
-    private void drawCard(GuiGraphicsExtractor c, int x, int y, int w, int h, Component title) {
-        c.fill(x, y, x + w, y + h, 0xAA090914);
-        c.fill(x, y, x + w, y + 1, 0xFFFF55FF);
-        WbText.drawClipped(c, font, title.getString(), x + 12, y + 10, w - 24, WbTheme.ACCENT);
+    private void drawCard(GuiGraphicsExtractor c, int x, int y, int w, int h, Component title, int accent) {
+        WbChrome.drawCard(c, font, x, y, w, h, title, accent, false);
+    }
+
+    private void drawSettingsNavigationChrome(GuiGraphicsExtractor c, int left, int top, int panelWidth, int mouseX, int mouseY) {
+        int y = top + (compact() ? 42 : 52);
+        int cols = navColumns(panelWidth);
+        int gap = 6;
+        int tabW = Math.max(72, (panelWidth - 36 - gap * (cols - 1)) / cols);
+        int tabX = left + 18;
+        int index = 0;
+        for (Tab target : Tab.values()) {
+            int col = index % cols;
+            int row = index / cols;
+            int bx = tabX + col * (tabW + gap);
+            int by = y + row * 26;
+            boolean selected = target == tab;
+            boolean hovered = WbChrome.contains(bx, by, tabW, 22, mouseX, mouseY);
+            WbChrome.drawInset(c, bx, by, tabW, 22, selected ? tabAccent(target) : WbTheme.INFO, selected || hovered);
+            if (selected) {
+                c.fill(bx + 4, by + 19, bx + tabW - 4, by + 21, tabAccent(target));
+            }
+            index++;
+        }
+        if (tab != Tab.SAFETY) {
+            return;
+        }
+        int safetyY = y + navRows(panelWidth) * 26 + 6;
+        int safetyCols = panelWidth < 560 ? 2 : 4;
+        int safetyW = Math.max(90, (panelWidth - 36 - gap * (safetyCols - 1)) / safetyCols);
+        int safetyIndex = 0;
+        for (SafetyPage target : SafetyPage.values()) {
+            int col = safetyIndex % safetyCols;
+            int row = safetyIndex / safetyCols;
+            int bx = tabX + col * (safetyW + gap);
+            int by = safetyY + row * 24;
+            boolean selected = target == safetyPage;
+            boolean hovered = WbChrome.contains(bx, by, safetyW, 20, mouseX, mouseY);
+            WbChrome.drawInset(c, bx, by, safetyW, 20, selected ? WbTheme.ACCENT_RIGHT : WbTheme.INFO, selected || hovered);
+            safetyIndex++;
+        }
+    }
+
+    private void drawTargetVersionDropdown(GuiGraphicsExtractor c, int x, int y, int w, int mouseX, int mouseY) {
+        if (tab != Tab.GENERAL || !targetVersionDropdownOpen) {
+            return;
+        }
+        int fullW = Math.max(120, Math.min(w, 520));
+        int dropdownY = y + 128;
+        int cols = targetVersionColumns(fullW);
+        int gap = 5;
+        int optionW = Math.max(58, (fullW - gap * (cols - 1)) / cols);
+        int rows = (TargetMinecraftVersion.FINAL_RELEASES.size() + cols - 1) / cols;
+        WbChrome.drawDropdownPanel(c, x, dropdownY - 4, fullW, 22, rows);
+        for (int i = 0; i < TargetMinecraftVersion.FINAL_RELEASES.size(); i++) {
+            TargetMinecraftVersion.Entry entry = TargetMinecraftVersion.FINAL_RELEASES.get(i);
+            int col = i % cols;
+            int row = i / cols;
+            int rowX = x + col * (optionW + gap);
+            int rowY = dropdownY + row * 22;
+            boolean selected = entry.name().equals(TargetMinecraftVersion.normalize(WorldBinder.config().targetMinecraftVersion));
+            boolean hovered = WbChrome.contains(rowX, rowY, optionW, 19, mouseX, mouseY);
+            WbChrome.drawDropdownRow(c, rowX, rowY, optionW, 19, selected, hovered, selected ? WbTheme.ACCENT : WbTheme.INFO);
+        }
     }
 
     private void saveConfig() {
@@ -806,17 +973,17 @@ public final class WorldBinderConfigScreen extends Screen {
     }
 
     private int contentHeight(int w) {
-        if (tab == Tab.GENERAL) return 336;
+        if (tab == Tab.GENERAL) return 336 + (targetVersionDropdownOpen ? targetVersionDropdownHeight(Math.max(120, Math.min(w, 520))) + 10 : 0);
         if (tab == Tab.PERFORMANCE) return 330;
         if (tab == Tab.HUD) return 420;
         if (tab == Tab.SAFETY && safetyPage == SafetyPage.GAMERULES) {
             int cols = w < 420 ? 2 : 3;
             int rows = (BOOLEAN_GAMERULES.length + cols - 1) / cols;
-            return (w < 520 ? 94 : 68) + 112 + rows * 28 + 24;
+            return 28 + 112 + rows * 28 + 24;
         }
-        if (tab == Tab.SAFETY && safetyPage == SafetyPage.CORE) return 230;
-        if (tab == Tab.SAFETY && safetyPage == SafetyPage.RESOURCE_PACK) return 210;
-        if (tab == Tab.SAFETY) return 180;
+        if (tab == Tab.SAFETY && safetyPage == SafetyPage.CORE) return 180;
+        if (tab == Tab.SAFETY && safetyPage == SafetyPage.RESOURCE_PACK) return 164;
+        if (tab == Tab.SAFETY) return 144;
         return 320;
     }
 

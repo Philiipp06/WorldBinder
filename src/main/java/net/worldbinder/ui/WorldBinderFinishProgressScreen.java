@@ -4,7 +4,10 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 import net.worldbinder.capture.SceneCaptureService;
@@ -40,14 +43,16 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         int buttonW = Math.max(90, Math.min(170, (panelW - 40 - buttonGap) / 2));
         int left = (width - buttonW * 2 - buttonGap) / 2;
         int y = (height - panelH) / 2 + panelH - 36;
-        addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.finish.save_now"), button -> {
+        addRenderableWidget(WbButton.create(left, y, buttonW, 22, Component.translatable("worldbinder.finish.save_now"),
+                Component.translatable("worldbinder.finish.save_now.tooltip"), button -> {
             if (capture.abortQueueAndSaveNow()) {
                 minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
             }
-        }).bounds(left, y, buttonW, 22).build(), Component.translatable("worldbinder.finish.save_now.tooltip")));
-        addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.gui.open_map"), button -> {
+        }));
+        addRenderableWidget(WbButton.create(left + buttonW + buttonGap, y, buttonW, 22, Component.translatable("worldbinder.gui.open_map"),
+                Component.translatable("worldbinder.tooltip.open_map"), button -> {
             minecraft.gui.setScreen(new WorldBinderMapScreen(this));
-        }).bounds(left + buttonW + buttonGap, y, buttonW, 22).build(), Component.translatable("worldbinder.tooltip.open_map")));
+        }));
     }
 
     @Override
@@ -57,7 +62,7 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x5505050C);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
@@ -72,8 +77,7 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         int h = 190;
         int left = (width - w) / 2;
         int top = (height - h) / 2;
-        context.fill(left, top, left + w, top + h, 0xEE121020);
-        context.fill(left, top, left + w, top + 3, 0xFFFF55FF);
+        WbChrome.drawPanel(context, left, top, w, h);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.finish.progress_title"), width / 2, top + 18, 0xFFFFFFFF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(capture.finishStatusLine()), left + 28, top + 50, 0xFFE6E6F0);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.finish.chunks_left", capture.queuedChunkCount()), left + 28, top + 72, 0xFFBDB6D9);
@@ -82,10 +86,9 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         int barX = left + 28;
         int barY = top + 132;
         int barW = w - 56;
-        context.fill(barX, barY, barX + barW, barY + 10, 0x66000000);
         int queueStart = Math.max(1, capture.queuedChunkCount() + capture.scannedChunks());
         int filled = (int) (barW * Math.min(1.0D, capture.scannedChunks() / (double) queueStart));
-        context.fill(barX, barY, barX + filled, barY + 10, 0xFFFF55FF);
+        WbChrome.drawProgressTrack(context, barX, barY, barW, 10, filled, WbTheme.ACCENT);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.finish.progress_hint"), left + 28, top + 152, 0xFF8F86B8);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {

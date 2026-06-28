@@ -4,7 +4,10 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 import net.worldbinder.capture.SceneCaptureService;
@@ -38,18 +41,21 @@ public final class WorldBinderFinishScreen extends Screen {
         int left = (width - panelW) / 2;
         int y = height / 2 + 40;
         int buttonW = Math.max(90, Math.min(170, (panelW - 40) / 2));
-        addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.finish.finish_queue"), button -> {
+        addRenderableWidget(WbButton.create(left + 10, y, buttonW, 22, Component.translatable("worldbinder.finish.finish_queue"),
+                Component.translatable("worldbinder.finish.finish_queue.tooltip"), button -> {
             capture.finishAfterQueue();
             minecraft.gui.setScreen(new WorldBinderFinishProgressScreen(parent, capture));
-        }).bounds(left + 10, y, buttonW, 22).build(), Component.translatable("worldbinder.finish.finish_queue.tooltip")));
-        addRenderableWidget(WbTooltips.register(Button.builder(Component.translatable("worldbinder.finish.save_now"), button -> {
+        }));
+        addRenderableWidget(WbButton.create(left + panelW - buttonW - 10, y, buttonW, 22, Component.translatable("worldbinder.finish.save_now"),
+                Component.translatable("worldbinder.finish.save_now.tooltip"), button -> {
             if (capture.abortQueueAndSaveNow()) {
                 minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
             }
-        }).bounds(left + panelW - buttonW - 10, y, buttonW, 22).build(), Component.translatable("worldbinder.finish.save_now.tooltip")));
-        addRenderableWidget(Button.builder(Component.translatable("worldbinder.config.cancel"), button -> {
+        }));
+        addRenderableWidget(WbButton.create(left + (panelW - buttonW) / 2, y + 30, buttonW, 22, Component.translatable("worldbinder.config.cancel"),
+                Component.translatable("worldbinder.tooltip.close"), button -> {
             minecraft.gui.setScreen(parent);
-        }).bounds(left + (panelW - buttonW) / 2, y + 30, buttonW, 22).build());
+        }));
     }
 
     @Override
@@ -59,7 +65,7 @@ public final class WorldBinderFinishScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x6605050C);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
@@ -70,9 +76,7 @@ public final class WorldBinderFinishScreen extends Screen {
         int h = Math.max(160, Math.min(178, height - 24));
         int left = (width - w) / 2;
         int top = (height - h) / 2;
-        context.fill(left, top, left + w, top + h, 0xEE11101C);
-        context.fill(left, top, left + w, top + 3, 0xFFFF55FF);
-        context.fill(left, top + h - 3, left + w, top + h, 0xFF5E03FC);
+        WbChrome.drawPanel(context, left, top, w, h);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.finish.title"), width / 2, top + 18, 0xFFFFFFFF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.finish.message"), left + 28, top + 48, 0xFFE6E6F0);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.finish.queue_chunks", capture.queuedChunkCount()), left + 28, top + 72, 0xFFBDB6D9);

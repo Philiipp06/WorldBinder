@@ -1,4 +1,4 @@
-# WorldBinder 1.1.0 — How to Use
+# WorldBinder 1.2.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -37,7 +37,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.1.0 uses a responsive virtual GUI canvas. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.2.0 uses a responsive virtual GUI canvas with modernized menu navigation, dropdowns and polished HUD notifications. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
 
 ## 3. Choose capture settings
 

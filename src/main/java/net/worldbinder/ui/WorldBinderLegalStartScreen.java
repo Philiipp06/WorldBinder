@@ -5,6 +5,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.ui.component.WbText;
@@ -87,7 +88,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x6605050C);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
@@ -99,10 +100,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
 
-        context.fill(left, top, left + panelWidth, top + panelHeight, WbTheme.PANEL);
-        context.fill(left + 1, top + 1, left + panelWidth - 1, top + panelHeight - 1, WbTheme.PANEL_INNER);
-        context.fill(left, top, left + panelWidth, top + 3, WbTheme.ACCENT);
-        context.fill(left, top + panelHeight - 3, left + panelWidth, top + panelHeight, WbTheme.ACCENT_DARK);
+        WbChrome.drawPanel(context, left, top, panelWidth, panelHeight);
 
         int x = left + 18;
         int y = top + 18;
@@ -114,7 +112,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
         int legalTop = top + 104;
         int legalWidth = panelWidth - 36;
         int legalHeight = 68;
-        context.fill(legalLeft - 2, legalTop - 2, legalLeft + legalWidth + 2, legalTop + legalHeight + 2, 0x33202030);
+        WbChrome.drawInset(context, legalLeft - 2, legalTop - 2, legalWidth + 4, legalHeight + 4, WbTheme.WARN, true);
         y = legalTop + 8;
         y += WbText.drawWrapped(context, font,
                 Lang.string("worldbinder.legal.short_notice"),
@@ -140,4 +138,3 @@ public final class WorldBinderLegalStartScreen extends Screen {
         return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
     }
 }
-

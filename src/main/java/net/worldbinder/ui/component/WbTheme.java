@@ -4,27 +4,34 @@ public final class WbTheme {
     private WbTheme() {
     }
 
-    public static final int BACKDROP = 0xAA05050C;
-    public static final int PANEL = 0xEE090914;
-    public static final int PANEL_INNER = 0xCC121225;
-    public static final int CARD = 0xAA090914;
-    public static final int CARD_ALT = 0x77000000;
-    public static final int ROW = 0x221B1030;
-    public static final int ROW_ALT = 0x33000000;
-    public static final int ROW_SELECTED = 0x665E03FC;
+    public static final int BACKDROP = 0xD0060A0F;
+    public static final int BACKDROP_SOFT = 0x88131B25;
+    public static final int PANEL = 0xF20B121A;
+    public static final int PANEL_INNER = 0xEA121C27;
+    public static final int PANEL_SHADOW = 0x88000000;
+    public static final int PANEL_BORDER = 0x66415364;
+    public static final int CARD = 0xD0121D29;
+    public static final int CARD_ALT = 0xAA182635;
+    public static final int CARD_HOVER = 0xE0203041;
+    public static final int FIELD = 0xC20A1018;
+    public static final int ROW = 0x55203242;
+    public static final int ROW_ALT = 0x4420303F;
+    public static final int ROW_HOVER = 0x66344A5C;
+    public static final int ROW_SELECTED = 0x8830D5C8;
 
-    public static final int ACCENT = 0xFFFF55FF;
-    public static final int ACCENT_DARK = 0xFF5E03FC;
-    public static final int ACCENT_RIGHT = 0xFFF803FC;
-    public static final int ACCENT_SOFT = 0x555E03FC;
-    public static final int ACCENT_MUTED = 0x445E03FC;
+    public static final int ACCENT = 0xFF30D5C8;
+    public static final int ACCENT_DARK = 0xFF4D8CFF;
+    public static final int ACCENT_RIGHT = 0xFFFFB85C;
+    public static final int ACCENT_SOFT = 0x5530D5C8;
+    public static final int ACCENT_MUTED = 0x3330D5C8;
+    public static final int ACCENT_GLOW = 0x2230D5C8;
 
     public static final int TEXT = 0xFFFFFFFF;
-    public static final int TEXT_SOFT = 0xFFE6E6F0;
-    public static final int TEXT_MUTED = 0xFFBDB6D9;
-    public static final int TEXT_DIM = 0xFF8F86B8;
-    public static final int OK = 0xFF55FFAA;
-    public static final int WARN = 0xFFFFD166;
-    public static final int ERROR = 0xFFFF5555;
-    public static final int INFO = 0xFF55A7FF;
+    public static final int TEXT_SOFT = 0xFFEAF1F8;
+    public static final int TEXT_MUTED = 0xFFC3CEDC;
+    public static final int TEXT_DIM = 0xFF8B9AAF;
+    public static final int OK = 0xFF72E3A6;
+    public static final int WARN = 0xFFFFB85C;
+    public static final int ERROR = 0xFFFF6B7D;
+    public static final int INFO = 0xFF7DB7FF;
 }

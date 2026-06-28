@@ -6,7 +6,10 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.capture.SceneCaptureService;
+import net.worldbinder.ui.component.WbButton;
+import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 
@@ -41,14 +44,16 @@ public final class WorldBinderExistingWorldScreen extends Screen {
         int gap = 10;
         int buttonW = Math.max(90, (panelW - 60 - gap) / 2);
         int buttonX = left + 30;
-        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.existing.overwrite"), b -> {
+        addRenderableWidget(WbButton.create(buttonX, y, buttonW, 22, Lang.text("worldbinder.existing.overwrite"),
+                Lang.text("worldbinder.existing.overwrite.tooltip"), b -> {
             if (capture.saveNowConfirmed()) {
                 minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
             }
-        }).bounds(buttonX, y, buttonW, 22).build(), Lang.text("worldbinder.existing.overwrite.tooltip")));
-        addRenderableWidget(WbTooltips.register(Button.builder(Lang.text("worldbinder.gui.cancel"), b -> {
+        }));
+        addRenderableWidget(WbButton.create(buttonX + buttonW + gap, y, buttonW, 22, Lang.text("worldbinder.gui.cancel"),
+                Lang.text("worldbinder.existing.cancel.tooltip"), b -> {
             minecraft.gui.setScreen(parent);
-        }).bounds(buttonX + buttonW + gap, y, buttonW, 22).build(), Lang.text("worldbinder.existing.cancel.tooltip")));
+        }));
     }
 
     @Override
@@ -58,20 +63,19 @@ public final class WorldBinderExistingWorldScreen extends Screen {
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, 0x00000000);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
         width = WbLayout.DESIGN_WIDTH;
         height = WbLayout.DESIGN_HEIGHT;
         try {
-        context.fill(0, 0, width, height, 0xD905050C);
+        WbChrome.drawBackdrop(context, width, height);
         int w = Math.max(260, Math.min(500, width - 24));
         int h = Math.max(156, Math.min(180, height - 24));
         int left = (width - w) / 2;
         int top = (height - h) / 2;
-        context.fill(left, top, left + w, top + h, 0xEE11101C);
-        context.fill(left, top, left + w, top + 3, 0xFFFF55FF);
+        WbChrome.drawPanel(context, left, top, w, h);
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.existing.header"), width / 2, top + 18, 0xFFFFFFFF);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.existing.message"), left + 30, top + 52, 0xFFE6E6F0);
         net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.existing.target", capture.targetFolderName()), left + 30, top + 74, 0xFFBDB6D9);

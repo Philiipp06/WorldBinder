@@ -1,10 +1,10 @@
-# WorldBinder 1.1.0
+# WorldBinder 1.2.0
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. WorldBinder does not provide combat advantages, movement advantages, X-ray features, hidden server bypasses or permission bypasses. It focuses on responsible world preservation and local export workflows.
 
-> **Release notice:** WorldBinder 1.1.0 is the Minecraft 26.2 compatibility release. It keeps the stable 1.0.0 capture, recovery and durable chunk cache foundation while updating the mod for the 26.2 release line. Exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
+> **Release notice:** WorldBinder 1.2.0 is the menu and notification polish release for Minecraft 26.2. It keeps the stable capture, recovery and durable chunk cache foundation while adding a modernized control center, dropdown navigation, responsive scaling improvements and polished HUD notifications instead of development-style chat feedback. Exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
 
 ## Supported loader
 
@@ -144,6 +144,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.1.0 is the current stable public release for Minecraft 26.2.
+WorldBinder 1.2.0 is the current stable public release for Minecraft 26.2.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.
