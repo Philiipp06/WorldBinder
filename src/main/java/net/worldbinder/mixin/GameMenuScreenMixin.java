@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.worldbinder.client.WorldBinderClient;
 import net.worldbinder.ui.WorldBinderScreen;
+import net.worldbinder.ui.component.WorldBinderMenuButton;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,16 +18,25 @@ public class GameMenuScreenMixin {
     @Inject(method = "init", at = @At("TAIL"))
     private void worldbinder$addPauseButton(CallbackInfo ci) {
         PauseScreen self = (PauseScreen) (Object) this;
+        if (!self.showsPauseMenu()) {
+            return;
+        }
+
         Minecraft client = Minecraft.getInstance();
         boolean running = WorldBinderClient.capture() != null && WorldBinderClient.capture().isCapturing();
         boolean paused = running && WorldBinderClient.capture().isPaused();
 
-        Button openButton = Button.builder(Component.translatable("worldbinder.pause.open"), b ->
-                client.gui.setScreen(new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(), WorldBinderClient.placement(), WorldBinderClient.scenes()))
-        ).bounds(10, self.height - 54, 204, 20)
-          .tooltip(Tooltip.create(Component.translatable("worldbinder.tooltip.pause_open")))
-          .build();
+        WorldBinderMenuButton openButton = new WorldBinderMenuButton(ignored ->
+                client.gui.setScreen(new WorldBinderScreen(
+                        WorldBinderClient.selections(),
+                        WorldBinderClient.capture(),
+                        WorldBinderClient.placement(),
+                        WorldBinderClient.scenes(),
+                        self
+                ))
+        );
         ((ScreenAccessor) self).worldbinder$addRenderableWidget(openButton);
+        openButton.placeInIconRow(self);
 
         if (running) {
             Button pauseButton = Button.builder(Component.translatable(paused ? "worldbinder.gui.resume_capture" : "worldbinder.gui.pause_capture"), b -> {

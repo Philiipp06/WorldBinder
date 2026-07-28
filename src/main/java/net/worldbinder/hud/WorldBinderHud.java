@@ -14,9 +14,11 @@ import net.worldbinder.client.WorldBinderClient;
 import net.worldbinder.scene.ChunkSnapshot;
 import net.worldbinder.scene.ChunkCaptureStatus;
 import net.worldbinder.status.OperationStatus;
+import net.worldbinder.status.WorldBinderNotifications;
 import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.storage.StorageProgress;
 import net.worldbinder.ui.component.WbTheme;
+import net.worldbinder.util.GuiText;
 import net.worldbinder.util.Lang;
 
 import java.util.ArrayList;
@@ -25,6 +27,10 @@ import java.util.Map;
 import java.util.Set;
 
 public final class WorldBinderHud {
+    private static final int STATUS_WIDTH = 520;
+    private static final int STATUS_FULL_HEIGHT = 76;
+    private static final int STATUS_STORAGE_HEIGHT = 58;
+    private static final int STATUS_DETAIL_HEIGHT = 42;
     private static final RadarRenderCache RADAR_CACHE = new RadarRenderCache();
 
     private WorldBinderHud() {
@@ -33,82 +39,125 @@ public final class WorldBinderHud {
     public static void register() {
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("worldbinder", "hud"), (context, tickCounter) -> {
             Minecraft client = Minecraft.getInstance();
-            if (client.player == null || client.gui.hud.isHidden()) {
+            if (client.player == null) {
+                return;
+            }
+            if (client.gui.hud.isHidden()) {
+                WorldBinderNotifications.visible(0);
                 return;
             }
             SceneCaptureService capture = WorldBinderClient.capture();
-            if (WorldBinder.config().showBossbarOverlay && OperationStatus.visible()) {
-                drawBossbar(context, client, capture);
+            WorldBinderConfig config = WorldBinder.config();
+            int bossbarBottom = 0;
+            if (config.showBossbarOverlay && OperationStatus.visible()) {
+                bossbarBottom = drawBossbar(context, client, capture);
             }
-            WorldBinderNotificationOverlay.draw(context, client);
-            if (capture != null && capture.isRoamingCapture() && WorldBinder.config().chunkRadarRightAligned) {
-                drawChunkRadar(context, client, capture);
+            boolean showRadar = capture != null && capture.isRoamingCapture() && config.showChunkRadar;
+            RadarLayout radarLayout = showRadar ? layoutChunkRadar(client, config) : null;
+            WorldBinderNotificationOverlay.draw(
+                    context,
+                    client,
+                    bossbarBottom,
+                    radarLayout == null ? 0 : radarLayout.y(),
+                    radarLayout == null ? 0 : radarLayout.y() + radarLayout.panelHeight()
+            );
+            if (showRadar) {
+                drawChunkRadar(context, client, capture, radarLayout);
             }
         });
     }
 
-    private static void drawBossbar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
+    private static int drawBossbar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
         Font renderer = client.font;
-        int requestedScale = Math.max(1, WorldBinder.config().bossbarScalePercent);
+        WorldBinderConfig config = WorldBinder.config();
         int screenWidth = client.getWindow().getGuiScaledWidth();
         int screenHeight = client.getWindow().getGuiScaledHeight();
-        float responsiveScale = hudScale(screenWidth, screenHeight);
-        int maxWidth = Math.max(170, screenWidth - 32);
-        int designWidth = Math.round(520 * responsiveScale * requestedScale / 100.0F);
-        int barWidth = clamp(designWidth, Math.min(260, maxWidth), maxWidth);
-        boolean verySmall = screenWidth < 740 || screenHeight < 270;
-        if (verySmall) {
-            barWidth = Math.min(barWidth, Math.max(170, screenWidth - 48));
-        }
-        int x = (screenWidth - barWidth) / 2;
-        int y = Math.max(4, Math.round(WorldBinder.config().bossbarOffsetY * responsiveScale));
         StorageProgress storage = StorageFlow.progress();
         boolean storageMode = storage.isRunning();
         boolean captureMode = capture != null && capture.isCapturing();
-        boolean compact = verySmall || barWidth < 360 || screenHeight < 170;
-        int overlayHeight = storageMode ? compact ? 44 : 58 : captureMode && !compact ? 76 : 42;
-        y = Math.min(y, Math.max(4, screenHeight - overlayHeight - 4));
+        int logicalHeight = storageMode ? STATUS_STORAGE_HEIGHT : captureMode ? STATUS_FULL_HEIGHT : STATUS_DETAIL_HEIGHT;
+        float scale = statusScale(screenWidth, screenHeight, config, logicalHeight);
+        int physicalWidth = Math.max(1, Math.round(STATUS_WIDTH * scale));
+        int physicalHeight = Math.max(1, Math.round(logicalHeight * scale));
+        int x = WorldBinderWidgetLayout.positionX(screenWidth, physicalWidth, config.bossbarWidgetXPercent);
+        int y = WorldBinderWidgetLayout.positionY(screenHeight, physicalHeight, config.bossbarWidgetYPercent);
 
+        context.pose().pushMatrix();
+        context.pose().translate(x, y);
+        context.pose().scale(scale, scale);
+        try {
+            drawBossbarContents(context, renderer, config, capture, storage, storageMode, captureMode, logicalHeight);
+        } finally {
+            context.pose().popMatrix();
+        }
+        return y + physicalHeight;
+    }
+
+    private static void drawBossbarContents(
+            net.minecraft.client.gui.GuiGraphicsExtractor context,
+            Font renderer,
+            WorldBinderConfig config,
+            SceneCaptureService capture,
+            StorageProgress storage,
+            boolean storageMode,
+            boolean captureMode,
+            int logicalHeight
+    ) {
         double shownProgress = storageMode ? storage.progress() : OperationStatus.progress();
-        int fill = (int) ((barWidth - 4) * Math.max(0.0D, Math.min(1.0D, shownProgress)));
+        int fill = (int) ((STATUS_WIDTH - 4) * Math.max(0.0D, Math.min(1.0D, shownProgress)));
+        context.fill(3, 4, STATUS_WIDTH + 3, logicalHeight + 4, withAlpha(config.bossbarBackgroundColor, 0x88));
+        context.fill(0, 0, STATUS_WIDTH, logicalHeight, withAlpha(config.bossbarBackgroundColor, 0xE6));
+        context.fill(0, 0, STATUS_WIDTH, 18, config.bossbarBackgroundColor);
+        context.fill(2, 2, 2 + fill, 16, storageMode || OperationStatus.active() ? config.bossbarAccentColor : WbTheme.OK);
+        context.fill(0, 0, STATUS_WIDTH, 1, config.bossbarAccentColor);
+        context.fill(0, 17, STATUS_WIDTH, 18, WbTheme.INFO);
 
         if (storageMode) {
-            context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x8810182A);
-            context.fill(x, y, x + barWidth, y + 18, 0xFF16202C);
-            context.fill(x + 2, y + 2, x + 2 + fill, y + 16, WbTheme.ACCENT);
-            context.fill(x, y, x + barWidth, y + 1, WbTheme.ACCENT);
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.title"), screenWidth / 2, y + 5, 0xFFFFFFFF);
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(storage.stage().label() + " • " + (int) (storage.progress() * 100.0D) + "%", Math.max(18, barWidth / 6))), screenWidth / 2, y + 28, 0xFFE6E6F0);
-            if (!compact) {
-                net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.elapsed_remaining", StorageProgress.formatMillis(storage.elapsedMillis()), storage.etaText()), screenWidth / 2, y + 44, 0xFFBDB6D9);
-            }
+            GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text("worldbinder.storage.title"), STATUS_WIDTH / 2, 5, WbTheme.TEXT);
+            GuiText.drawCenteredTextWithShadow(
+                    context,
+                    renderer,
+                    Component.literal(shorten(storage.stage().label() + " • " + (int) (storage.progress() * 100.0D) + "%", 76)),
+                    STATUS_WIDTH / 2,
+                    28,
+                    WbTheme.TEXT_SOFT
+            );
+            GuiText.drawCenteredTextWithShadow(
+                    context,
+                    renderer,
+                    Lang.text("worldbinder.storage.elapsed_remaining", StorageProgress.formatMillis(storage.elapsedMillis()), storage.etaText()),
+                    STATUS_WIDTH / 2,
+                    44,
+                    WbTheme.TEXT_DIM
+            );
             return;
         }
 
-        context.fill(x - 5, y - 5, x + barWidth + 5, y + overlayHeight, 0x88080810);
-        context.fill(x, y, x + barWidth, y + 18, 0xFF16202C);
-        context.fill(x + 2, y + 2, x + 2 + fill, y + 16, OperationStatus.active() ? WbTheme.ACCENT : WbTheme.OK);
-        context.fill(x, y, x + barWidth, y + 1, WbTheme.ACCENT);
-        context.fill(x, y + 17, x + barWidth, y + 18, WbTheme.INFO);
-
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.title(), Math.max(20, barWidth / 6))), screenWidth / 2, y + 5, 0xFFFFFFFF);
-        if (captureMode) {
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text(capture.isPaused() ? "worldbinder.common.paused" : "worldbinder.hud.downloading"), screenWidth / 2, y + 25, 0xFFE6E6F0);
-            if (!compact) {
-                int chipY = y + 43;
-                int done = capture.scannedChunks();
-                int scanning = capture.partialChunks();
-                int queued = capture.queuedChunks();
-                int total = Math.max(1, done + scanning + queued);
-                int gap = 8;
-                int meterW = Math.max(64, (barWidth - gap * 2) / 3);
-                drawMeter(context, renderer, x, chipY, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, WbTheme.OK);
-                drawMeter(context, renderer, x + meterW + gap, chipY, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), WbTheme.ACCENT);
-                drawMeter(context, renderer, x + (meterW + gap) * 2, chipY, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? WbTheme.ERROR : WbTheme.WARN);
-            }
-        } else {
-            net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.detail(), Math.max(24, barWidth / 6))), screenWidth / 2, y + 25, 0xFFE6E6F0);
+        GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.title(), 76)), STATUS_WIDTH / 2, 5, WbTheme.TEXT);
+        if (!captureMode) {
+            GuiText.drawCenteredTextWithShadow(context, renderer, Component.literal(shorten(OperationStatus.detail(), 78)), STATUS_WIDTH / 2, 25, WbTheme.TEXT_SOFT);
+            return;
         }
+
+        GuiText.drawCenteredTextWithShadow(context, renderer, Lang.text(capture.isPaused() ? "worldbinder.common.paused" : "worldbinder.hud.downloading"), STATUS_WIDTH / 2, 25, WbTheme.TEXT_SOFT);
+        int done = capture.scannedChunks();
+        int scanning = capture.partialChunks();
+        int queued = capture.queuedChunks();
+        int total = Math.max(1, done + scanning + queued);
+        int gap = 8;
+        int meterW = (STATUS_WIDTH - gap * 2) / 3;
+        drawMeter(context, renderer, 0, 43, meterW, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, WbTheme.OK);
+        drawMeter(context, renderer, meterW + gap, 43, meterW, Lang.string("worldbinder.hud.meter.entities"), Integer.toString(capture.capturedEntities()), Math.min(1.0D, capture.capturedEntities() / 1000.0D), config.bossbarAccentColor);
+        drawMeter(context, renderer, (meterW + gap) * 2, 43, meterW, Lang.string("worldbinder.hud.meter.queue"), Integer.toString(queued), Math.min(1.0D, queued / 512.0D), queued > 512 ? WbTheme.ERROR : WbTheme.WARN);
+    }
+
+    private static float statusScale(int screenWidth, int screenHeight, WorldBinderConfig config, int logicalHeight) {
+        float requested = hudScale(screenWidth, screenHeight) * config.effectiveBossbarScalePercent() / 100.0F;
+        float fit = Math.min(
+                (screenWidth - WorldBinderWidgetLayout.SCREEN_MARGIN * 2) / (float) STATUS_WIDTH,
+                (screenHeight - WorldBinderWidgetLayout.SCREEN_MARGIN * 2) / (float) logicalHeight
+        );
+        return Math.max(0.2F, Math.min(requested, fit));
     }
 
     private static void drawMeter(net.minecraft.client.gui.GuiGraphicsExtractor context, Font renderer, int x, int y, int w, String label, String value, double progress, int color) {
@@ -121,56 +170,185 @@ public final class WorldBinderHud {
         net.worldbinder.util.GuiText.drawTextWithShadow(context, renderer, Component.literal(text), x + 5, y + 4, 0xFFBDB6D9);
     }
 
-    private static void drawChunkRadar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
-        WorldBinderConfig config = WorldBinder.config();
+    public static WidgetBounds previewBounds(Minecraft client, WorldBinderConfig config, WorldBinderWidgetLayout.Widget widget) {
         int screenW = client.getWindow().getGuiScaledWidth();
         int screenH = client.getWindow().getGuiScaledHeight();
-        float responsiveScale = hudScale(screenW, screenH);
+        int width;
+        int height;
+        if (widget == WorldBinderWidgetLayout.Widget.STATUS) {
+            float scale = statusScale(screenW, screenH, config, STATUS_FULL_HEIGHT);
+            width = Math.max(1, Math.round(STATUS_WIDTH * scale));
+            height = Math.max(1, Math.round(STATUS_FULL_HEIGHT * scale));
+        } else if (widget == WorldBinderWidgetLayout.Widget.RADAR) {
+            RadarLayout radar = layoutChunkRadar(client, config);
+            width = radar.panelWidth();
+            height = radar.panelHeight();
+        } else {
+            width = WorldBinderNotificationOverlay.preferredWidth(config, screenW, screenH);
+            height = WorldBinderNotificationOverlay.previewHeight(config, screenW, screenH);
+        }
+        int x = WorldBinderWidgetLayout.positionX(screenW, width, WorldBinderWidgetLayout.xPercent(config, widget));
+        int y = WorldBinderWidgetLayout.positionY(screenH, height, WorldBinderWidgetLayout.yPercent(config, widget));
+        return new WidgetBounds(x, y, width, height);
+    }
+
+    public static void drawWidgetPreview(
+            net.minecraft.client.gui.GuiGraphicsExtractor context,
+            Minecraft client,
+            WorldBinderConfig config,
+            WorldBinderWidgetLayout.Widget widget
+    ) {
+        WidgetBounds bounds = previewBounds(client, config, widget);
+        if (widget == WorldBinderWidgetLayout.Widget.STATUS) {
+            drawBossbarPreview(context, client.font, config, bounds);
+        } else if (widget == WorldBinderWidgetLayout.Widget.RADAR) {
+            drawRadarPreview(context, client, config, bounds);
+        } else {
+            WorldBinderNotificationOverlay.drawPreview(context, client.font, config, bounds.x(), bounds.y(), bounds.width());
+        }
+    }
+
+    private static void drawBossbarPreview(
+            net.minecraft.client.gui.GuiGraphicsExtractor context,
+            Font font,
+            WorldBinderConfig config,
+            WidgetBounds bounds
+    ) {
+        float scale = bounds.width() / (float) STATUS_WIDTH;
+        context.pose().pushMatrix();
+        context.pose().translate(bounds.x(), bounds.y());
+        context.pose().scale(scale, scale);
+        try {
+            context.fill(3, 4, STATUS_WIDTH + 3, STATUS_FULL_HEIGHT + 4, 0x77000000);
+            context.fill(0, 0, STATUS_WIDTH, STATUS_FULL_HEIGHT, withAlpha(config.bossbarBackgroundColor, 0xE6));
+            context.fill(0, 0, STATUS_WIDTH, 18, config.bossbarBackgroundColor);
+            context.fill(2, 2, 2 + Math.round((STATUS_WIDTH - 4) * 0.42F), 16, config.bossbarAccentColor);
+            context.fill(0, 0, STATUS_WIDTH, 2, config.bossbarAccentColor);
+            GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.widget_editor.preview.status_title"), STATUS_WIDTH / 2, 5, WbTheme.TEXT);
+            GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.widget_editor.preview.status_message"), STATUS_WIDTH / 2, 25, WbTheme.TEXT_SOFT);
+            int gap = 8;
+            int meterW = (STATUS_WIDTH - gap * 2) / 3;
+            drawMeter(context, font, 0, 45, meterW, Lang.string("worldbinder.hud.meter.chunks"), "84/120", 0.7D, WbTheme.OK);
+            drawMeter(context, font, meterW + gap, 45, meterW, Lang.string("worldbinder.hud.meter.entities"), "12", 0.35D, config.bossbarAccentColor);
+            drawMeter(context, font, (meterW + gap) * 2, 45, meterW, Lang.string("worldbinder.hud.meter.queue"), "36", 0.3D, WbTheme.WARN);
+        } finally {
+            context.pose().popMatrix();
+        }
+    }
+
+    private static void drawRadarPreview(
+            net.minecraft.client.gui.GuiGraphicsExtractor context,
+            Minecraft client,
+            WorldBinderConfig config,
+            WidgetBounds bounds
+    ) {
+        RadarLayout layout = layoutChunkRadar(client, config);
+        int panelW = layout.logicalWidth();
+        int panelH = layout.logicalHeight();
+        int gridSize = layout.size();
+        int cell = layout.cell();
+        int grid = layout.grid();
+        float scale = bounds.width() / (float) panelW;
+
+        context.pose().pushMatrix();
+        context.pose().translate(bounds.x(), bounds.y());
+        context.pose().scale(scale, scale);
+        try {
+            context.fill(3, 4, panelW + 3, panelH + 4, 0x77000000);
+            context.fill(0, 0, panelW, panelH, config.chunkRadarBackgroundColor);
+            context.fill(0, 0, panelW, 2, config.chunkRadarAccentColor);
+            context.fill(0, 20, panelW, 21, 0x5534485A);
+            GuiText.drawTextWithShadow(context, client.font, Component.translatable("worldbinder.widget_editor.preview.radar_title"), 7, 6, WbTheme.TEXT);
+
+            int gridX = (panelW - grid) / 2;
+            int gridY = 25;
+            context.fill(gridX - 3, gridY - 3, gridX + grid + 3, gridY + grid + 3, 0xAA060A10);
+            for (int row = 0; row < gridSize; row++) {
+                for (int col = 0; col < gridSize; col++) {
+                    int color = ((row + col) % 4 == 0) ? 0xAA24506D : 0xAA2D6B4E;
+                    int cellX = gridX + col * cell;
+                    int cellY = gridY + row * cell;
+                    context.fill(cellX, cellY, cellX + cell - 1, cellY + cell - 1, color);
+                }
+            }
+            int center = gridSize / 2;
+            int centerX = gridX + center * cell;
+            int centerY = gridY + center * cell;
+            context.fill(centerX, centerY + cell / 2, centerX + cell - 1, centerY + cell / 2 + 1, config.chunkRadarAccentColor);
+            context.fill(centerX + cell / 2, centerY, centerX + cell / 2 + 1, centerY + cell - 1, config.chunkRadarAccentColor);
+        } finally {
+            context.pose().popMatrix();
+        }
+    }
+
+    private static RadarLayout layoutChunkRadar(Minecraft client, WorldBinderConfig config) {
+        int screenW = client.getWindow().getGuiScaledWidth();
+        int screenH = client.getWindow().getGuiScaledHeight();
         int requestedSize = Math.max(1, config.chunkRadarSize | 1);
         int size = cappedOddSize(requestedSize, config.effectiveRadarMaxRenderedChunks());
-        int requestedCell = Math.max(1, Math.round(config.chunkRadarCellSize * Math.max(1, config.chunkRadarScalePercent) / 100.0F * responsiveScale));
-        int maxPanelW = Math.max(64, Math.min(screenW / 3, 210));
-        int maxPanelH = Math.max(64, Math.min(screenH / 3, 210));
-        int maxGrid = Math.max(24, Math.min(maxPanelW - 18, maxPanelH - 34));
-        int cell = Math.max(1, Math.min(requestedCell, maxGrid / Math.max(1, size)));
-        while (size > 3 && size * cell > maxGrid) {
-            size -= 2;
-        }
+        int cell = Math.max(2, Math.min(16, config.chunkRadarCellSize));
         int grid = size * cell;
-        int panelW = Math.max(92, grid + 22);
-        int panelH = grid + 38;
-        int x = config.chunkRadarRightAligned
-                ? screenW - panelW - Math.round(config.chunkRadarOffsetX * responsiveScale)
-                : Math.round(config.chunkRadarOffsetX * responsiveScale);
-        int y = Math.round(config.chunkRadarOffsetY * responsiveScale);
-        int bossbarClearance = OperationStatus.visible() ? Math.min(screenH - panelH - 4, Math.round(92 * responsiveScale)) : 4;
-        y = Math.max(y, bossbarClearance);
-        x = Math.max(4, Math.min(screenW - panelW - 4, x));
-        y = Math.max(4, Math.min(screenH - panelH - 4, y));
+        int logicalW = Math.max(92, grid + 22);
+        int logicalH = grid + 38;
+        float requestedScale = hudScale(screenW, screenH) * config.effectiveChunkRadarScalePercent() / 100.0F;
+        float fitScale = Math.min(
+                (screenW - WorldBinderWidgetLayout.SCREEN_MARGIN * 2) / (float) logicalW,
+                (screenH - WorldBinderWidgetLayout.SCREEN_MARGIN * 2) / (float) logicalH
+        );
+        float scale = Math.max(0.2F, Math.min(requestedScale, fitScale));
+        int panelW = Math.max(1, Math.round(logicalW * scale));
+        int panelH = Math.max(1, Math.round(logicalH * scale));
+        int x = WorldBinderWidgetLayout.positionX(screenW, panelW, config.chunkRadarWidgetXPercent);
+        int y = WorldBinderWidgetLayout.positionY(screenH, panelH, config.chunkRadarWidgetYPercent);
+        return new RadarLayout(x, y, panelW, panelH, logicalW, logicalH, scale, requestedSize, size, cell, grid);
+    }
 
-        context.fill(x + 3, y + 4, x + panelW + 3, y + panelH + 4, 0x88000000);
-        context.fill(x, y, x + panelW, y + panelH, 0xE6111822);
-        context.fill(x + 1, y + 1, x + panelW - 1, y + panelH - 1, 0x332B3A4A);
-        context.fill(x, y, x + panelW, y + 2, WbTheme.ACCENT);
-        context.fill(x, y + 20, x + panelW, y + 21, 0x5534485A);
+    private static void drawChunkRadar(
+            net.minecraft.client.gui.GuiGraphicsExtractor context,
+            Minecraft client,
+            SceneCaptureService capture,
+            RadarLayout layout
+    ) {
+        WorldBinderConfig config = WorldBinder.config();
+        int x = layout.x();
+        int y = layout.y();
+        int panelW = layout.logicalWidth();
+        int panelH = layout.logicalHeight();
+        int requestedSize = layout.requestedSize();
+        int size = layout.size();
+        int cell = layout.cell();
+        int grid = layout.grid();
 
-        int playerChunkX = client.player.blockPosition().getX() >> 4;
-        int playerChunkZ = client.player.blockPosition().getZ() >> 4;
-        String title = Lang.string("worldbinder.hud.chunk_title", playerChunkX, playerChunkZ);
-        if (size != requestedSize) {
-            title += " • capped";
-        }
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, client.font, Component.literal(shorten(title, Math.max(10, (panelW - 14) / 6))), x + 7, y + 6, WbTheme.TEXT);
+        context.pose().pushMatrix();
+        context.pose().translate(x, y);
+        context.pose().scale(layout.scale(), layout.scale());
+        try {
+            context.fill(3, 4, panelW + 3, panelH + 4, 0x88000000);
+            context.fill(0, 0, panelW, panelH, config.chunkRadarBackgroundColor);
+            context.fill(1, 1, panelW - 1, panelH - 1, 0x332B3A4A);
+            context.fill(0, 0, panelW, 2, config.chunkRadarAccentColor);
+            context.fill(0, 20, panelW, 21, 0x5534485A);
 
-        RadarRenderFrame frame = RADAR_CACHE.frame(capture, config, playerChunkX, playerChunkZ, size, cell);
-        int center = size / 2;
-        int gridX = x + (panelW - grid) / 2;
-        int gridY = y + 25;
-        context.fill(gridX - 3, gridY - 3, gridX + grid + 3, gridY + grid + 3, 0xBB060A10);
-        for (RadarCell radarCell : frame.cells) {
-            int px = gridX + (radarCell.dx + center) * cell;
-            int py = gridY + (radarCell.dz + center) * cell;
-            drawRadarCell(context, radarCell, px, py, cell, frame.detailCells, config.radarLayerMode);
+            int playerChunkX = client.player.blockPosition().getX() >> 4;
+            int playerChunkZ = client.player.blockPosition().getZ() >> 4;
+            String title = Lang.string("worldbinder.hud.chunk_title", playerChunkX, playerChunkZ);
+            if (size != requestedSize) {
+                title += " • capped";
+            }
+            net.worldbinder.util.GuiText.drawTextWithShadow(context, client.font, Component.literal(shorten(title, Math.max(10, (panelW - 14) / 6))), 7, 6, WbTheme.TEXT);
+
+            RadarRenderFrame frame = RADAR_CACHE.frame(capture, config, playerChunkX, playerChunkZ, size, cell);
+            int center = size / 2;
+            int gridX = (panelW - grid) / 2;
+            int gridY = 25;
+            context.fill(gridX - 3, gridY - 3, gridX + grid + 3, gridY + grid + 3, 0xBB060A10);
+            for (RadarCell radarCell : frame.cells) {
+                int px = gridX + (radarCell.dx + center) * cell;
+                int py = gridY + (radarCell.dz + center) * cell;
+                drawRadarCell(context, radarCell, px, py, cell, frame.detailCells, config.radarLayerMode);
+            }
+        } finally {
+            context.pose().popMatrix();
         }
     }
 
@@ -181,6 +359,10 @@ public final class WorldBinderHud {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return ((alpha & 0xFF) << 24) | (color & 0x00FFFFFF);
     }
 
     private static int cappedOddSize(int requestedSize, int maxRenderedChunks) {
@@ -378,5 +560,26 @@ public final class WorldBinderHud {
     }
 
     private record RadarCell(int dx, int dz, boolean player, int baseColor, int borderColor, int[] detailColors) {
+    }
+
+    private record RadarLayout(
+            int x,
+            int y,
+            int panelWidth,
+            int panelHeight,
+            int logicalWidth,
+            int logicalHeight,
+            float scale,
+            int requestedSize,
+            int size,
+            int cell,
+            int grid
+    ) {
+    }
+
+    public record WidgetBounds(int x, int y, int width, int height) {
+        public boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height;
+        }
     }
 }

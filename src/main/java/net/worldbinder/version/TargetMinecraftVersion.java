@@ -161,4 +161,8 @@ public final class TargetMinecraftVersion {
     public static String profileLabel(String raw) {
         return resolve(raw).profile.label();
     }
+
+    public static String profileTranslationKey(String raw) {
+        return "worldbinder.generation_profile." + resolve(raw).profile.name().toLowerCase(Locale.ROOT);
+    }
 }

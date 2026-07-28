@@ -31,6 +31,10 @@ public final class WorldBinder {
         return config;
     }
 
+    public static void replaceConfig(WorldBinderConfig next) {
+        config = next == null ? new WorldBinderConfig() : next;
+    }
+
     public static void saveConfig() {
         config().save();
     }

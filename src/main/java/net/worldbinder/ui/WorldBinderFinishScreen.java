@@ -26,8 +26,9 @@ public final class WorldBinderFinishScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -69,8 +70,8 @@ public final class WorldBinderFinishScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
         int w = Math.max(260, Math.min(420, width - 24));
         int h = Math.max(160, Math.min(178, height - 24));

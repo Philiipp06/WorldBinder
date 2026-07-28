@@ -26,8 +26,9 @@ public final class WorldBinderFinishProgressScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -66,8 +67,8 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
         if (!capture.isCapturing()) {
             minecraft.gui.setScreen(parent);

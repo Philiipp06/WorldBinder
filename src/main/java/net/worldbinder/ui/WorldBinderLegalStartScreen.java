@@ -38,8 +38,9 @@ public final class WorldBinderLegalStartScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -49,7 +50,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
     }
 
     private void initScaled() {
-        int panelWidth = 520;
+        int panelWidth = Math.min(520, width - 16);
         int panelHeight = 220;
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
@@ -92,10 +93,10 @@ public final class WorldBinderLegalStartScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
-        int panelWidth = 520;
+        int panelWidth = Math.min(520, width - 16);
         int panelHeight = 220;
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;

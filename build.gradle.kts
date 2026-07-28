@@ -1,5 +1,5 @@
 plugins {
-    id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
+    id("net.fabricmc.fabric-loom") version "1.16.3"
     id("maven-publish")
 }
 
@@ -35,6 +35,15 @@ tasks.processResources {
     inputs.property("version", project.version)
     filesMatching("fabric.mod.json") {
         expand("version" to project.version)
+    }
+}
+
+tasks.named<Jar>("jar") {
+    archiveFileName.set(
+        "${project.property("archives_base_name")}-${project.property("mod_version")}+mc${project.property("minecraft_version")}.jar"
+    )
+    from("LICENSE") {
+        rename { "LICENSE_${project.property("archives_base_name")}" }
     }
 }
 

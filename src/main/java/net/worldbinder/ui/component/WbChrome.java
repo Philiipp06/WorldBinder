@@ -50,6 +50,43 @@ public final class WbChrome {
         context.fill(x, y + height - 1, x + width, y + height, 0x66000000);
     }
 
+    public static void drawField(GuiGraphicsExtractor context, int x, int y, int width, int height, int accent, boolean focused, boolean hovered) {
+        int fill = focused ? WbTheme.FIELD_FOCUS : hovered ? WbTheme.FIELD_HOVER : WbTheme.FIELD;
+        int border = focused ? accent : hovered ? WbTheme.PANEL_BORDER : 0x55354658;
+        context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x55000000);
+        context.fill(x, y, x + width, y + height, border);
+        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fill);
+        context.fill(x + 2, y + 2, x + width - 2, y + 3, focused ? WbTheme.ACCENT_GLOW : 0x221D2B3C);
+        if (focused) {
+            context.fill(x, y, x + 2, y + height, accent);
+        }
+    }
+
+    public static void drawSectionSurface(GuiGraphicsExtractor context, int x, int y, int width, int height, int accent) {
+        context.fill(x + 2, y + 3, x + width + 2, y + height + 3, 0x44000000);
+        context.fill(x, y, x + width, y + height, 0x75101A25);
+        context.fill(x, y, x + width, y + 1, 0x553A4A5E);
+        context.fill(x, y, x + 2, y + height, accent);
+        context.fill(x + 10, y + height - 1, x + width - 10, y + height, 0x33000000);
+    }
+
+    public static void drawDivider(GuiGraphicsExtractor context, int x, int y, int width) {
+        context.fill(x, y, x + width, y + 1, WbTheme.DIVIDER);
+    }
+
+    public static void drawScrollBar(GuiGraphicsExtractor context, int x, int y, int height, int scroll, int maxScroll, int viewportHeight) {
+        if (maxScroll <= 0 || height <= 8) {
+            return;
+        }
+        context.fill(x, y, x + 3, y + height, WbTheme.SCROLL_TRACK);
+        int contentHeight = Math.max(viewportHeight + maxScroll, viewportHeight);
+        int thumbHeight = Math.max(18, Math.min(height, Math.round(height * (viewportHeight / (float) contentHeight))));
+        int travel = Math.max(0, height - thumbHeight);
+        int thumbY = y + (maxScroll <= 0 ? 0 : Math.round(travel * (scroll / (float) maxScroll)));
+        context.fill(x, thumbY, x + 3, thumbY + thumbHeight, WbTheme.SCROLL_THUMB);
+        context.fill(x, thumbY, x + 1, thumbY + thumbHeight, WbTheme.ACCENT);
+    }
+
     public static void drawProgressTrack(GuiGraphicsExtractor context, int x, int y, int width, int height, int fill, int accent) {
         int fillRight = Math.max(x + 1, Math.min(x + width - 1, x + fill));
         context.fill(x, y, x + width, y + height, WbTheme.FIELD);
@@ -64,18 +101,22 @@ public final class WbChrome {
 
     public static void drawDropdownPanel(GuiGraphicsExtractor context, int x, int y, int width, int rowHeight, int rows, int accent) {
         int height = rowHeight * rows + 6;
-        context.fill(x + 3, y + 4, x + width + 3, y + height + 4, 0x77000000);
-        context.fill(x, y, x + width, y + height, 0xF0141B28);
-        context.fill(x, y, x + width, y + 1, accent);
-        context.fill(x + 2, y + 2, x + Math.max(x + 2, x + width - 2), y + 3, WbTheme.PANEL_BORDER);
-        context.fill(x, y + height - 1, x + width, y + height, 0x66000000);
-        context.fill(x, y, x + 1, y + height, WbTheme.PANEL_BORDER);
-        context.fill(x + width - 1, y, x + width, y + height, WbTheme.PANEL_BORDER);
+        context.fill(x + 4, y + 5, x + width + 4, y + height + 5, 0x99000000);
+        context.fill(x, y, x + width, y + height, 0xFF101925);
+        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, 0xF0182533);
+        context.fill(x, y, x + width, y + 2, accent);
+        context.fill(x + 2, y + 3, x + width - 2, y + 4, 0x334E6A82);
+        context.fill(x, y + height - 1, x + width, y + height, 0x99000000);
+        context.fill(x, y, x + 1, y + height, 0xAA3D5368);
+        context.fill(x + width - 1, y, x + width, y + height, 0xAA3D5368);
     }
 
     public static void drawDropdownRow(GuiGraphicsExtractor context, int x, int y, int width, int height, boolean active, boolean hovered, int accent) {
-        context.fill(x, y, x + width, y + height, active ? WbTheme.ACCENT_MUTED : hovered ? WbTheme.ROW_HOVER : WbTheme.ROW_ALT);
-        context.fill(x, y, x + 3, y + height, active ? accent : hovered ? WbTheme.ACCENT_SOFT : 0x003CF2C8);
+        context.fill(x, y, x + width, y + height, active ? WbTheme.ROW_SELECTED : hovered ? WbTheme.ROW_HOVER : WbTheme.ROW_ALT);
+        context.fill(x, y, x + (active ? 3 : 2), y + height, active ? accent : hovered ? WbTheme.ACCENT_SOFT : 0x223A4A5E);
+        if (active) {
+            context.fill(x + width - 8, y + height / 2 - 1, x + width - 5, y + height / 2 + 2, accent);
+        }
     }
 
     public static boolean contains(int x, int y, int width, int height, int mouseX, int mouseY) {

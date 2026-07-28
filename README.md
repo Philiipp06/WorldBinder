@@ -1,16 +1,16 @@
-# WorldBinder 1.2.0
+# WorldBinder 1.3.0
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. WorldBinder does not provide combat advantages, movement advantages, X-ray features, hidden server bypasses or permission bypasses. It focuses on responsible world preservation and local export workflows.
 
-> **Release notice:** WorldBinder 1.2.0 is the menu and notification polish release for Minecraft 26.2. It keeps the stable capture, recovery and durable chunk cache foundation while adding a modernized control center, dropdown navigation, responsive scaling improvements and polished HUD notifications instead of development-style chat feedback. Exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
+> **Release notice:** WorldBinder 1.3.0 is the HUD customization, settings and notification refinement release for Minecraft 26.2. It keeps the stable capture, recovery and durable chunk cache foundation while introducing a compact visual HUD Widget Editor, fully proportional widget scaling, a visual HEX/ARGB color picker, refined toast notifications, cleaner chat feedback, substantially modernized settings and direct WorldBinder icon buttons in both the main menu and pause menu. Exports can still differ from the original server-side world depending on what the client received, server setup, custom content, resource packs, entities, dimensions and selected target output version.
 
 ## Supported loader
 
 WorldBinder is built and released for **Fabric** on Minecraft **26.2**.
 
-For this release line, use Fabric Loader 0.19.2 or newer and Fabric API 0.152.0+26.2 or newer. Forge, NeoForge and Quilt are not supported at this time. WorldBinder is developed and released as a native Fabric mod.
+For this release line, use Fabric Loader 0.19.3 or newer and Fabric API 0.155.2+26.2 or newer. Forge, NeoForge and Quilt are not supported at this time. WorldBinder is developed and released as a native Fabric mod.
 
 ## Main features
 
@@ -29,6 +29,12 @@ For this release line, use Fabric Loader 0.19.2 or newer and Fabric API 0.152.0+
 - Ctrl+C chunk center coordinate copying
 - Queue Dashboard / Profiler for capture and export telemetry
 - Export validation reports
+- Compact, collapsible HUD Widget Editor with drag positioning, proportional resize controls and visibility toggles
+- Visual color picker with HEX/ARGB input, opacity control and per-widget quick colors
+- Refined WorldBinder toast notifications with multi-line text and proportional scaling
+- Clean, consistently styled optional chat feedback
+- Modernized settings, dropdowns and menu components
+- WorldBinder icon buttons in the Minecraft main menu and pause menu
 - Responsive GUI scaling across different window sizes and GUI scales
 - Dedicated WorldBinder keybind category in Minecraft Controls
 - German and English language support
@@ -134,7 +140,7 @@ Helpful reports include:
 
 ## Build from source
 
-WorldBinder requires Java 25, Fabric Loader 0.19.2 or newer and Fabric API 0.152.0+26.2 or newer for the Minecraft 26.2 release line.
+WorldBinder requires Java 25, Fabric Loader 0.19.3 or newer and Fabric API 0.155.2+26.2 or newer for the Minecraft 26.2 release line.
 
 ```bash
 ./gradlew clean build
@@ -144,6 +150,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.2.0 is the current stable public release for Minecraft 26.2.
+WorldBinder 1.3.0 is the current stable public release for Minecraft 26.2.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

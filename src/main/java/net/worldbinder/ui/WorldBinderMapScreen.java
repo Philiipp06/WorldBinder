@@ -76,8 +76,9 @@ public final class WorldBinderMapScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -240,8 +241,9 @@ public final class WorldBinderMapScreen extends Screen {
         MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
         long hovered = chunkAt(virtualEvent.x(), virtualEvent.y());
         if (hovered != Long.MIN_VALUE) {
@@ -293,8 +295,8 @@ public final class WorldBinderMapScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
         WbChrome.drawBackdrop(context, width, height);
         SceneCaptureService capture = WorldBinderClient.capture();

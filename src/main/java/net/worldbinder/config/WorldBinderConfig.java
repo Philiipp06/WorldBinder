@@ -11,6 +11,12 @@ import java.nio.file.Files;
 
 public final class WorldBinderConfig {
     private static final int MAX_ROAMING_RADIUS_CHUNKS = 12;
+    private static final int DEFAULT_NOTIFICATION_SCALE_PERCENT = 80;
+    private static final int MIN_NOTIFICATION_SCALE_PERCENT = 50;
+    private static final int MAX_NOTIFICATION_SCALE_PERCENT = 160;
+    private static final int DEFAULT_NOTIFICATION_DURATION_PERCENT = 100;
+    private static final int MIN_NOTIFICATION_DURATION_PERCENT = 40;
+    private static final int MAX_NOTIFICATION_DURATION_PERCENT = 250;
 
     public enum PerformancePreset {
         SAFE,
@@ -37,6 +43,13 @@ public final class WorldBinderConfig {
         DISABLED,
         ENABLED,
         LOWER_PROTOCOL_ONLY
+    }
+
+    public enum NotificationAnchor {
+        TOP_LEFT,
+        TOP_RIGHT,
+        BOTTOM_LEFT,
+        BOTTOM_RIGHT
     }
 
     public PerformancePreset performancePreset = PerformancePreset.BALANCED;
@@ -80,8 +93,13 @@ public final class WorldBinderConfig {
     public boolean includeEntityPlayers = false;
     public boolean useFullEntityNbtForPlacement = true;
     public boolean sendPlacementCommands = true;
-    public boolean showDetailedChatFeedback = true;
+    public boolean showDetailedChatFeedback = false;
+    public boolean showNotifications = true;
+    public int notificationScalePercent = DEFAULT_NOTIFICATION_SCALE_PERCENT;
+    public int notificationDurationPercent = DEFAULT_NOTIFICATION_DURATION_PERCENT;
+    public NotificationAnchor notificationAnchor = NotificationAnchor.BOTTOM_RIGHT;
     public boolean showBossbarOverlay = true;
+    public boolean showChunkRadar = true;
     public boolean showArchiveStatsInMenu = true;
     public boolean autoOpenMenuFromPause = true;
     public boolean showWorldGizmos = true;
@@ -98,7 +116,19 @@ public final class WorldBinderConfig {
 
     public int bossbarScalePercent = 100;
     public int bossbarOffsetY = 14;
+    public int bossbarWidgetXPercent = 50;
+    public int bossbarWidgetYPercent = 2;
+    public int bossbarAccentColor = 0xFF30D5C8;
+    public int bossbarBackgroundColor = 0xE6121A24;
     public int chunkRadarScalePercent = 100;
+    public int chunkRadarWidgetXPercent = 100;
+    public int chunkRadarWidgetYPercent = 12;
+    public int chunkRadarAccentColor = 0xFF66A9FF;
+    public int chunkRadarBackgroundColor = 0xE6111822;
+    public int notificationWidgetXPercent = 100;
+    public int notificationWidgetYPercent = 100;
+    public int notificationAccentColor = 0xFF66A9FF;
+    public int notificationBackgroundColor = 0xF0121A24;
     public MapLayerMode f10MapLayerMode = MapLayerMode.BOTH;
     public MapLayerMode radarLayerMode = MapLayerMode.BOTH;
 
@@ -231,7 +261,6 @@ public final class WorldBinderConfig {
     }
 
     public int effectiveRadarMaxRenderedChunks() {
-        // -1 keeps the old automatic behavior, while the HUD still needs a runtime cap.
         int requested = radarMaxRenderedChunks < 0 ? 1024 : radarMaxRenderedChunks;
         return Math.max(9, Math.min(1024, requested));
     }
@@ -241,6 +270,36 @@ public final class WorldBinderConfig {
             return 0;
         }
         return Math.max(16, 1000 / Math.max(1, radarUpdateRate));
+    }
+
+    public int effectiveNotificationScalePercent() {
+        return Math.max(MIN_NOTIFICATION_SCALE_PERCENT, Math.min(MAX_NOTIFICATION_SCALE_PERCENT, notificationScalePercent));
+    }
+
+    public int effectiveBossbarScalePercent() {
+        return Math.max(50, Math.min(180, bossbarScalePercent));
+    }
+
+    public int effectiveChunkRadarScalePercent() {
+        return Math.max(50, Math.min(180, chunkRadarScalePercent));
+    }
+
+    public int effectiveWidgetPositionPercent(int value) {
+        return Math.max(0, Math.min(100, value));
+    }
+
+    public int effectiveNotificationDurationPercent() {
+        return Math.max(MIN_NOTIFICATION_DURATION_PERCENT, Math.min(MAX_NOTIFICATION_DURATION_PERCENT, notificationDurationPercent));
+    }
+
+    public long effectiveNotificationDurationMillis(long defaultMillis) {
+        long safeDefault = Math.max(1_000L, Math.min(30_000L, defaultMillis));
+        long scaled = Math.round(safeDefault * (effectiveNotificationDurationPercent() / 100.0D));
+        return Math.max(1_000L, Math.min(30_000L, scaled));
+    }
+
+    public NotificationAnchor effectiveNotificationAnchor() {
+        return notificationAnchor == null ? NotificationAnchor.BOTTOM_RIGHT : notificationAnchor;
     }
 
     public boolean effectiveAdaptiveThrottleEnabled() {
@@ -287,7 +346,9 @@ public final class WorldBinderConfig {
 
     public String targetVersionLabel() {
         TargetMinecraftVersion.Entry version = targetVersion();
-        return version.name() + " • " + version.profile().label();
+        return version.name() + " • " + net.worldbinder.util.Lang.string(
+                TargetMinecraftVersion.profileTranslationKey(version.name())
+        );
     }
 
     public void cycleTargetVersion(boolean backwards) {
@@ -298,6 +359,11 @@ public final class WorldBinderConfig {
     }
 
     public void setPreset(PerformancePreset preset) {
+        applyPreset(preset);
+        save();
+    }
+
+    public void applyPreset(PerformancePreset preset) {
         PerformancePreset next = preset == null ? PerformancePreset.BALANCED : preset;
         if (performancePreset == PerformancePreset.CUSTOM) {
             rememberCurrentCustomValues();
@@ -308,7 +374,6 @@ public final class WorldBinderConfig {
         } else {
             applyPresetValues(next);
         }
-        save();
     }
 
     public void rememberCurrentCustomValues() {
@@ -408,7 +473,25 @@ public final class WorldBinderConfig {
         if (resourcePackFallbackMode == null) {
             resourcePackFallbackMode = ResourcePackFallbackMode.LOWER_PROTOCOL_ONLY;
         }
-        // Keep raw custom numbers as entered; runtime accessors apply safety limits.
+        if (notificationAnchor == null) {
+            notificationAnchor = NotificationAnchor.BOTTOM_RIGHT;
+        }
+        if (notificationScalePercent == 0) {
+            notificationScalePercent = DEFAULT_NOTIFICATION_SCALE_PERCENT;
+        }
+        if (notificationDurationPercent == 0) {
+            notificationDurationPercent = DEFAULT_NOTIFICATION_DURATION_PERCENT;
+        }
+        notificationScalePercent = effectiveNotificationScalePercent();
+        notificationDurationPercent = effectiveNotificationDurationPercent();
+        bossbarScalePercent = effectiveBossbarScalePercent();
+        chunkRadarScalePercent = effectiveChunkRadarScalePercent();
+        bossbarWidgetXPercent = effectiveWidgetPositionPercent(bossbarWidgetXPercent);
+        bossbarWidgetYPercent = effectiveWidgetPositionPercent(bossbarWidgetYPercent);
+        chunkRadarWidgetXPercent = effectiveWidgetPositionPercent(chunkRadarWidgetXPercent);
+        chunkRadarWidgetYPercent = effectiveWidgetPositionPercent(chunkRadarWidgetYPercent);
+        notificationWidgetXPercent = effectiveWidgetPositionPercent(notificationWidgetXPercent);
+        notificationWidgetYPercent = effectiveWidgetPositionPercent(notificationWidgetYPercent);
         if (defaultArchiveName == null || defaultArchiveName.isBlank()) {
             defaultArchiveName = "worldbinder_export";
         }

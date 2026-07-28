@@ -2,6 +2,7 @@ package net.worldbinder.client;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.capture.SceneCaptureService;
@@ -11,6 +12,7 @@ import net.worldbinder.placement.ScenePlacementService;
 import net.worldbinder.render.WorldBinderWorldOverlay;
 import net.worldbinder.scene.SceneLibrary;
 import net.worldbinder.selection.SelectionManager;
+import net.worldbinder.status.WorldBinderNotifications;
 import net.worldbinder.util.Chat;
 
 public final class WorldBinderClient implements ClientModInitializer {
@@ -31,6 +33,8 @@ public final class WorldBinderClient implements ClientModInitializer {
         WorldBinderWorldOverlay.register();
         WorldBinderKeybinds.register(selectionManager, captureService, placementService, sceneLibrary);
         ClientTickEvents.END_CLIENT_TICK.register(WorldBinderClient::showRecoveryNoticeOnce);
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> WorldBinderNotifications.clear());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> WorldBinderNotifications.clear());
     }
 
     private static void showRecoveryNoticeOnce(Minecraft client) {

@@ -5,18 +5,19 @@ import net.minecraft.client.input.MouseButtonEvent;
 public final class WbLayout {
     public static final int DESIGN_WIDTH = 960;
     public static final int DESIGN_HEIGHT = 540;
-    private static final int MIN_OUTER_MARGIN = 4;
+    public static final int MIN_VIRTUAL_WIDTH = 480;
+    public static final int MIN_VIRTUAL_HEIGHT = 270;
 
     private WbLayout() {
     }
 
-    public record UiScale(float scale, int offsetX, int offsetY) {
+    public record UiScale(float scale, int offsetX, int offsetY, int virtualWidth, int virtualHeight) {
         public int toVirtualX(double x) {
-            return Math.max(0, Math.min(DESIGN_WIDTH, Math.round((float) ((x - offsetX) / scale))));
+            return Math.max(0, Math.min(virtualWidth, Math.round((float) ((x - offsetX) / scale))));
         }
 
         public int toVirtualY(double y) {
-            return Math.max(0, Math.min(DESIGN_HEIGHT, Math.round((float) ((y - offsetY) / scale))));
+            return Math.max(0, Math.min(virtualHeight, Math.round((float) ((y - offsetY) / scale))));
         }
 
         public double toVirtualDelta(double value) {
@@ -25,15 +26,20 @@ public final class WbLayout {
     }
 
     public static UiScale uiScale(int realWidth, int realHeight) {
-        int safeWidth = Math.max(1, realWidth - MIN_OUTER_MARGIN * 2);
-        int safeHeight = Math.max(1, realHeight - MIN_OUTER_MARGIN * 2);
-        float scale = Math.min(safeWidth / (float) DESIGN_WIDTH, safeHeight / (float) DESIGN_HEIGHT);
-        scale = Math.max(0.25F, scale);
-        int scaledWidth = Math.round(DESIGN_WIDTH * scale);
-        int scaledHeight = Math.round(DESIGN_HEIGHT * scale);
+        int safeWidth = Math.max(1, realWidth);
+        int safeHeight = Math.max(1, realHeight);
+        int virtualWidth = clamp(safeWidth, MIN_VIRTUAL_WIDTH, DESIGN_WIDTH);
+        int virtualHeight = clamp(safeHeight, MIN_VIRTUAL_HEIGHT, DESIGN_HEIGHT);
+        float scale = Math.min(1.0F, Math.min(
+                safeWidth / (float) virtualWidth,
+                safeHeight / (float) virtualHeight
+        ));
+        scale = Math.max(0.01F, scale);
+        int scaledWidth = Math.round(virtualWidth * scale);
+        int scaledHeight = Math.round(virtualHeight * scale);
         int offsetX = Math.max(0, (realWidth - scaledWidth) / 2);
         int offsetY = Math.max(0, (realHeight - scaledHeight) / 2);
-        return new UiScale(scale, offsetX, offsetY);
+        return new UiScale(scale, offsetX, offsetY, virtualWidth, virtualHeight);
     }
 
     public static MouseButtonEvent virtualMouseEvent(MouseButtonEvent event, int realWidth, int realHeight) {
@@ -47,6 +53,10 @@ public final class WbLayout {
 
     public static int virtualMouseY(double y, int realWidth, int realHeight) {
         return uiScale(realWidth, realHeight).toVirtualY(y);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     public static int panelWidth(int screenWidth) {

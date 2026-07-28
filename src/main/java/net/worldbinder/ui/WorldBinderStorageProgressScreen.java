@@ -28,8 +28,9 @@ public final class WorldBinderStorageProgressScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -39,7 +40,7 @@ public final class WorldBinderStorageProgressScreen extends Screen {
     }
 
     private void initScaled() {
-        int panelW = 500;
+        int panelW = Math.min(500, width - 16);
         int panelH = 206;
         int left = (width - panelW) / 2;
         int y = (height - panelH) / 2 + panelH - 36;
@@ -72,11 +73,11 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
         StorageProgress progress = StorageFlow.progress();
-        int w = 500;
+        int w = Math.min(500, width - 16);
         int h = 206;
         int left = (width - w) / 2;
         int top = (height - h) / 2;

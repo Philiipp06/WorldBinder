@@ -1,4 +1,4 @@
-# WorldBinder 1.2.0 — How to Use
+# WorldBinder 1.3.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -6,8 +6,8 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 ## 1. Install WorldBinder
 
-1. Install Minecraft 26.2 with Fabric Loader 0.19.2 or newer.
-2. Install Fabric API 0.152.0+26.2 or newer.
+1. Install Minecraft 26.2 with Fabric Loader 0.19.3 or newer.
+2. Install Fabric API 0.155.2+26.2 or newer.
 3. Place the WorldBinder jar into your `mods` folder.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
@@ -26,6 +26,8 @@ Default keybinds:
 
 Press **F9** to open the WorldBinder Control Center.
 
+You can also select the WorldBinder icon button in Minecraft's main menu or pause menu to open WorldBinder directly.
+
 The Control Center provides access to:
 
 - Capture controls
@@ -37,7 +39,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.2.0 uses a responsive virtual GUI canvas with modernized menu navigation, dropdowns and polished HUD notifications. Menus keep the same layout across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.3.0 uses a responsive virtual GUI canvas with substantially modernized settings, dropdowns and menus. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
 
 ## 3. Choose capture settings
 
@@ -51,6 +53,10 @@ Open **Settings** from the Control Center and review:
 - resource pack export
 - gamerule export
 - HUD and map options
+- custom toast duration (40–250%)
+- the HUD Widget Editor for status, radar and notification widgets
+
+Open **Settings > HUD & Map > HUD Widget Editor** to customize overlays. Select a widget from the compact panel or click it directly in the preview. Collapse the panel whenever you need the complete canvas, drag a widget to position it, and use the bottom-right handle or size slider to scale its complete frame, text and contents proportionally. Click either color row to open the visual color picker, choose a color or enter HEX/ARGB directly, then select **Apply** to return the changes to Settings and **Save** to write the configuration.
 
 Recommended presets:
 
@@ -171,7 +177,7 @@ Useful reports include:
 - Minecraft version
 - WorldBinder version
 - Fabric Loader and Fabric API version
-- whether Fabric API 0.152.0+26.2 or newer is installed
+- whether Fabric API 0.155.2+26.2 or newer is installed
 - selected target output version
 - capture mode and performance preset
 - whether the issue happened in singleplayer, Paper or Multiverse

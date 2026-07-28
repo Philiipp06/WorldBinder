@@ -35,8 +35,9 @@ public final class WorldBinderProfilerScreen extends Screen {
     protected void init() {
         int realWidth = width;
         int realHeight = height;
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             initScaled();
         } finally {
@@ -81,12 +82,12 @@ public final class WorldBinderProfilerScreen extends Screen {
         context.pose().pushMatrix();
         context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
         context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = WbLayout.DESIGN_WIDTH;
-        height = WbLayout.DESIGN_HEIGHT;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
         try {
             WbChrome.drawBackdrop(context, width, height);
             int panelW = Math.max(300, Math.min(860, width - 28));
-            int panelH = Math.max(260, Math.min(500, height - 42));
+            int panelH = Math.max(180, Math.min(500, height - 24));
             int left = (width - panelW) / 2;
             int top = (height - panelH) / 2;
             drawPanel(context, left, top, panelW, panelH);

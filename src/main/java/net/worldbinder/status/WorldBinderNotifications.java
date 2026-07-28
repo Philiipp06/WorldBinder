@@ -1,6 +1,7 @@
 package net.worldbinder.status;
 
 import net.minecraft.network.chat.Component;
+import net.worldbinder.WorldBinder;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -8,8 +9,10 @@ import java.util.Deque;
 import java.util.List;
 
 public final class WorldBinderNotifications {
-    private static final int MAX_VISIBLE = 4;
-    private static final Deque<Entry> ENTRIES = new ArrayDeque<>();
+    private static final int MAX_ACTIVE = 4;
+    private static final int MAX_PENDING = 32;
+    private static final Deque<Entry> ACTIVE = new ArrayDeque<>();
+    private static final Deque<PendingEntry> PENDING = new ArrayDeque<>();
     private static long nextId;
 
     private WorldBinderNotifications() {
@@ -31,17 +34,55 @@ public final class WorldBinderNotifications {
         show(Type.ERROR, Component.translatable("worldbinder.notification.error"), message, 8_500L);
     }
 
-    public static synchronized List<Entry> visible() {
+    public static synchronized List<Entry> visible(int availableSlots) {
         long now = System.currentTimeMillis();
-        ENTRIES.removeIf(entry -> entry.visibleUntil <= now);
-        return new ArrayList<>(ENTRIES);
+        ACTIVE.removeIf(entry -> entry.visibleUntil <= now);
+        int capacity = Math.max(0, Math.min(MAX_ACTIVE, availableSlots));
+        demoteOverflow(capacity, now);
+        while (ACTIVE.size() < capacity && !PENDING.isEmpty()) {
+            PendingEntry pending = PENDING.removeFirst();
+            ACTIVE.addFirst(new Entry(
+                    pending.id(),
+                    pending.type(),
+                    pending.title(),
+                    pending.message(),
+                    now,
+                    now + pending.durationMillis()
+            ));
+        }
+        return new ArrayList<>(ACTIVE);
     }
 
     private static synchronized void show(Type type, Component title, Component message, long durationMillis) {
-        long now = System.currentTimeMillis();
-        ENTRIES.addFirst(new Entry(++nextId, type, title, message, now, now + durationMillis));
-        while (ENTRIES.size() > MAX_VISIBLE) {
-            ENTRIES.removeLast();
+        long effectiveDuration = WorldBinder.config().effectiveNotificationDurationMillis(durationMillis);
+        PENDING.addLast(new PendingEntry(++nextId, type, title, message, effectiveDuration));
+        while (PENDING.size() > MAX_PENDING) {
+            PENDING.removeFirst();
+        }
+    }
+
+    public static synchronized void clear() {
+        ACTIVE.clear();
+        PENDING.clear();
+    }
+
+    private static void demoteOverflow(int capacity, long now) {
+        List<PendingEntry> demoted = new ArrayList<>();
+        while (ACTIVE.size() > capacity) {
+            Entry entry = ACTIVE.removeLast();
+            demoted.add(new PendingEntry(
+                    entry.id(),
+                    entry.type(),
+                    entry.title(),
+                    entry.message(),
+                    Math.max(1L, entry.visibleUntil() - now)
+            ));
+        }
+        for (int i = demoted.size() - 1; i >= 0; i--) {
+            PENDING.addFirst(demoted.get(i));
+        }
+        while (PENDING.size() > MAX_PENDING) {
+            PENDING.removeFirst();
         }
     }
 
@@ -61,5 +102,12 @@ public final class WorldBinderNotifications {
         public long ageMillis(long now) {
             return Math.max(0L, now - createdAt);
         }
+
+        public long remainingMillis(long now) {
+            return Math.max(0L, visibleUntil - now);
+        }
+    }
+
+    private record PendingEntry(long id, Type type, Component title, Component message, long durationMillis) {
     }
 }

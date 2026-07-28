@@ -739,6 +739,7 @@ public final class SceneCaptureService {
         }
         BlockPos pos = hitResult.getBlockPos();
         lastInteractedBlockEntityPos = pos.immutable();
+        lastInteractedEntity = null;
         cacheBlockEntityHot(client, pos);
     }
 
@@ -747,6 +748,7 @@ public final class SceneCaptureService {
             return;
         }
         lastInteractedEntity = entity;
+        lastInteractedBlockEntityPos = null;
         cacheEntityHot(entity);
     }
 
@@ -764,6 +766,10 @@ public final class SceneCaptureService {
 
 
     public void onContainerScreenClosed(Screen screen) {
+        BlockPos interactedBlockEntityPos = lastInteractedBlockEntityPos;
+        Entity interactedEntity = lastInteractedEntity;
+        lastInteractedBlockEntityPos = null;
+        lastInteractedEntity = null;
         if (!isCapturing() || captureInputPaused() || screen == null) {
             return;
         }
@@ -772,14 +778,14 @@ public final class SceneCaptureService {
             return;
         }
         int storedSlots = inspectVisibleContainerSlots(screen);
-        if (lastInteractedBlockEntityPos != null) {
-            cacheBlockEntityHot(client, lastInteractedBlockEntityPos);
+        if (interactedBlockEntityPos != null) {
+            cacheBlockEntityHot(client, interactedBlockEntityPos);
             if (storedSlots > 0 && activeScene != null) {
-                activeScene.storageNotes.add("Captured visible container screen at " + lastInteractedBlockEntityPos.toShortString() + " (" + storedSlots + " slots visible)");
+                activeScene.storageNotes.add("Captured visible container screen at " + interactedBlockEntityPos.toShortString() + " (" + storedSlots + " slots visible)");
             }
         }
-        if (lastInteractedEntity != null) {
-            cacheEntityHot(lastInteractedEntity);
+        if (interactedEntity != null) {
+            cacheEntityHot(interactedEntity);
             if (storedSlots > 0 && activeScene != null) {
                 activeScene.storageNotes.add("Captured visible entity container screen (" + storedSlots + " slots visible)");
             }

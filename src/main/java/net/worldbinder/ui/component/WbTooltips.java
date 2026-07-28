@@ -35,7 +35,7 @@ public final class WbTooltips {
             return;
         }
         for (GuiEventListener child : screen.children()) {
-            if (!(child instanceof AbstractWidget widget) || !widget.visible || !widget.active) {
+            if (!(child instanceof AbstractWidget widget) || !widget.visible) {
                 continue;
             }
             Component tooltip = TOOLTIP_BY_WIDGET.get(widget);
