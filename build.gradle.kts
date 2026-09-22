@@ -1,5 +1,5 @@
 plugins {
-    id("net.fabricmc.fabric-loom") version "1.16.3"
+    id("net.fabricmc.fabric-loom") version "1.17.21"
     id("maven-publish")
 }
 
@@ -51,4 +51,24 @@ tasks.register("buildFabric") {
     group = "build"
     description = "Builds the official Fabric WorldBinder jar. Fabric is the only supported loader for this release."
     dependsOn("build")
+}
+
+val clientTest = sourceSets.create("clientTest") {
+    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+    runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
+}
+
+loom {
+    mods {
+        register("worldbinder") { sourceSet(sourceSets.main.get()) }
+        register("worldbinder_test") { sourceSet(clientTest) }
+    }
+    runs {
+        register("clientTest") {
+            client()
+            source(clientTest)
+            runDir("build/client-test")
+            vmArg("-Dfabric.client.gametest")
+        }
+    }
 }

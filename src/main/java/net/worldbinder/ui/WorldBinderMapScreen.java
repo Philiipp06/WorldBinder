@@ -24,7 +24,7 @@ import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Chat;
 import net.worldbinder.util.Lang;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.Map;
 import java.util.Set;
@@ -224,7 +224,7 @@ public final class WorldBinderMapScreen extends Screen {
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
         WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
         MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
-        if (virtualEvent.button() == 0) {
+        if (virtualEvent.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
             offsetX = uiScale.toVirtualDelta(offsetX);
             offsetY = uiScale.toVirtualDelta(offsetY);
             followPlayer = false;
@@ -248,7 +248,7 @@ public final class WorldBinderMapScreen extends Screen {
         long hovered = chunkAt(virtualEvent.x(), virtualEvent.y());
         if (hovered != Long.MIN_VALUE) {
             selectedChunk = hovered;
-            if (virtualEvent.button() == 1) {
+            if (virtualEvent.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT) {
                 WorldBinderClient.capture().queueChunkForRescan(chunkXFromKey(hovered), chunkZFromKey(hovered));
                 return true;
             }
@@ -270,8 +270,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (getFocused() == goX || getFocused() == goZ) {
             return super.keyPressed(event);
         }
-        boolean copyPressed = event.key() == GLFW.GLFW_KEY_C
-                && (event.modifiers() & (GLFW.GLFW_MOD_CONTROL | GLFW.GLFW_MOD_SUPER)) != 0;
+        boolean copyPressed = event.isCopy();
         if (copyPressed && selectedChunk != Long.MIN_VALUE) {
             copySelectedChunkCenter();
             return true;

@@ -261,7 +261,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         if (insidePanel(event.x(), event.y())) {
             return super.mouseClicked(event, doubleClick);
         }
-        if (event.button() == 0) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
             WorldBinderWidgetLayout.Widget hit = widgetAt(event.x(), event.y());
             if (hit != null) {
                 boolean changedSelection = selected != hit;
@@ -290,7 +290,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
-        if (event.button() == 0 && resizing) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && resizing) {
             int deltaX = (int) Math.round(event.x()) - resizeStartX;
             int deltaY = (int) Math.round(event.y()) - resizeStartY;
             int delta = Math.round((deltaX + deltaY) / 2.0F);
@@ -298,7 +298,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             WorldBinderWidgetLayout.setScale(working, selected, nextScale);
             return true;
         }
-        if (event.button() == 0 && dragging) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && dragging) {
             WorldBinderHud.WidgetBounds bounds = WorldBinderHud.previewBounds(minecraft, working, selected);
             WorldBinderWidgetLayout.setPosition(
                     working,
@@ -454,7 +454,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
     private static void copyWidgetSettings(WorldBinderConfig source, WorldBinderConfig target) {
         target.showBossbarOverlay = source.showBossbarOverlay;
         target.showChunkRadar = source.showChunkRadar;
-        target.showNotifications = source.showNotifications;
+        target.messageMode = source.messageMode;
         target.bossbarScalePercent = source.bossbarScalePercent;
         target.chunkRadarScalePercent = source.chunkRadarScalePercent;
         target.notificationScalePercent = source.notificationScalePercent;

@@ -4,6 +4,9 @@
   "package": "net.worldbinder.mixin",
   "compatibilityLevel": "JAVA_25",
   "client": [
+    "MovementLivingMixin",
+    "MovementPlayerMixin",
+    "MovementWaterMixin",
     "AbstractContainerScreenMixin",
     "GameMenuScreenMixin",
     "TitleScreenMixin",

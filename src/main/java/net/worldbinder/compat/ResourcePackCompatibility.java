@@ -59,9 +59,6 @@ public final class ResourcePackCompatibility {
         if (!FabricLoader.getInstance().isModLoaded("viafabricplus")) {
             return false;
         }
-        // ViaFabricPlus does not expose a stable tiny public API across all versions. Treat its
-        // presence as a conservative lower-protocol hint for this compatibility fallback and only
-        // react to actual resource-pack failure packets, never to normal success/discard packets.
         return true;
     }
 

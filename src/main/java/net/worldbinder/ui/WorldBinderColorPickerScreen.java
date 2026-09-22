@@ -90,7 +90,7 @@ public final class WorldBinderColorPickerScreen extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (event.button() == 0) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
             if (inside(event.x(), event.y(), svX(), svY(), svWidth(), svHeight())) {
                 dragTarget = DragTarget.SATURATION_VALUE;
                 updateFromPointer(event.x(), event.y());
@@ -112,7 +112,7 @@ public final class WorldBinderColorPickerScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
-        if (event.button() == 0 && dragTarget != DragTarget.NONE) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && dragTarget != DragTarget.NONE) {
             updateFromPointer(event.x(), event.y());
             return true;
         }

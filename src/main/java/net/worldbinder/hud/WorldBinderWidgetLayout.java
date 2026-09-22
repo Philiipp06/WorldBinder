@@ -82,7 +82,7 @@ public final class WorldBinderWidgetLayout {
         return switch (widget) {
             case STATUS -> config.showBossbarOverlay;
             case RADAR -> config.showChunkRadar;
-            case NOTIFICATIONS -> config.showNotifications;
+            case NOTIFICATIONS -> config.effectiveMessageMode().toast();
         };
     }
 
@@ -90,7 +90,9 @@ public final class WorldBinderWidgetLayout {
         switch (widget) {
             case STATUS -> config.showBossbarOverlay = enabled;
             case RADAR -> config.showChunkRadar = enabled;
-            case NOTIFICATIONS -> config.showNotifications = enabled;
+            case NOTIFICATIONS -> config.messageMode = enabled
+                    ? (config.effectiveMessageMode().chat() ? WorldBinderConfig.MessageMode.CHAT_AND_TOAST : WorldBinderConfig.MessageMode.TOAST)
+                    : (config.effectiveMessageMode().chat() ? WorldBinderConfig.MessageMode.CHAT : WorldBinderConfig.MessageMode.NONE);
         }
     }
 
@@ -166,7 +168,7 @@ public final class WorldBinderWidgetLayout {
                 config.chunkRadarBackgroundColor = 0xE6111822;
             }
             case NOTIFICATIONS -> {
-                config.showNotifications = true;
+                setEnabled(config, widget, true);
                 config.notificationScalePercent = 80;
                 config.notificationWidgetXPercent = 100;
                 config.notificationWidgetYPercent = 100;

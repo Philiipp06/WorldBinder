@@ -34,8 +34,8 @@ public final class WorldBinderNotificationOverlay {
             int occupiedRightBottomPixels
     ) {
         WorldBinderConfig config = WorldBinder.config();
-        if (!config.showNotifications) {
-            WorldBinderNotifications.visible(0);
+        if (!config.effectiveMessageMode().toast()) {
+            WorldBinderNotifications.clear();
             return LayoutResult.EMPTY;
         }
 

@@ -13,7 +13,7 @@ public final class WorldBinder {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-    private static WorldBinderConfig config;
+    private static volatile WorldBinderConfig config;
 
     private WorldBinder() {
     }
@@ -33,6 +33,7 @@ public final class WorldBinder {
 
     public static void replaceConfig(WorldBinderConfig next) {
         config = next == null ? new WorldBinderConfig() : next;
+        net.worldbinder.status.WorldBinderNotifications.clear();
     }
 
     public static void saveConfig() {

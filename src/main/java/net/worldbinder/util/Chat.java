@@ -68,10 +68,10 @@ public final class Chat {
         Minecraft client = Minecraft.getInstance();
         client.execute(() -> {
             if (client.player != null) {
-                if (WorldBinder.config().showNotifications) {
+                if (WorldBinder.config().effectiveMessageMode().toast()) {
                     notificationAction.run();
                 }
-                if (WorldBinder.config().showDetailedChatFeedback) {
+                if (WorldBinder.config().effectiveMessageMode().chat()) {
                     client.gui.chatListener().handleSystemMessage(chatLine(message, type), false);
                 }
             }

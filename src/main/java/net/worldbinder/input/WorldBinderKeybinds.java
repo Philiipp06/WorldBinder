@@ -17,7 +17,6 @@ import net.worldbinder.ui.WorldBinderStorageProgressScreen;
 import net.worldbinder.ui.WorldBinderLegalStartScreen;
 import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.storage.StorageStage;
-import org.lwjgl.glfw.GLFW;
 
 public final class WorldBinderKeybinds {
     private static final KeyMapping.Category WORLD_BINDER_CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WorldBinder.MOD_ID, WorldBinder.MOD_ID));
@@ -31,36 +30,36 @@ public final class WorldBinderKeybinds {
     public static void register(SelectionManager selections, SceneCaptureService capture, ScenePlacementService placement, SceneLibrary library) {
         KeyMapping openMenu = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_menu",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F9,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F9,
                 WORLD_BINDER_CATEGORY,
                 0
         ));
         KeyMapping setFirst = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_1",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F7,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F7,
                 WORLD_BINDER_CATEGORY,
                 1
         ));
         KeyMapping setSecond = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_2",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F8,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F8,
                 WORLD_BINDER_CATEGORY,
                 2
         ));
         KeyMapping quickCapture = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.quick_capture_world",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F6,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F6,
                 WORLD_BINDER_CATEGORY,
                 3
         ));
         KeyMapping openMap = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_map",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F10,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F10,
                 WORLD_BINDER_CATEGORY,
                 4
         ));

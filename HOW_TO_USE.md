@@ -1,4 +1,4 @@
-# WorldBinder 1.3.0 — How to Use
+# WorldBinder 1.4.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -6,8 +6,8 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 ## 1. Install WorldBinder
 
-1. Install Minecraft 26.2 with Fabric Loader 0.19.3 or newer.
-2. Install Fabric API 0.155.2+26.2 or newer.
+1. Install Minecraft 26.3 with Fabric Loader 0.19.5 or newer.
+2. Install Fabric API 0.160.7+26.3 or newer.
 3. Place the WorldBinder jar into your `mods` folder.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
@@ -39,7 +39,30 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.3.0 uses a responsive virtual GUI canvas with substantially modernized settings, dropdowns and menus. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.4.0 retains the responsive virtual GUI canvas, settings, dropdowns and menus introduced in the previous release while its internals are reorganized into smaller, maintainable components. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
+
+## Messages and Movement Tools
+
+Open **Settings > HUD & Map**, scroll to notifications and select **Chat**, **Toast**, **Chat & Toast** or **None**, then **Save**. This controls WorldBinder status, success, warning and error messages centrally. New installations default to Toast; existing notification preferences are migrated. None hides even warning/error popups, but does not disable log files. Turning notifications off in the Widget Editor removes only the toast channel and keeps a selected chat channel.
+
+Open **Settings > Movement Tools** and scroll through the independently configurable tools. All default to OFF. Toggle a tool, adjust its slider where present and select **Save**; Back discards unapplied edits.
+
+- **Speed:** 1.0-5.0x movement speed.
+- **Fly:** use movement keys plus Jump to rise and Sneak to descend; separate 0.5-5.0x flight speed. Collisions remain active.
+- **Spider:** move forward against a wall to climb; Sneak stops the assistance.
+- **Jesus:** walk on source and flowing water at their actual surface height; Sneak to enter the water. Underwater movement is not forced upward. Water Speed applies while swimming, not while standing on the surface.
+- **No Fall:** prevent fall damage in local worlds, not on remote servers.
+- **Step:** step up 1.0-3.0 blocks where there is headroom.
+- **High Jump:** 1.0-3.0x jump strength, not a fixed jump height in blocks.
+- **Glide:** reduce falling speed; strength 1.0-5.0.
+- **Fast Ladder:** 1.0-5.0x climb speed; forward/Jump ascends, release to descend, Sneak holds position.
+- **Auto Sprint:** sprint while moving forward when hunger and other vanilla conditions allow it.
+- **Safe Walk:** prevent grounded movement beyond unsupported block edges.
+- **Auto Jump:** jump against actual small obstacles with enough headroom; automatically suppressed while Step or active wall climbing takes priority.
+- **Water Speed:** 1.0-5.0x underwater acceleration setting.
+- **Air Control:** 1.0-5.0x airborne steering setting.
+
+Fly takes priority over the other helpers. Glide does not override ladder climbing or vanilla elytra flight. Movement settings do not change capture/cache/export processing. Use these tools only in singleplayer, local test worlds or on servers that expressly allow them. Server validation remains authoritative and may correct or reject movement; these tools do not bypass anti-cheat or server permissions.
 
 ## 3. Choose capture settings
 
@@ -53,6 +76,7 @@ Open **Settings** from the Control Center and review:
 - resource pack export
 - gamerule export
 - HUD and map options
+- message delivery: Chat, Toast, Chat & Toast or None
 - custom toast duration (40–250%)
 - the HUD Widget Editor for status, radar and notification widgets
 
@@ -177,7 +201,7 @@ Useful reports include:
 - Minecraft version
 - WorldBinder version
 - Fabric Loader and Fabric API version
-- whether Fabric API 0.155.2+26.2 or newer is installed
+- whether Fabric API 0.160.7+26.3 or newer is installed
 - selected target output version
 - capture mode and performance preset
 - whether the issue happened in singleplayer, Paper or Multiverse

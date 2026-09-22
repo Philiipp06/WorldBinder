@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Locale;
 
 public final class TargetMinecraftVersion {
-    public static final String CURRENT = "26.2";
+    public static final String CURRENT = "26.3";
 
     public enum GenerationProfile {
         OCEAN_1_13("1.13 ocean generation"),
@@ -103,6 +103,7 @@ public final class TargetMinecraftVersion {
             entry("1.21.6", 4435, GenerationProfile.TRIALS_1_21),
             entry("1.21.7", 4438, GenerationProfile.TRIALS_1_21),
             entry("1.21.8", 4440, GenerationProfile.TRIALS_1_21),
+            entry("26.2", 4903, GenerationProfile.CURRENT_26),
             entry(CURRENT, -1, GenerationProfile.CURRENT_26)
     );
 

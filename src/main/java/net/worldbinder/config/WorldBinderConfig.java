@@ -10,6 +10,19 @@ import java.io.Writer;
 import java.nio.file.Files;
 
 public final class WorldBinderConfig {
+    public enum MessageMode {
+        CHAT, TOAST, CHAT_AND_TOAST, NONE;
+
+        public boolean chat() { return this == CHAT || this == CHAT_AND_TOAST; }
+        public boolean toast() { return this == TOAST || this == CHAT_AND_TOAST; }
+    }
+
+    public MessageMode messageMode = MessageMode.TOAST;
+    public net.worldbinder.movement.MovementSettings movement = new net.worldbinder.movement.MovementSettings();
+
+    public MessageMode effectiveMessageMode() {
+        return messageMode == null ? MessageMode.TOAST : messageMode;
+    }
     private static final int MAX_ROAMING_RADIUS_CHUNKS = 12;
     private static final int DEFAULT_NOTIFICATION_SCALE_PERCENT = 80;
     private static final int MIN_NOTIFICATION_SCALE_PERCENT = 50;
@@ -93,8 +106,6 @@ public final class WorldBinderConfig {
     public boolean includeEntityPlayers = false;
     public boolean useFullEntityNbtForPlacement = true;
     public boolean sendPlacementCommands = true;
-    public boolean showDetailedChatFeedback = false;
-    public boolean showNotifications = true;
     public int notificationScalePercent = DEFAULT_NOTIFICATION_SCALE_PERCENT;
     public int notificationDurationPercent = DEFAULT_NOTIFICATION_DURATION_PERCENT;
     public NotificationAnchor notificationAnchor = NotificationAnchor.BOTTOM_RIGHT;
@@ -156,7 +167,14 @@ public final class WorldBinderConfig {
         }
 
         try (Reader reader = Files.newBufferedReader(WorldBinderPaths.CONFIG_FILE)) {
-            WorldBinderConfig config = WorldBinder.GSON.fromJson(reader, WorldBinderConfig.class);
+            com.google.gson.JsonObject json = com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();
+            WorldBinderConfig config = WorldBinder.GSON.fromJson(json, WorldBinderConfig.class);
+            if (config != null && !json.has("messageMode")) {
+                boolean chat = json.has("showDetailedChatFeedback") && json.get("showDetailedChatFeedback").getAsBoolean();
+                boolean toast = !json.has("showNotifications") || json.get("showNotifications").getAsBoolean();
+                config.messageMode = chat ? (toast ? MessageMode.CHAT_AND_TOAST : MessageMode.CHAT)
+                        : (toast ? MessageMode.TOAST : MessageMode.NONE);
+            }
             return config == null ? new WorldBinderConfig() : config.normalized();
         } catch (Exception exception) {
             WorldBinder.LOGGER.warn("Failed to load WorldBinder config. Falling back to defaults.", exception);
@@ -458,6 +476,9 @@ public final class WorldBinderConfig {
     }
 
     private WorldBinderConfig normalized() {
+        messageMode = effectiveMessageMode();
+        if (movement == null) movement = new net.worldbinder.movement.MovementSettings();
+        movement.normalize();
         if (performancePreset == null) {
             performancePreset = PerformancePreset.BALANCED;
         }
