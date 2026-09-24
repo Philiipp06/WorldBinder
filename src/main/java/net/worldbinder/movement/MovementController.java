@@ -28,7 +28,8 @@ public final class MovementController {
     }
 
     public static boolean flight(Entity entity) {
-        return enabled(entity, MovementTool.FLY) && eligible(entity);
+        return enabled(entity, MovementTool.FLY) && eligible(entity)
+                && !((Player)entity).getAbilities().mayfly && FlightMotion.active(entity);
     }
 
     public static boolean eligible(Entity entity) {

@@ -1,10 +1,10 @@
-# WorldBinder 1.4.0
+# WorldBinder 1.4.1
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
 
-> **Release notice:** WorldBinder 1.4.0 targets Minecraft 26.3 with updated Fabric dependencies, SDL-compatible input and rendering API adjustments. It adds a central Chat / Toast / Chat & Toast / None message setting and a separate Movement Tools tab. The code cleanup splits capture, export, recovery, configuration and Control Center responsibilities into smaller components; this port preserves that structure without changing the capture algorithms. Exports still depend on the data received by the client and the selected target version.
+> **Release notice:** WorldBinder 1.4.1 continues Minecraft 26.3 support. Fly now starts and stops with double Jump, has smoother motion and a Sprint speed boost. F12 opens Movement Tools directly. The 1.4.0 message routing, Movement Tools and code cleanup remain in place; capture algorithms are unchanged. Exports still depend on the data received by the client and the selected target version.
 
 ## Supported loader
 
@@ -26,6 +26,7 @@ For this release line, use Fabric Loader 0.19.5 or newer and Fabric API 0.160.7+
 - Configurable performance presets
 - F9 Control Center
 - F10 live chunk map with coverage colors, filters and inspector tooltips
+- F12 Movement Tools shortcut
 - Ctrl+C chunk center coordinate copying
 - Queue Dashboard / Profiler for capture and export telemetry
 - Export validation reports
@@ -47,7 +48,7 @@ Open **Settings > Movement Tools**. Every feature is disabled by default and sav
 | Tool | Behavior / range |
 | --- | --- |
 | Speed | Movement speed, 1.0-5.0x |
-| Fly | Collision-aware free flight; separate 0.5-5.0x speed |
+| Fly | Double Jump toggles collision-aware free flight; separate 0.5-5.0x speed, Sprint boost |
 | Spider | Climb walls while moving forward against them |
 | Jesus | Walk on water surfaces; sneak to enter the water |
 | No Fall | Prevent fall damage in local worlds |
@@ -61,7 +62,7 @@ Open **Settings > Movement Tools**. Every feature is disabled by default and sav
 | Water Speed | Additional underwater acceleration, 1.0-5.0x |
 | Air Control | Additional airborne steering, 1.0-5.0x |
 
-Fly takes priority over other movement helpers without granting or changing creative abilities. Vanilla creative/elytra flight is not replaced unless Fly is enabled. Spider requires actual wall contact and suppresses ground jumps; Step suppresses Auto Jump, which requires a real obstacle and clearance above it. Glide only limits descent; Air Control only changes steering. Jesus uses per-query collision shapes at the actual source/flowing water height, releases on Sneak and leaves underwater movement to vanilla/Water Speed. Input-driven helpers ignore open menus. These tools are separate from capture processing. On remote servers, server rules and movement validation remain authoritative; No Fall is not a remote-server damage bypass. Only enable tools where explicitly allowed.
+Enable Fly in Settings, then double-tap Jump to enter or leave flight. Hold Jump to rise, Sneak to descend and Sprint for faster horizontal flight. Landing ends flight. Fly takes priority over other movement helpers without granting or changing creative abilities; native creative flight stays untouched. Spider requires actual wall contact and suppresses ground jumps; Step suppresses Auto Jump, which requires a real obstacle and clearance above it. Glide only limits descent; Air Control only changes steering. Jesus uses per-query collision shapes at the actual source/flowing water height, releases on Sneak and leaves underwater movement to vanilla/Water Speed. Input-driven helpers ignore open menus. These tools are separate from capture processing. On remote servers, server rules and movement validation remain authoritative; No Fall is not a remote-server damage bypass. Only enable tools where explicitly allowed.
 
 Minecraft 26.3 is the runtime target. Minecraft 26.2 remains an explicit export target with its own DataVersion, alongside the existing older export targets.
 
@@ -74,6 +75,7 @@ Minecraft 26.3 is the runtime target. Minecraft 26.2 remains an explicit export 
 | F8 | Set position 2 |
 | F9 | Open WorldBinder Control Center |
 | F10 | Open WorldBinder Map |
+| F12 | Open Movement Tools directly |
 
 All keybinds can be changed in Minecraft Controls under the `WorldBinder` category.
 
@@ -176,6 +178,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.4.0 is the current development release line for Minecraft 26.3.
+WorldBinder 1.4.1 is the current development release line for Minecraft 26.3.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

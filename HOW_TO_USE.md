@@ -1,4 +1,4 @@
-# WorldBinder 1.4.0 — How to Use
+# WorldBinder 1.4.1 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -21,6 +21,7 @@ Default keybinds:
 | F8 | Set position 2 |
 | F9 | Open WorldBinder Control Center |
 | F10 | Open WorldBinder Map |
+| F12 | Open Movement Tools directly |
 
 ## 2. Open the Control Center
 
@@ -39,16 +40,16 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.4.0 retains the responsive virtual GUI canvas, settings, dropdowns and menus introduced in the previous release while its internals are reorganized into smaller, maintainable components. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.4.1 retains the responsive virtual GUI canvas, settings, dropdowns and menus introduced in previous releases while its internals remain organized into smaller components. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
 
 ## Messages and Movement Tools
 
 Open **Settings > HUD & Map**, scroll to notifications and select **Chat**, **Toast**, **Chat & Toast** or **None**, then **Save**. This controls WorldBinder status, success, warning and error messages centrally. New installations default to Toast; existing notification preferences are migrated. None hides even warning/error popups, but does not disable log files. Turning notifications off in the Widget Editor removes only the toast channel and keeps a selected chat channel.
 
-Open **Settings > Movement Tools** and scroll through the independently configurable tools. All default to OFF. Toggle a tool, adjust its slider where present and select **Save**; Back discards unapplied edits.
+Press **F12** or open **Settings > Movement Tools** and scroll through the independently configurable tools. All default to OFF. Toggle a tool, adjust its slider where present and select **Save**; Back discards unapplied edits. F12 can be rebound in Minecraft Controls.
 
 - **Speed:** 1.0-5.0x movement speed.
-- **Fly:** use movement keys plus Jump to rise and Sneak to descend; separate 0.5-5.0x flight speed. Collisions remain active.
+- **Fly:** enable the tool, then double-tap Jump (Space by default) to start or stop flying. Jump rises, Sneak descends and Sprint boosts horizontal flight speed. Landing ends flight. Separate 0.5-5.0x speed; collisions remain active. Native creative flight is unaffected.
 - **Spider:** move forward against a wall to climb; Sneak stops the assistance.
 - **Jesus:** walk on source and flowing water at their actual surface height; Sneak to enter the water. Underwater movement is not forced upward. Water Speed applies while swimming, not while standing on the surface.
 - **No Fall:** prevent fall damage in local worlds, not on remote servers.

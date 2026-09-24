@@ -1,4 +1,4 @@
-# WorldBinder 1.4.0 Runtime Audit
+# WorldBinder 1.4.1 Runtime Audit
 
 Runtime: Minecraft 26.3, Java 25, Fabric Loader 0.19.5, Fabric API 0.160.7+26.3.
 The cleanup base is c61b975. Capture, cache, recovery and export implementation classes are unchanged by the movement audit.
@@ -12,7 +12,7 @@ All 14 enum entries have independent OFF defaults in `MovementSettings`, JSON pe
 | Tool | Runtime implementation and release behavior |
 | --- | --- |
 | Speed | `MovementAttributes`: transient movement-speed modifier; removal restores the existing base and other mods' modifiers. |
-| Fly | `FlightMotion` through `MovementController.travel`: collision-aware horizontal/vertical motion, independent speed; no ability flags are written, no creative permissions remain. Open menus ignore input. |
+| Fly | `FlightMotion.tick` tracks Creative-style double Jump while Fly is enabled; `MovementController.travel` uses the active flight state for collision-aware, smoothed horizontal/vertical motion with a Sprint boost. Landing, tool disable, player replacement and native creative flight clear the custom state. No ability flags are written. Open menus ignore input. |
 | Spider | `spiderActive` requires forward input, current physical wall contact and horizontal collision, excluding water/lava/ladders/flight. `SurfaceMotion` applies an impulse only while active; normal physics resumes when contact ends. |
 | Jesus | `WaterSurface` and `MovementWaterMixin`: per-query water-only shape at actual fluid height, only above exposed surfaces. Sneak, disabled state, passengers, spectators and flight do not add collision. Nothing is persisted on blocks or players. |
 | No Fall | `MovementPlayerMixin.causeFallDamage`: local player's integrated-server damage path is cancelled while enabled; disabled falls use vanilla. No remote-server protection is promised. |

@@ -12,6 +12,7 @@ import net.worldbinder.placement.ScenePlacementService;
 import net.worldbinder.scene.SceneLibrary;
 import net.worldbinder.selection.SelectionManager;
 import net.worldbinder.ui.WorldBinderScreen;
+import net.worldbinder.ui.WorldBinderConfigScreen;
 import net.worldbinder.ui.WorldBinderMapScreen;
 import net.worldbinder.ui.WorldBinderStorageProgressScreen;
 import net.worldbinder.ui.WorldBinderLegalStartScreen;
@@ -63,6 +64,13 @@ public final class WorldBinderKeybinds {
                 WORLD_BINDER_CATEGORY,
                 4
         ));
+        KeyMapping openMovement = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.worldbinder.open_movement",
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F12,
+                WORLD_BINDER_CATEGORY,
+                5
+        ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (StorageFlow.progress().stage() != lastStorageStage) {
@@ -97,6 +105,9 @@ public final class WorldBinderKeybinds {
             }
             while (openMap.consumeClick()) {
                 Minecraft.getInstance().gui.setScreen(new WorldBinderMapScreen(Minecraft.getInstance().gui.screen()));
+            }
+            while (openMovement.consumeClick()) {
+                client.gui.setScreen(WorldBinderConfigScreen.movement(client.gui.screen()));
             }
             capture.tick();
             placement.tick();

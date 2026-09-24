@@ -8,6 +8,7 @@ import net.worldbinder.WorldBinder;
 import net.worldbinder.capture.SceneCaptureService;
 import net.worldbinder.hud.WorldBinderHud;
 import net.worldbinder.input.WorldBinderKeybinds;
+import net.worldbinder.movement.FlightMotion;
 import net.worldbinder.placement.ScenePlacementService;
 import net.worldbinder.render.WorldBinderWorldOverlay;
 import net.worldbinder.scene.SceneLibrary;
@@ -32,6 +33,7 @@ public final class WorldBinderClient implements ClientModInitializer {
         WorldBinderHud.register();
         WorldBinderWorldOverlay.register();
         WorldBinderKeybinds.register(selectionManager, captureService, placementService, sceneLibrary);
+        ClientTickEvents.END_CLIENT_TICK.register(FlightMotion::tick);
         ClientTickEvents.END_CLIENT_TICK.register(WorldBinderClient::showRecoveryNoticeOnce);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> WorldBinderNotifications.clear());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> WorldBinderNotifications.clear());

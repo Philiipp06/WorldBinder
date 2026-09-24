@@ -28,6 +28,10 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return new WorldBinderConfigScreen(parent, Tab.PERFORMANCE, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
     }
 
+    public static WorldBinderConfigScreen movement(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.MOVEMENT, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
+    }
+
     public static WorldBinderConfigScreen general(Screen parent) {
         return new WorldBinderConfigScreen(parent, Tab.GENERAL, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
     }
