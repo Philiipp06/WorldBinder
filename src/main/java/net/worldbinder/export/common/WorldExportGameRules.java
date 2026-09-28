@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.TagParser;
 import net.worldbinder.WorldBinder;
+import net.worldbinder.config.GameRuleSettings;
 import net.worldbinder.scene.WorldScene;
 import net.worldbinder.version.TargetMinecraftVersion;
 
@@ -39,19 +40,28 @@ final class WorldExportGameRules {
     static CompoundTag legacyRules(WorldScene scene) {
         CompoundTag rules = defaultRules();
         if (scene.gameRulesNbt == null || scene.gameRulesNbt.isBlank()) {
-            return rules;
+            return filterForTarget(rules, targetVersion(scene));
         }
 
         String raw = scene.gameRulesNbt.trim();
         if (raw.contains("=") && !raw.startsWith("{")) {
             applyDelimitedOverrides(rules, raw);
-            return rules;
+            return filterForTarget(rules, targetVersion(scene));
         }
 
         try {
             applyNbtOverrides(rules, TagParser.parseCompoundFully(raw));
         } catch (CommandSyntaxException exception) {
             WorldBinder.LOGGER.warn("Failed to parse captured game rules. Falling back to safe defaults.", exception);
+        }
+        return filterForTarget(rules, targetVersion(scene));
+    }
+
+    private static CompoundTag filterForTarget(CompoundTag rules, TargetMinecraftVersion.Entry target) {
+        for (String key : java.util.List.copyOf(rules.keySet())) {
+            if (!GameRuleSettings.supports(target.name(), key)) {
+                rules.remove(key);
+            }
         }
         return rules;
     }
@@ -152,7 +162,38 @@ final class WorldExportGameRules {
         register26(keys, "naturalRegeneration", "minecraft:natural_health_regeneration");
         register26Inverted(keys, "disableRaids", "minecraft:raids");
         register26Inverted(keys, "disableElytraMovementCheck", "minecraft:elytra_movement_check");
+        register26(keys, "announceAdvancements", "minecraft:show_advancement_messages");
+        register26(keys, "commandBlockOutput", "minecraft:command_block_output");
+        register26(keys, "doImmediateRespawn", "minecraft:immediate_respawn");
+        register26(keys, "doLimitedCrafting", "minecraft:limited_crafting");
+        register26(keys, "doVinesSpread", "minecraft:spread_vines");
+        register26(keys, "drowningDamage", "minecraft:drowning_damage");
+        register26(keys, "fallDamage", "minecraft:fall_damage");
+        register26(keys, "fireDamage", "minecraft:fire_damage");
+        register26(keys, "forgiveDeadPlayers", "minecraft:forgive_dead_players");
+        register26(keys, "keepInventory", "minecraft:keep_inventory");
+        register26(keys, "logAdminCommands", "minecraft:log_admin_commands");
+        register26(keys, "mobGriefing", "minecraft:mob_griefing");
+        register26(keys, "maxCommandChainLength", "minecraft:max_command_sequence_length");
+        register26(keys, "maxEntityCramming", "minecraft:max_entity_cramming");
+        register26(keys, "playersSleepingPercentage", "minecraft:players_sleeping_percentage");
+        register26(keys, "randomTickSpeed", "minecraft:random_tick_speed");
+        register26(keys, "reducedDebugInfo", "minecraft:reduced_debug_info");
+        register26(keys, "sendCommandFeedback", "minecraft:send_command_feedback");
+        register26(keys, "showDeathMessages", "minecraft:show_death_messages");
+        register26(keys, "spectatorsGenerateChunks", "minecraft:spectators_generate_chunks");
+        register26(keys, "universalAnger", "minecraft:universal_anger");
+        register26FireSpread(keys);
         return keys;
+    }
+
+    private static void register26FireSpread(Map<String, Rule26Mapping> keys) {
+        keys.put("doFireTick", new Rule26Mapping("minecraft:fire_spread_radius_around_player", false) {
+            @Override
+            String transform(String value) {
+                return "true".equalsIgnoreCase(value) ? "-1" : "0";
+            }
+        });
     }
 
     private static void register26(Map<String, Rule26Mapping> keys, String legacyKey, String registryKey) {
@@ -291,8 +332,20 @@ final class WorldExportGameRules {
     private record RuleExport(String key, String value) {
     }
 
-    private record Rule26Mapping(String registryKey, boolean inverted) {
-        private String transform(String value) {
+    private static class Rule26Mapping {
+        private final String registryKey;
+        private final boolean inverted;
+
+        private Rule26Mapping(String registryKey, boolean inverted) {
+            this.registryKey = registryKey;
+            this.inverted = inverted;
+        }
+
+        String registryKey() {
+            return registryKey;
+        }
+
+        String transform(String value) {
             if (!inverted) {
                 return value;
             }

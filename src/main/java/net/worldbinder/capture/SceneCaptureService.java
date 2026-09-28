@@ -125,19 +125,19 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
         if (roamingCapture) {
             Minecraft client = Minecraft.getInstance();
             if (client != null) {
-                client.gui.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.gui.screen(), this));
+                net.worldbinder.compat.ClientCompat.setScreen(client, new net.worldbinder.ui.WorldBinderFinishScreen(net.worldbinder.compat.ClientCompat.screen(client), this));
             }
             return;
         }
         if (hasPendingWork()) {
             Minecraft client = Minecraft.getInstance();
             if (client != null) {
-                client.gui.setScreen(new net.worldbinder.ui.WorldBinderFinishScreen(client.gui.screen(), this));
+                net.worldbinder.compat.ClientCompat.setScreen(client, new net.worldbinder.ui.WorldBinderFinishScreen(net.worldbinder.compat.ClientCompat.screen(client), this));
             }
             return;
         }
         Minecraft client = Minecraft.getInstance();
-        requestSaveNowWithConfirm(client == null ? null : client.gui.screen());
+        requestSaveNowWithConfirm(client == null ? null : net.worldbinder.compat.ClientCompat.screen(client));
     }
 
     private void saveWorldDownloadNow() {
@@ -172,7 +172,7 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
 
     public boolean abortQueueAndSaveNow() {
         Minecraft client = Minecraft.getInstance();
-        return requestSaveNowWithConfirm(client == null ? null : client.gui.screen());
+        return requestSaveNowWithConfirm(client == null ? null : net.worldbinder.compat.ClientCompat.screen(client));
     }
 
     public boolean hasPendingWork() {
@@ -202,7 +202,7 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
         Minecraft client = Minecraft.getInstance();
         if (WorldBinder.config().confirmExistingWorld && targetWorldExists()) {
             if (client != null) {
-                client.gui.setScreen(new net.worldbinder.ui.WorldBinderExistingWorldScreen(parent, this));
+                net.worldbinder.compat.ClientCompat.setScreen(client, new net.worldbinder.ui.WorldBinderExistingWorldScreen(parent, this));
             }
             return false;
         }
@@ -374,7 +374,7 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
 
     public boolean multiplayerSafetyActive() {
         Minecraft client = Minecraft.getInstance();
-        return WorldBinder.config().serverSafetyMode && client.level != null && !!client.isMultiplayerServer();
+        return WorldBinder.config().serverSafetyMode && client.level != null && net.worldbinder.compat.ClientCompat.multiplayer(client);
     }
 
     public String safetySummary() {
@@ -741,7 +741,7 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
     }
 
     private void maybeWarnServerSafety(Minecraft client) {
-        if (serverSafetyWarningSent || !WorldBinder.config().serverSafetyMode || !client.isMultiplayerServer()) {
+        if (serverSafetyWarningSent || !WorldBinder.config().serverSafetyMode || !net.worldbinder.compat.ClientCompat.multiplayer(client)) {
             return;
         }
         serverSafetyWarningSent = true;
@@ -1060,10 +1060,10 @@ public final class SceneCaptureService extends CaptureChunkPipeline {
         if (client == null) {
             return;
         }
-        if (client.gui.screen() instanceof net.worldbinder.ui.WorldBinderStorageProgressScreen) {
+        if (net.worldbinder.compat.ClientCompat.screen(client) instanceof net.worldbinder.ui.WorldBinderStorageProgressScreen) {
             return;
         }
-        client.gui.setScreen(new net.worldbinder.ui.WorldBinderStorageProgressScreen(client.gui.screen()));
+        net.worldbinder.compat.ClientCompat.setScreen(client, new net.worldbinder.ui.WorldBinderStorageProgressScreen(net.worldbinder.compat.ClientCompat.screen(client)));
     }
 
     private void resetActiveJob() {

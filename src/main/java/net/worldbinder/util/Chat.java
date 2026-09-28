@@ -72,7 +72,7 @@ public final class Chat {
                     notificationAction.run();
                 }
                 if (WorldBinder.config().effectiveMessageMode().chat()) {
-                    client.gui.chatListener().handleSystemMessage(chatLine(message, type), false);
+                    net.worldbinder.compat.ClientCompat.clientSystemMessage(client, chatLine(message, type));
                 }
             }
         });

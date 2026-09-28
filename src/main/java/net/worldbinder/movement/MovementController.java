@@ -42,7 +42,7 @@ public final class MovementController {
     }
 
     public static boolean inputAllowed() {
-        return Minecraft.getInstance().gui.screen() == null;
+        return net.worldbinder.compat.ClientCompat.screen(Minecraft.getInstance()) == null;
     }
 
     public static boolean spiderActive(Entity entity) {

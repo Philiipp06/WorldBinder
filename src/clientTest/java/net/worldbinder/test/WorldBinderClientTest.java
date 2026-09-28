@@ -1,6 +1,8 @@
 package net.worldbinder.test;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.Minecraft;
@@ -8,6 +10,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Input;
@@ -19,13 +22,33 @@ import net.worldbinder.WorldBinder;
 import net.worldbinder.config.WorldBinderConfig;
 import net.worldbinder.movement.*;
 import net.worldbinder.status.WorldBinderNotifications;
+import net.worldbinder.hud.WorldBinderHud;
+import net.worldbinder.hud.WorldBinderNotificationOverlay;
+import net.worldbinder.client.WorldBinderClient;
 import net.worldbinder.ui.WorldBinderConfigScreen;
+import net.worldbinder.ui.WorldBinderScreen;
+import net.worldbinder.ui.WorldBinderVersionPickerScreen;
+import net.worldbinder.ui.WorldBinderLegalStartScreen;
+import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbMotion;
 import net.worldbinder.util.Chat;
 
 public final class WorldBinderClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        String compatibilityJar = System.getProperty("worldbinder.compatibilityJar");
+        if (compatibilityJar != null) {
+            String codeSource = WorldBinder.class.getProtectionDomain().getCodeSource().getLocation().toString();
+            check(codeSource.contains(compatibilityJar), "Compatibility test must load the packaged 26.3 JAR: " + codeSource);
+        }
+        net.worldbinder.export.common.WorldExportGameRulesTest.run();
         context.runOnClient(client -> {
             WorldBinderConfig config = new WorldBinderConfig();
+            var largeUi = WbLayout.uiScale(1920, 1080);
+            check(largeUi.virtualWidth() == 960 && largeUi.virtualHeight() == 540 && largeUi.scale() == 1.0F,
+                    "Large screens keep the fixed virtual menu size");
+            var smallUi = WbLayout.uiScale(427, 240);
+            check(smallUi.virtualWidth() == 480 && smallUi.virtualHeight() == 270 && smallUi.scale() < 1.0F,
+                    "Small screens uniformly scale down the minimum menu size");
             check(net.worldbinder.version.TargetMinecraftVersion.resolve("26.2").effectiveDataVersion() == 4903,
                     "26.2 export target retained independently from 26.3 runtime");
             for (MovementTool tool : MovementTool.values()) {
@@ -39,28 +62,136 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                 config.movement.enabled(tool, true);
             }
             config.messageMode = WorldBinderConfig.MessageMode.CHAT;
+            config.reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.HIDDEN;
+            config.movementBadgeXPercent = 37;
+            config.movementBadgeYPercent = 23;
+            config.movementBadgeScalePercent = 135;
+            config.highContrastUi = true;
+            config.reducedUiMotion = true;
             config.save();
             WorldBinderConfig loaded = WorldBinderConfig.load();
             check(loaded.messageMode == config.messageMode, "Message mode save/load");
+            check(loaded.reloadDisplayMode == config.reloadDisplayMode, "Reload display mode save/load");
+            check(loaded.movementBadgeXPercent == 37 && loaded.movementBadgeYPercent == 23
+                    && loaded.movementBadgeScalePercent == 135, "Movement badge widget save/load");
+            check(loaded.highContrastUi && loaded.reducedUiMotion, "Display preferences save/load");
             for (MovementTool tool : MovementTool.values()) check(loaded.movement.enabled(tool), tool + " save/load");
+            loaded.reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.COMPACT;
+            loaded.save();
+            check(WorldBinderConfig.load().reloadDisplayMode == WorldBinderConfig.ReloadDisplayMode.HIDDEN,
+                    "Legacy compact reload choice migrates to interactive display");
+            loaded.reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.VANILLA;
+            loaded.reloadDisplayConfigured = true;
+            loaded.save();
+            check(WorldBinderConfig.load().reloadDisplayMode == WorldBinderConfig.ReloadDisplayMode.VANILLA,
+                    "Explicit vanilla reload choice remains available");
+            WorldBinder.replaceConfig(new WorldBinderConfig());
+            WorldBinder.saveConfig();
+            var radar = new WorldBinderHud.WidgetBounds(800, 100, 150, 150);
+            var status = new WorldBinderHud.WidgetBounds(400, 0, 520, 76);
+            int clearTop = WorldBinderNotificationOverlay.chooseStackTop(8, 64, 540, 700, 300, status, radar);
+            check(clearTop >= 255, "Toasts avoid both status and radar");
+            check(WorldBinderNotificationOverlay.chooseStackTop(100, 64, 540, 10, 300, status, radar) == 100,
+                    "Toasts keep their position when widgets do not overlap horizontally");
+            var hotbar = new WorldBinderHud.WidgetBounds(135, 195, 200, 45);
+            check(WorldBinderNotificationOverlay.chooseStackTop(198, 34, 240, 209, 210, hotbar) <= 156,
+                    "Toasts move above the hotbar on compact screens");
+        });
+        context.setScreen(() -> new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(),
+                WorldBinderClient.placement(), WorldBinderClient.scenes(), new TitleScreen()));
+        context.waitTicks(3);
+        context.takeScreenshot("menu-overview-1_5");
+        context.clickScreenButton("Capture");
+        context.waitTicks(2);
+        context.takeScreenshot("menu-capture-1_5");
+        context.runOnClient(client -> {
+            var screen = net.worldbinder.compat.ClientCompat.screen(client);
+            for (int i = 0; i < 24; i++) screen.mouseScrolled(390, 180, 0, -1);
+            check(screen.children().stream().anyMatch(child -> child instanceof Button button && button.visible
+                    && button.getMessage().getString().equals("Custom Settings")),
+                    "Capture preset actions remain reachable after scrolling");
+        });
+        context.waitTicks(1);
+        context.takeScreenshot("menu-capture-bottom-1_5");
+        context.clickScreenButton("Map");
+        context.waitTicks(1);
+        context.takeScreenshot("menu-map-1_5");
+        context.setScreen(() -> new net.worldbinder.ui.WorldBinderMapScreen(new TitleScreen()));
+        context.waitTicks(1);
+        context.takeScreenshot("map-empty-1_5");
+        context.setScreen(() -> new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(),
+                WorldBinderClient.placement(), WorldBinderClient.scenes(), new TitleScreen()));
+        context.clickScreenButton("Capture");
+        context.runOnClient(client -> check(net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                        .anyMatch(child -> child instanceof Button button && button.visible
+                                && button.getMessage().getString().equals("Minecraft 26.3")),
+                "Capture version picker is visible without scrolling on compact screens"));
+        context.clickScreenButton("Minecraft 26.3");
+        context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderVersionPickerScreen);
+        context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
+        context.waitTicks(3);
+        context.takeScreenshot("settings-general-1_5");
+        context.runOnClient(client -> {
+            var settings = net.worldbinder.compat.ClientCompat.screen(client);
+            settings.keyPressed(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_TAB,
+                    0, com.mojang.blaze3d.platform.InputConstants.MOD_CONTROL));
+            check(net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                    .anyMatch(child -> child instanceof Button button && button.getMessage().getString().equals("Performance")),
+                    "Ctrl+Tab navigates settings sections");
+        });
+        context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
+        context.clickScreenButton("Minecraft 26.3");
+        context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderVersionPickerScreen);
+        context.runOnClient(client -> {
+            EditBox search = (EditBox) net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                    .filter(EditBox.class::isInstance).findFirst().orElseThrow();
+            search.setValue("26.2");
+            check(net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                    .anyMatch(child -> child instanceof Button button
+                            && button.getMessage().getString().equals("26.2")), "Version search filters supported targets");
+        });
+        context.waitTicks(3);
+        context.takeScreenshot("version-picker-1_5");
+        context.clickScreenButton("26.2");
+        context.clickScreenButton("worldbinder.config.save");
+        context.runOnClient(client -> {
+            check(WorldBinder.config().targetMinecraftVersion.equals("26.2"), "Version picker saves settings target");
             WorldBinder.replaceConfig(new WorldBinderConfig());
             WorldBinder.saveConfig();
         });
+        context.setScreen(() -> WorldBinderConfigScreen.performance(new TitleScreen()));
+        context.waitTicks(3);
+        context.takeScreenshot("settings-performance-1_5");
         context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
         context.clickScreenButton("Movement Tools");
         context.waitTicks(3);
         context.takeScreenshot("movement-settings-top");
-        context.runOnClient(client -> {
-            for (MovementTool tool : MovementTool.values()) {
+        MovementTool[][] movementGroups = {
+                {MovementTool.SPEED, MovementTool.STEP, MovementTool.HIGH_JUMP, MovementTool.AUTO_SPRINT,
+                        MovementTool.SAFE_WALK, MovementTool.AUTO_JUMP},
+                {MovementTool.FLY, MovementTool.SPIDER, MovementTool.GLIDE, MovementTool.FAST_LADDER,
+                        MovementTool.NO_FALL},
+                {MovementTool.JESUS, MovementTool.WATER_SPEED},
+                {MovementTool.AIR_CONTROL}
+        };
+        String[] movementTabs = {
+                "worldbinder.config.movement.group.ground", "worldbinder.config.movement.group.vertical",
+                "worldbinder.config.movement.group.water", "worldbinder.config.movement.group.control"
+        };
+        for (int group = 0; group < movementGroups.length; group++) {
+            context.clickScreenButton(net.minecraft.network.chat.Component.translatable(movementTabs[group]).getString());
+            MovementTool[] tools = movementGroups[group];
+            context.runOnClient(client -> {
+            for (MovementTool tool : tools) {
                 String name = net.minecraft.network.chat.Component.translatable(tool.key()).getString();
-                Button toggle = (Button) client.gui.screen().children().stream()
-                        .filter(child -> child instanceof Button button && button.getMessage().getString().startsWith(name + " "))
+                Button toggle = (Button) net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                        .filter(child -> child instanceof Button button && button.getMessage().getString().startsWith(name + ": "))
                         .findFirst().orElseThrow();
                 toggle.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN,
-                        com.mojang.blaze3d.platform.InputConstants.KEYCODE_RETURN, 0));
+                        0, 0));
             }
-            var sliders = client.gui.screen().children().stream().filter(AbstractSliderButton.class::isInstance).toList();
-            check(sliders.size() == java.util.Arrays.stream(MovementTool.values()).filter(MovementTool::adjustable).count(), "All movement sliders present");
+            var sliders = net.worldbinder.compat.ClientCompat.screen(client).children().stream().filter(AbstractSliderButton.class::isInstance).toList();
+            check(sliders.size() == java.util.Arrays.stream(tools).filter(MovementTool::adjustable).count(), "Movement group sliders present");
             try {
                 var setValue = AbstractSliderButton.class.getDeclaredMethod("setValue", double.class);
                 setValue.setAccessible(true);
@@ -70,7 +201,8 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                     setValue.invoke(slider, 0.75);
                 }
             } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
-        });
+            });
+        }
         context.clickScreenButton("worldbinder.config.save");
         context.runOnClient(client -> {
             var saved = WorldBinderConfig.load().movement;
@@ -83,19 +215,170 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
             }
             WorldBinder.replaceConfig(new WorldBinderConfig());
         });
+        context.setScreen(() -> WorldBinderConfigScreen.safety(new TitleScreen()));
+        context.clickScreenButton("worldbinder.config.safety.page.gamerules");
+        context.waitTicks(2);
+        context.takeScreenshot("settings-gamerules-1_5");
+        context.runOnClient(client -> {
+            var screen = net.worldbinder.compat.ClientCompat.screen(client);
+            String preset = net.minecraft.network.chat.Component.translatable("worldbinder.config.rules.peaceful").getString();
+            for (int i = 0; i < 30 && screen.children().stream().noneMatch(child -> child instanceof Button button
+                    && button.visible && button.getMessage().getString().equals(preset)); i++) {
+                screen.mouseScrolled(400, 150, 0, -1);
+            }
+            check(screen.children().stream().anyMatch(child -> child instanceof Button button
+                    && button.visible && button.getMessage().getString().equals(preset)),
+                    "Gamerule presets remain reachable on compact screens");
+        });
+        context.waitTicks(2);
+        context.takeScreenshot("settings-gamerules-controls-1_5");
+        context.clickScreenButton("worldbinder.config.rules.peaceful");
+        context.clickScreenButton("worldbinder.config.save");
+        context.runOnClient(client -> {
+            String rules = WorldBinder.config().gameRulesOverride;
+            check(rules.contains("mobGriefing=false") && rules.contains("disableRaids=true")
+                    && rules.contains("keepInventory=true"), "Safe gamerule preset persists all protections");
+            WorldBinder.replaceConfig(new WorldBinderConfig());
+            WorldBinder.saveConfig();
+        });
+        context.setScreen(() -> WorldBinderConfigScreen.hud(new TitleScreen()));
+        context.waitTicks(2);
+        context.takeScreenshot("settings-hud-1_5");
+        context.clickScreenButton("worldbinder.config.widget_editor");
+        context.waitTicks(2);
+        context.takeScreenshot("widget-editor-1_5");
         context.setScreen(() -> WorldBinderConfigScreen.hud(new TitleScreen()));
         context.runOnClient(client -> {
-            for (int i = 0; i < 60; i++) client.gui.screen().mouseScrolled(400, 150, 0, -1);
+            for (int i = 0; i < 60; i++) net.worldbinder.compat.ClientCompat.screen(client).mouseScrolled(400, 150, 0, -1);
         });
         context.waitTicks(2);
         context.takeScreenshot("message-settings");
+        context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
+        context.clickScreenButton("Display & Input");
+        context.waitTicks(2);
+        context.takeScreenshot("settings-display-1_5");
+        context.clickScreenButton("High contrast: OFF");
+        context.clickScreenButton("Reduce motion: OFF");
+        context.clickScreenButton("worldbinder.config.save");
+        context.runOnClient(client -> {
+            check(WorldBinderConfig.load().highContrastUi && WorldBinderConfig.load().reducedUiMotion,
+                    "Display settings save from UI");
+            check(WbMotion.approach(0, 1, 16_000_000L, 5) == 1, "Reduced motion snaps transitions");
+        });
+        context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
+        context.clickScreenButton("Display & Input");
+        context.takeScreenshot("settings-contrast-1_5");
+        context.runOnClient(client -> {
+            WorldBinder.replaceConfig(new WorldBinderConfig());
+            WorldBinder.saveConfig();
+        });
         context.setScreen(TitleScreen::new);
+        AtomicReference<CompletableFuture<Void>> titleReload = new AtomicReference<>();
+        context.runOnClient(client -> {
+            WorldBinder.config().reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.HIDDEN;
+            titleReload.set(client.reloadResourcePacks());
+        });
+        context.waitFor(client -> currentOverlay(client) instanceof net.minecraft.client.gui.screens.LoadingOverlay);
+        context.runOnClient(client -> check(net.worldbinder.reload.ReloadInteraction.forInput(currentOverlay(client)) == null,
+                "Title reload leaves menu input available"));
+        context.waitTicks(2);
+        context.takeScreenshot("reload-title-1_5");
+        context.runOnClient(client -> {
+            check(currentOverlay(client) instanceof net.minecraft.client.gui.screens.LoadingOverlay,
+                    "Title reload remains active during input test");
+            Button options = (Button) net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                    .filter(child -> child instanceof Button button && button.getMessage().getString().equals(
+                            net.minecraft.network.chat.Component.translatable("menu.options").getString()))
+                    .findFirst().orElseThrow();
+            clickThroughMouseHandler(client, options);
+            check(net.worldbinder.compat.ClientCompat.screen(client)
+                    instanceof net.minecraft.client.gui.screens.options.OptionsScreen,
+                    "Menu button remains clickable during resource reload");
+            net.worldbinder.compat.ClientCompat.setScreen(client, new TitleScreen());
+        });
+        context.waitFor(client -> titleReload.get() != null && titleReload.get().isDone());
+        context.runOnClient(client -> {
+            check(!titleReload.get().isCompletedExceptionally(), "Title-screen resource reload completes");
+            WorldBinder.config().reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.VANILLA;
+        });
         try (var world = context.worldBuilder().create()) {
             context.waitFor(client -> client.player != null && client.level != null);
             world.getServer().runCommand("gamemode survival @a");
             world.getServer().runCommand("fill -8 99 -8 8 99 8 minecraft:stone");
             world.getServer().runCommand("tp @a 0 100 0");
             context.waitTicks(10);
+            context.runOnClient(client -> {
+                KeyMapping quick = KeyMapping.get("key.worldbinder.quick_capture_world");
+                check(quick != null, "F6 quick capture registered");
+                KeyMapping.click(quick.getDefaultKey());
+            });
+            context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderLegalStartScreen);
+            context.takeScreenshot("capture-quick-start-1_5");
+            context.clickScreenButton("Full legal notice");
+            context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderScreen);
+            context.takeScreenshot("capture-legal-details-1_5");
+            context.runOnClient(client -> net.worldbinder.compat.ClientCompat.screen(client).mouseScrolled(390, 180, 0, -3));
+            context.waitTicks(1);
+            context.takeScreenshot("capture-legal-end-1_5");
+            context.runOnClient(client -> {
+                var screen = net.worldbinder.compat.ClientCompat.screen(client);
+                for (int i = 0; i < 24; i++) screen.mouseScrolled(390, 180, 0, -1);
+            });
+            context.waitTicks(1);
+            context.takeScreenshot("capture-legal-full-1_5");
+            context.runOnClient(client -> net.worldbinder.compat.ClientCompat.screen(client).onClose());
+            context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderLegalStartScreen);
+            context.runOnClient(client -> net.worldbinder.compat.ClientCompat.setScreen(client, null));
+            context.waitTicks(2);
+            context.runOnClient(client -> check(!client.isPaused(), "World resumed before reload movement test"));
+            AtomicReference<CompletableFuture<Void>> reload = new AtomicReference<>();
+            context.runOnClient(client -> {
+                WorldBinder.config().reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.HIDDEN;
+                reload.set(client.reloadResourcePacks());
+            });
+            context.waitFor(client -> currentOverlay(client) instanceof net.minecraft.client.gui.screens.LoadingOverlay);
+            context.runOnClient(client -> check(net.worldbinder.reload.ReloadInteraction.forInput(currentOverlay(client)) == null,
+                    "In-world reload leaves movement input available"));
+            AtomicReference<net.minecraft.world.phys.Vec3> beforeReloadMove = new AtomicReference<>();
+            context.runOnClient(client -> {
+                beforeReloadMove.set(client.player.position());
+                client.options.keyUp.setDown(true);
+            });
+            context.waitTicks(2);
+            context.runOnClient(client -> {
+                client.options.keyUp.setDown(false);
+                double dx = client.player.getX() - beforeReloadMove.get().x;
+                double dz = client.player.getZ() - beforeReloadMove.get().z;
+                check(dx * dx + dz * dz > 0.0001,
+                        "Player can move while resources reload: paused=" + client.isPaused()
+                                + " overlay=" + currentOverlay(client) + " dx=" + dx + " dz=" + dz);
+            });
+            context.takeScreenshot("reload-compact-1_5");
+            context.waitFor(client -> reload.get() != null && reload.get().isDone());
+            context.runOnClient(client -> {
+                check(!reload.get().isCompletedExceptionally(), "Interactive resource reload completes normally");
+                net.worldbinder.compat.ClientCompat.setScreen(client,
+                        new WorldBinderScreen(WorldBinderClient.selections(), WorldBinderClient.capture(),
+                                WorldBinderClient.placement(), WorldBinderClient.scenes()));
+                WorldBinder.config().reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.HIDDEN;
+                reload.set(client.reloadResourcePacks());
+            });
+            context.waitTicks(2);
+            context.takeScreenshot("reload-menu-1_5");
+            context.waitFor(client -> reload.get() != null && reload.get().isDone());
+            context.runOnClient(client -> {
+                check(!reload.get().isCompletedExceptionally(), "Open-menu resource reload completes normally");
+                net.worldbinder.compat.ClientCompat.setScreen(client, null);
+                WorldBinder.config().reloadDisplayMode = WorldBinderConfig.ReloadDisplayMode.VANILLA;
+            });
+            context.runOnClient(client -> {
+                WorldBinder.config().messageMode = WorldBinderConfig.MessageMode.TOAST;
+                WorldBinderNotifications.clear();
+                Chat.info("WorldBinder notification preview");
+            });
+            context.waitTicks(2);
+            context.takeScreenshot("toast-preview-1_5");
+            context.runOnClient(client -> WorldBinderNotifications.clear());
             testMessages(context);
             context.runOnClient(client -> {
                 KeyMapping shortcut = KeyMapping.get("key.worldbinder.open_movement");
@@ -104,12 +387,12 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                         "Movement shortcut defaults to F12");
                 KeyMapping.click(shortcut.getDefaultKey());
             });
-            context.waitFor(client -> client.gui.screen() instanceof WorldBinderConfigScreen);
+            context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderConfigScreen);
             context.runOnClient(client -> {
-                check(client.gui.screen().children().stream()
+                check(net.worldbinder.compat.ClientCompat.screen(client).children().stream()
                         .anyMatch(child -> child instanceof Button button
-                                && button.getMessage().getString().contains("Fly")), "Shortcut opens Movement Tools");
-                client.gui.setScreen(null);
+                                && button.getMessage().getString().contains("Speed")), "Shortcut opens Movement Tools");
+                net.worldbinder.compat.ClientCompat.setScreen(client, null);
             });
             context.runOnClient(client -> testMovement(client));
             world.getServer().runOnServer(server -> {
@@ -123,6 +406,19 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                 check(player.getHealth() < health, "No Fall disabled restores damage");
                 player.setHealth(health);
             });
+            context.runOnClient(client -> {
+                WorldBinder.config().movement.enabled(MovementTool.SPEED, true);
+                WorldBinder.config().movement.enabled(MovementTool.AUTO_SPRINT, true);
+                WorldBinder.config().movement.enabled(MovementTool.SAFE_WALK, true);
+            });
+            context.waitFor(WorldBinderClientTest::loadingOverlayGone);
+            context.waitTicks(2);
+            context.takeScreenshot("movement-badge-1_5");
+            context.runOnClient(client -> {
+                WorldBinder.config().movement.enabled(MovementTool.SPEED, false);
+                WorldBinder.config().movement.enabled(MovementTool.AUTO_SPRINT, false);
+                WorldBinder.config().movement.enabled(MovementTool.SAFE_WALK, false);
+            });
             context.takeScreenshot("movement-world-smoke");
             CaptureRegressionTest.run(context);
         }
@@ -131,17 +427,55 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         WorldBinder.LOGGER.info("WORLDBINDER_CLIENT_TEST_PASSED: configuration, UI, message routing, movement and capture/cache/recovery/export smoke checks");
     }
 
+    private static net.minecraft.client.gui.screens.Overlay currentOverlay(Minecraft client) {
+        try {
+            try {
+                return (net.minecraft.client.gui.screens.Overlay) client.gui.getClass().getMethod("overlay").invoke(client.gui);
+            } catch (NoSuchMethodException ignored) {
+                return (net.minecraft.client.gui.screens.Overlay) client.getClass().getMethod("getOverlay").invoke(client);
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Cannot inspect the resource reload overlay", e);
+        }
+    }
+
+    private static boolean loadingOverlayGone(Minecraft client) {
+        return currentOverlay(client) == null;
+    }
+
+    private static void clickThroughMouseHandler(Minecraft client, Button button) {
+        try {
+            var window = client.getWindow();
+            var handler = client.mouseHandler;
+            var x = handler.getClass().getDeclaredField("xpos");
+            var y = handler.getClass().getDeclaredField("ypos");
+            x.setAccessible(true);
+            y.setAccessible(true);
+            x.setDouble(handler, (button.getX() + button.getWidth() / 2.0) * window.getScreenWidth() / window.getGuiScaledWidth());
+            y.setDouble(handler, (button.getY() + button.getHeight() / 2.0) * window.getScreenHeight() / window.getGuiScaledHeight());
+            var onButton = handler.getClass().getDeclaredMethod("onButton", long.class,
+                    net.minecraft.client.input.MouseButtonInfo.class, int.class);
+            onButton.setAccessible(true);
+            int leftButton = net.minecraft.SharedConstants.getCurrentVersion().name().equals("26.3") ? 1 : 0;
+            var left = new net.minecraft.client.input.MouseButtonInfo(leftButton, 0);
+            onButton.invoke(handler, window.handle(), left, 1);
+            onButton.invoke(handler, window.handle(), left, 0);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Cannot dispatch resource-reload menu click", e);
+        }
+    }
+
     private static void testMessages(ClientGameTestContext context) {
         for (WorldBinderConfig.MessageMode mode : WorldBinderConfig.MessageMode.values()) {
             context.setScreen(() -> WorldBinderConfigScreen.hud(null));
             context.runOnClient(client -> {
                 String label = net.minecraft.network.chat.Component.translatable(
                         "worldbinder.messages." + mode.name().toLowerCase(java.util.Locale.ROOT)).getString();
-                Button choice = (Button) client.gui.screen().children().stream()
+                Button choice = (Button) net.worldbinder.compat.ClientCompat.screen(client).children().stream()
                         .filter(child -> child instanceof Button button && button.getMessage().getString().equals(label))
                         .findFirst().orElseThrow();
                 choice.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN,
-                        com.mojang.blaze3d.platform.InputConstants.KEYCODE_RETURN, 0));
+                        0, 0));
             });
             context.clickScreenButton("worldbinder.config.save");
             context.runOnClient(client -> {
@@ -162,8 +496,7 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
 
     private static int chatCount(Minecraft client) {
         try {
-            Object hud = client.gui.hud;
-            Object chat = hud.getClass().getMethod("getChat").invoke(hud);
+            Object chat = net.worldbinder.compat.ClientCompat.chat(client);
             var field = chat.getClass().getDeclaredField("allMessages");
             field.setAccessible(true);
             return ((List<?>)field.get(chat)).size();
@@ -237,7 +570,7 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         player.travel(Vec3.ZERO);
         client.options.keyShift.setDown(false);
         check(player.getY() < beforeDescent, "Flight descends");
-        client.gui.setScreen(new TitleScreen());
+        net.worldbinder.compat.ClientCompat.setScreen(client, new TitleScreen());
         Vec3 pausedPosition = player.position();
         client.options.keyJump.setDown(true);
         FlightMotion.tick(client);
@@ -250,7 +583,7 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         client.options.keyJump.setDown(false);
         FlightMotion.tick(client);
         check(player.position().equals(pausedPosition), "Flight ignores menu input");
-        client.gui.setScreen(null);
+        net.worldbinder.compat.ClientCompat.setScreen(client, null);
         FlightMotion.tick(client);
         client.options.keyJump.setDown(true);
         FlightMotion.tick(client);

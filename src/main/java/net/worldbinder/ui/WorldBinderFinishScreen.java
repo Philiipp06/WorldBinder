@@ -8,6 +8,7 @@ import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTheme;
+import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 import net.worldbinder.capture.SceneCaptureService;
@@ -40,22 +41,23 @@ public final class WorldBinderFinishScreen extends Screen {
     private void initScaled() {
         int panelW = Math.max(260, Math.min(420, width - 24));
         int left = (width - panelW) / 2;
-        int y = height / 2 + 40;
+        int panelH = Math.max(160, Math.min(178, height - 24));
+        int y = (height - panelH) / 2 + panelH - 66;
         int buttonW = Math.max(90, Math.min(170, (panelW - 40) / 2));
         addRenderableWidget(WbButton.create(left + 10, y, buttonW, 22, Component.translatable("worldbinder.finish.finish_queue"),
                 Component.translatable("worldbinder.finish.finish_queue.tooltip"), button -> {
             capture.finishAfterQueue();
-            minecraft.gui.setScreen(new WorldBinderFinishProgressScreen(parent, capture));
+            net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderFinishProgressScreen(parent, capture));
         }));
         addRenderableWidget(WbButton.create(left + panelW - buttonW - 10, y, buttonW, 22, Component.translatable("worldbinder.finish.save_now"),
                 Component.translatable("worldbinder.finish.save_now.tooltip"), button -> {
             if (capture.abortQueueAndSaveNow()) {
-                minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
+                net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderStorageProgressScreen(parent));
             }
         }));
         addRenderableWidget(WbButton.create(left + (panelW - buttonW) / 2, y + 30, buttonW, 22, Component.translatable("worldbinder.config.cancel"),
                 Component.translatable("worldbinder.tooltip.close"), button -> {
-            minecraft.gui.setScreen(parent);
+            net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
         }));
     }
 
@@ -78,10 +80,11 @@ public final class WorldBinderFinishScreen extends Screen {
         int left = (width - w) / 2;
         int top = (height - h) / 2;
         WbChrome.drawPanel(context, left, top, w, h);
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.finish.title"), width / 2, top + 18, 0xFFFFFFFF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.finish.message"), left + 28, top + 48, 0xFFE6E6F0);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.finish.queue_chunks", capture.queuedChunkCount()), left + 28, top + 72, 0xFFBDB6D9);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.finish.estimate", capture.estimatedFinishText()), left + 28, top + 90, 0xFFBDB6D9);
+        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.finish.title"), width / 2, top + 18, WbTheme.TEXT);
+        WbChrome.drawDivider(context, left + 28, top + 38, w - 56);
+        WbText.drawClipped(context, font, Component.translatable("worldbinder.finish.message"), left + 28, top + 48, w - 56, WbTheme.TEXT_SOFT);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.finish.queue_chunks", capture.queuedChunkCount()), left + 28, top + 72, w - 56, WbTheme.TEXT_MUTED);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.finish.estimate", capture.estimatedFinishText()), left + 28, top + 90, w - 56, WbTheme.TEXT_MUTED);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {
             width = realWidth;

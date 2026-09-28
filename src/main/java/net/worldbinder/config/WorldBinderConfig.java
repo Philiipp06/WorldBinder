@@ -18,13 +18,15 @@ public final class WorldBinderConfig {
     }
 
     public MessageMode messageMode = MessageMode.TOAST;
+    public boolean highContrastUi = false;
+    public boolean reducedUiMotion = false;
     public net.worldbinder.movement.MovementSettings movement = new net.worldbinder.movement.MovementSettings();
 
     public MessageMode effectiveMessageMode() {
         return messageMode == null ? MessageMode.TOAST : messageMode;
     }
     private static final int MAX_ROAMING_RADIUS_CHUNKS = 12;
-    private static final int DEFAULT_NOTIFICATION_SCALE_PERCENT = 80;
+    private static final int DEFAULT_NOTIFICATION_SCALE_PERCENT = 100;
     private static final int MIN_NOTIFICATION_SCALE_PERCENT = 50;
     private static final int MAX_NOTIFICATION_SCALE_PERCENT = 160;
     private static final int DEFAULT_NOTIFICATION_DURATION_PERCENT = 100;
@@ -58,6 +60,12 @@ public final class WorldBinderConfig {
         LOWER_PROTOCOL_ONLY
     }
 
+    public enum ReloadDisplayMode {
+        VANILLA,
+        COMPACT,
+        HIDDEN
+    }
+
     public enum NotificationAnchor {
         TOP_LEFT,
         TOP_RIGHT,
@@ -84,6 +92,8 @@ public final class WorldBinderConfig {
     public int customVisibleChunkPriorityRadius = 2;
     public boolean showLegalStartReminder = true;
     public ResourcePackFallbackMode resourcePackFallbackMode = ResourcePackFallbackMode.LOWER_PROTOCOL_ONLY;
+    public ReloadDisplayMode reloadDisplayMode = ReloadDisplayMode.HIDDEN;
+    public boolean reloadDisplayConfigured;
     public boolean showResourcePackFallbackWarning = true;
     public boolean queueDebugDiagnostics = false;
     public int queueLoadedChunkGraceTicks = 40;
@@ -129,17 +139,23 @@ public final class WorldBinderConfig {
     public int bossbarOffsetY = 14;
     public int bossbarWidgetXPercent = 50;
     public int bossbarWidgetYPercent = 2;
-    public int bossbarAccentColor = 0xFF30D5C8;
-    public int bossbarBackgroundColor = 0xE6121A24;
+    public int bossbarAccentColor = 0xFF49D7BB;
+    public int bossbarBackgroundColor = 0xE6142020;
     public int chunkRadarScalePercent = 100;
     public int chunkRadarWidgetXPercent = 100;
     public int chunkRadarWidgetYPercent = 12;
-    public int chunkRadarAccentColor = 0xFF66A9FF;
-    public int chunkRadarBackgroundColor = 0xE6111822;
+    public int chunkRadarAccentColor = 0xFF9AC2FF;
+    public int chunkRadarBackgroundColor = 0xE6142020;
     public int notificationWidgetXPercent = 100;
     public int notificationWidgetYPercent = 100;
-    public int notificationAccentColor = 0xFF66A9FF;
-    public int notificationBackgroundColor = 0xF0121A24;
+    public int notificationAccentColor = 0xFF9AC2FF;
+    public int notificationBackgroundColor = 0xF0142020;
+    public boolean showMovementBadges = true;
+    public int movementBadgeScalePercent = 100;
+    public int movementBadgeXPercent = 0;
+    public int movementBadgeYPercent = 0;
+    public int movementBadgeAccentColor = 0xFF84BFFF;
+    public int movementBadgeBackgroundColor = 0xD8121C29;
     public MapLayerMode f10MapLayerMode = MapLayerMode.BOTH;
     public MapLayerMode radarLayerMode = MapLayerMode.BOTH;
 
@@ -494,6 +510,11 @@ public final class WorldBinderConfig {
         if (resourcePackFallbackMode == null) {
             resourcePackFallbackMode = ResourcePackFallbackMode.LOWER_PROTOCOL_ONLY;
         }
+        if (reloadDisplayMode == null || reloadDisplayMode == ReloadDisplayMode.COMPACT
+                || !reloadDisplayConfigured && reloadDisplayMode == ReloadDisplayMode.VANILLA) {
+            reloadDisplayMode = ReloadDisplayMode.HIDDEN;
+        }
+        reloadDisplayConfigured = true;
         if (notificationAnchor == null) {
             notificationAnchor = NotificationAnchor.BOTTOM_RIGHT;
         }
@@ -513,6 +534,9 @@ public final class WorldBinderConfig {
         chunkRadarWidgetYPercent = effectiveWidgetPositionPercent(chunkRadarWidgetYPercent);
         notificationWidgetXPercent = effectiveWidgetPositionPercent(notificationWidgetXPercent);
         notificationWidgetYPercent = effectiveWidgetPositionPercent(notificationWidgetYPercent);
+        movementBadgeScalePercent = Math.max(50, Math.min(180, movementBadgeScalePercent));
+        movementBadgeXPercent = effectiveWidgetPositionPercent(movementBadgeXPercent);
+        movementBadgeYPercent = effectiveWidgetPositionPercent(movementBadgeYPercent);
         if (defaultArchiveName == null || defaultArchiveName.isBlank()) {
             defaultArchiveName = "worldbinder_export";
         }

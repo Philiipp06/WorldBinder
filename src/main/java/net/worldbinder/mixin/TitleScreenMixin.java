@@ -17,7 +17,7 @@ public class TitleScreenMixin {
         TitleScreen screen = (TitleScreen) (Object) this;
         Minecraft client = Minecraft.getInstance();
         WorldBinderMenuButton button = new WorldBinderMenuButton(ignored ->
-                client.gui.setScreen(new WorldBinderScreen(
+                net.worldbinder.compat.ClientCompat.setScreen(client, new WorldBinderScreen(
                         WorldBinderClient.selections(),
                         WorldBinderClient.capture(),
                         WorldBinderClient.placement(),

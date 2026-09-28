@@ -42,32 +42,37 @@ public final class WorldBinderHud {
             if (client.player == null) {
                 return;
             }
-            if (client.gui.hud.isHidden()) {
+            if (net.worldbinder.compat.ClientCompat.hudHidden(client)) {
                 WorldBinderNotifications.visible(0);
                 return;
             }
             SceneCaptureService capture = WorldBinderClient.capture();
             WorldBinderConfig config = WorldBinder.config();
-            int bossbarBottom = 0;
+            WidgetBounds statusBounds = null;
             if (config.showBossbarOverlay && OperationStatus.visible()) {
-                bossbarBottom = drawBossbar(context, client, capture);
+                statusBounds = drawBossbar(context, client, capture);
             }
             boolean showRadar = capture != null && capture.isRoamingCapture() && config.showChunkRadar;
             RadarLayout radarLayout = showRadar ? layoutChunkRadar(client, config) : null;
+            WidgetBounds radarBounds = radarLayout == null ? null : new WidgetBounds(
+                    radarLayout.x(), radarLayout.y(), radarLayout.panelWidth(), radarLayout.panelHeight());
+            WidgetBounds movementBounds = config.showMovementBadges && MovementHud.hasActive(config)
+                    ? MovementHud.bounds(client, config, false) : null;
             WorldBinderNotificationOverlay.draw(
                     context,
                     client,
-                    bossbarBottom,
-                    radarLayout == null ? 0 : radarLayout.y(),
-                    radarLayout == null ? 0 : radarLayout.y() + radarLayout.panelHeight()
+                    statusBounds,
+                    radarBounds,
+                    movementBounds
             );
             if (showRadar) {
                 drawChunkRadar(context, client, capture, radarLayout);
             }
+            MovementHud.draw(context, client, config, false);
         });
     }
 
-    private static int drawBossbar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
+    private static WidgetBounds drawBossbar(net.minecraft.client.gui.GuiGraphicsExtractor context, Minecraft client, SceneCaptureService capture) {
         Font renderer = client.font;
         WorldBinderConfig config = WorldBinder.config();
         int screenWidth = client.getWindow().getGuiScaledWidth();
@@ -90,7 +95,7 @@ public final class WorldBinderHud {
         } finally {
             context.pose().popMatrix();
         }
-        return y + physicalHeight;
+        return new WidgetBounds(x, y, physicalWidth, physicalHeight);
     }
 
     private static void drawBossbarContents(
@@ -183,6 +188,8 @@ public final class WorldBinderHud {
             RadarLayout radar = layoutChunkRadar(client, config);
             width = radar.panelWidth();
             height = radar.panelHeight();
+        } else if (widget == WorldBinderWidgetLayout.Widget.MOVEMENT) {
+            return MovementHud.bounds(client, config, true);
         } else {
             width = WorldBinderNotificationOverlay.preferredWidth(config, screenW, screenH);
             height = WorldBinderNotificationOverlay.previewHeight(config, screenW, screenH);
@@ -203,6 +210,8 @@ public final class WorldBinderHud {
             drawBossbarPreview(context, client.font, config, bounds);
         } else if (widget == WorldBinderWidgetLayout.Widget.RADAR) {
             drawRadarPreview(context, client, config, bounds);
+        } else if (widget == WorldBinderWidgetLayout.Widget.MOVEMENT) {
+            MovementHud.draw(context, client, config, true);
         } else {
             WorldBinderNotificationOverlay.drawPreview(context, client.font, config, bounds.x(), bounds.y(), bounds.width());
         }

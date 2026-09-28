@@ -74,6 +74,7 @@ abstract class WorldBinderScreenView extends Screen {
     protected EditBox archiveName;
     protected String pendingArchiveName;
     protected Section section = Section.OVERVIEW;
+    protected boolean legalNoticeFirst;
     protected Component customTooltip;
     protected int selectedArchiveIndex;
     protected Button placeSelectedButton;
@@ -89,9 +90,7 @@ abstract class WorldBinderScreenView extends Screen {
     protected long pendingDeleteMillis;
     protected long nextActivityRefreshMillis;
     protected int contentScroll;
-    protected boolean sectionDropdownOpen;
     protected boolean presetDropdownOpen;
-    protected boolean targetVersionDropdownOpen;
     protected List<String> cachedActivityEntries = List.of();
 
     protected WorldBinderScreenView(SelectionManager selections, SceneCaptureService capture,
@@ -119,10 +118,6 @@ abstract class WorldBinderScreenView extends Screen {
     protected abstract void clampArchiveWindow(int size);
 
     protected abstract int captureTargetDropdownWidth(int contentW);
-
-    protected abstract int captureTargetVersionColumns(int width);
-
-    protected abstract int captureTargetDropdownOffset(int contentW);
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
@@ -206,7 +201,9 @@ protected void drawOverview(GuiGraphicsExtractor context, int x, int top, int wi
         int statusColor = !worldAvailable()
                 ? WbTheme.WARN
                 : capture.isSaving() || capture.isPaused() ? WbTheme.WARN : capture.isCapturing() ? WbTheme.OK : WbTheme.TEXT_MUTED;
-        WbText.drawClipped(context, font, "◆ " + status, x + 20, heroY + 32, width - 40, statusColor);
+        context.fill(x + 20, heroY + 34, x + 25, heroY + 39, statusColor);
+        WbText.drawClipped(context, font, status, x + 31, heroY + 32,
+                width > 420 ? width / 2 - 40 : width - 51, WbTheme.TEXT_SOFT);
         int recoveries = library.recoveryCount();
         if (recoveries > 0 && width > 420) {
             WbText.drawClipped(context, font, Lang.string("worldbinder.recovery.sessions") + ": " + recoveries, x + Math.max(20, width / 2), heroY + 32, width / 2 - 24, WbTheme.WARN);
@@ -262,30 +259,27 @@ protected void drawOverview(GuiGraphicsExtractor context, int x, int top, int wi
         }
 
         if (!tiny) {
-            WbText.drawClipped(context, font, Lang.string("worldbinder.overview.quick_actions"), x + 20, actionsTop - 18, width - 40, WbTheme.TEXT_DIM);
+            WbText.drawClipped(context, font, Lang.string("worldbinder.overview.quick_actions"), x + 20, actionsTop - 7, width - 40, WbTheme.TEXT_DIM);
         }
     }
 
 protected void drawCapture(GuiGraphicsExtractor context, int x, int top, int width, int mouseX, int mouseY) {
         boolean narrow = width < 620;
-        int card1Y = top + 88;
-        int targetOffset = captureTargetDropdownOffset(width);
-        int card1H = (narrow ? 232 : 216) + targetOffset;
+        int card1Y = top + captureCardOffset();
+        int card1H = narrow ? 232 : 216;
         int archiveFieldY = card1Y + 54;
         int targetFieldY = card1Y + 116;
-        int actionY = card1Y + 154 + targetOffset;
+        int actionY = card1Y + 154;
         int archiveW = Math.max(120, width - 36);
         int targetW = captureTargetDropdownWidth(width);
         drawCard(context, x, card1Y, width, card1H, Lang.text("worldbinder.section.capture"), Lang.text("worldbinder.capture.card.tooltip"), mouseX, mouseY);
         WbChrome.drawInset(context, x + 18, archiveFieldY - 2, archiveW, 26, WbTheme.INFO, false);
-        WbChrome.drawInset(context, x + 18, targetFieldY - 2, targetW, 26, WbTheme.ACCENT_RIGHT, targetVersionDropdownOpen || WbChrome.contains(x + 18, targetFieldY, targetW, 22, mouseX, mouseY));
         WbText.drawClipped(context, font, Lang.string("worldbinder.gui.archive_name"), x + 20, archiveFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
         WbText.drawClipped(context, font, Lang.string("worldbinder.gui.target_output_version"), x + 20, targetFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
-        drawCaptureTargetVersionDropdown(context, x + 18, targetFieldY + 28, targetW, mouseX, mouseY);
         WbText.drawClipped(context, font, targetSummaryLine(), x + 20, actionY + 30, width - 40, WbTheme.INFO);
 
-        int presetY = card1Y + (narrow ? 244 : 228) + targetOffset;
-        int presetH = width < 560 ? 190 : 164;
+        int presetY = card1Y + (narrow ? 244 : 228);
+        int presetH = width < 560 ? 222 : 164;
         drawCard(context, x, presetY, width, presetH, Lang.text("worldbinder.capture.performance"), Lang.text("worldbinder.capture.performance.tooltip"), mouseX, mouseY);
         WbText.drawClipped(context, font, Lang.string("worldbinder.common.preset") + ": " + presetLine(), x + 20, presetY + 34, width - 40, WbTheme.TEXT_SOFT);
         WbText.drawClipped(context, font, WorldBinder.config().presetDescription(), x + 20, presetY + 52, width - 40, WbTheme.TEXT_MUTED);
@@ -310,46 +304,29 @@ protected void drawCapture(GuiGraphicsExtractor context, int x, int top, int wid
         }
     }
 
-    protected void drawCaptureTargetVersionDropdown(GuiGraphicsExtractor context, int x, int y, int width, int mouseX, int mouseY) {
-        if (!targetVersionDropdownOpen) {
-            return;
-        }
-        int cols = captureTargetVersionColumns(width);
-        int gap = 5;
-        int optionW = Math.max(34, (width - gap * (cols - 1)) / cols);
-        int rows = (TargetMinecraftVersion.FINAL_RELEASES.size() + cols - 1) / cols;
-        WbChrome.drawDropdownPanel(context, x, y - 4, width, 22, rows, WbTheme.ACCENT_RIGHT);
-        String current = TargetMinecraftVersion.normalize(WorldBinder.config().targetMinecraftVersion);
-        for (int i = 0; i < TargetMinecraftVersion.FINAL_RELEASES.size(); i++) {
-            TargetMinecraftVersion.Entry entry = TargetMinecraftVersion.FINAL_RELEASES.get(i);
-            int col = i % cols;
-            int row = i / cols;
-            int rowX = x + col * (optionW + gap);
-            int rowY = y + row * 22;
-            boolean selected = entry.name().equals(current);
-            boolean hovered = WbChrome.contains(rowX, rowY, optionW, 19, mouseX, mouseY);
-            WbChrome.drawDropdownRow(context, rowX, rowY, optionW, 19, selected, hovered, selected ? WbTheme.ACCENT : WbTheme.INFO);
-        }
-    }
-
 protected void drawMapSection(GuiGraphicsExtractor context, int x, int top, int width, int mouseX, int mouseY) {
         boolean tiny = WbLayout.tiny(panelWidth(), panelHeight());
         int bottom = WbLayout.contentBottom(top, panelHeight());
-        int cardH = Math.max(128, bottom - top - 146);
+        boolean shortViewport = panelHeight() < 320;
+        int cardH = Math.max(128, bottom - top - 74);
         drawCard(context, x, top + 70, width, cardH, Lang.text("worldbinder.section.map"), Lang.text("worldbinder.section.map.tooltip"), mouseX, mouseY);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.map.screen_hint"), x + 20, top + 108, width - 40, WbTheme.TEXT_SOFT, 2);
+        if (shortViewport) {
+            WbText.drawClipped(context, font, Lang.string("worldbinder.map.saved_line", capture.scannedChunks(), capture.queuedChunks(), capture.partialChunksView().size()), x + 20, top + 140, width - 40, WbTheme.INFO);
+            return;
+        }
         if (!tiny && width > 360) {
-            drawMiniChunkMap(context, x + 24, top + 112, 9, Math.min(12, Math.max(7, (width - 220) / 24)));
+            drawMiniChunkMap(context, x + 24, top + 168, 9, Math.min(12, Math.max(7, (width - 220) / 24)));
         }
         int textX = tiny || width <= 360 ? x + 20 : x + 170;
         int textW = tiny || width <= 360 ? width - 40 : width - 190;
-        WbText.drawWrapped(context, font, Lang.string("worldbinder.map.screen_hint"), textX, top + 112, textW, WbTheme.TEXT_SOFT, 3);
         WbText.drawClipped(context, font, Lang.string(
                 "worldbinder.map.mode_line",
                 mapLayerLabel(WorldBinder.config().f10MapLayerMode),
                 radarDetailLabel(WorldBinder.config().radarDetailMode)
-        ), textX, top + 166, textW, WbTheme.TEXT_MUTED);
-        WbText.drawClipped(context, font, Lang.string("worldbinder.map.saved_line", capture.scannedChunks(), capture.queuedChunks(), capture.partialChunksView().size()), textX, top + 190, textW, WbTheme.TEXT_DIM);
-        WbText.drawWrapped(context, font, capture.captureRouteHint(), textX, top + 214, textW, WbTheme.INFO, 2);
+        ), textX, top + 170, textW, WbTheme.TEXT_MUTED);
+        WbText.drawClipped(context, font, Lang.string("worldbinder.map.saved_line", capture.scannedChunks(), capture.queuedChunks(), capture.partialChunksView().size()), textX, top + 192, textW, WbTheme.TEXT_DIM);
+        WbText.drawWrapped(context, font, capture.captureRouteHint(), textX, top + 216, textW, WbTheme.INFO, 2);
     }
 
 protected void drawArchiveSection(GuiGraphicsExtractor context, int x, int top, int width, int mouseX, int mouseY, boolean recoveryOnly) {
@@ -440,29 +417,26 @@ protected void drawSettingsSection(GuiGraphicsExtractor context, int x, int top,
 protected void drawAboutSection(GuiGraphicsExtractor context, int x, int top, int width, int mouseX, int mouseY) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
         int cardY = top + 70;
-        int cardH = Math.max(150, bottom - cardY - 10);
+        int cardH = Math.max(340, bottom - cardY - 10);
         drawCard(context, x, cardY, width, cardH, Lang.text("worldbinder.about.title"), Lang.text("worldbinder.about.tooltip"), mouseX, mouseY);
-        int y = cardY + 36;
         int textW = width - 40;
-        WbText.drawClipped(context, font, Lang.string("worldbinder.about.version"), x + 20, y, textW, WbTheme.ACCENT);
-        y += 22;
-        y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.author"), x + 20, y, textW, WbTheme.TEXT_SOFT, 2);
-        y += 6;
-        y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.keys"), x + 20, y, textW, WbTheme.TEXT_MUTED, 2);
-        y += 6;
-        y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.feedback"), x + 20, y, textW, WbTheme.INFO, 2);
-        y += 6;
-        y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.data", net.worldbinder.io.WorldBinderPaths.WORLDS.toAbsolutePath()), x + 20, y, textW, WbTheme.TEXT_MUTED, 2);
-        y += 12;
-        if (y < bottom - 88) {
-            WbText.draw(context, font, Lang.string("worldbinder.about.legal_title"), x + 20, y, WbTheme.WARN);
-            y += 20;
-            y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_1"), x + 20, y, textW, WbTheme.TEXT_SOFT, 3);
-            y += 4;
-            y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_2"), x + 20, y, textW, WbTheme.TEXT_SOFT, 3);
-            y += 4;
-            WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_3"), x + 20, y, textW, WbTheme.ERROR, 2);
+        if (legalNoticeFirst) {
+            WbText.drawClipped(context, font, Lang.string("worldbinder.about.legal_title"), x + 20,
+                    cardY + 36, textW, WbTheme.WARN);
+            WbChrome.drawDivider(context, x + 20, cardY + 54, textW);
+            int y = cardY + 67;
+            y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_1"), x + 20, y, textW, WbTheme.TEXT_SOFT, 6) + 14;
+            y += WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_2"), x + 20, y, textW, WbTheme.TEXT_SOFT, 6) + 14;
+            WbText.drawWrapped(context, font, Lang.string("worldbinder.about.legal_3"), x + 20, y, textW, WbTheme.ERROR, 6);
+            return;
         }
+        WbText.drawClipped(context, font, Lang.string("worldbinder.about.version"), x + 20, cardY + 36, textW, WbTheme.ACCENT);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.about.author"), x + 20, cardY + 58, textW, WbTheme.TEXT_SOFT, 2);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.about.keys"), x + 20, cardY + 92, textW, WbTheme.TEXT_MUTED, 2);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.about.data", net.worldbinder.io.WorldBinderPaths.WORLDS.toAbsolutePath()), x + 20, cardY + 127, textW, WbTheme.TEXT_MUTED, 2);
+        WbChrome.drawDivider(context, x + 20, cardY + 194, textW);
+        WbText.drawClipped(context, font, Lang.string("worldbinder.about.legal_title"), x + 20, cardY + 211, textW, WbTheme.WARN);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.legal.short_notice"), x + 20, cardY + 232, textW, WbTheme.TEXT_SOFT, 5);
     }
 
 protected void drawArchiveList(GuiGraphicsExtractor context, int x, int top, int width, boolean recoveryOnly, boolean validationMode) {
@@ -511,12 +485,10 @@ protected void drawArchiveList(GuiGraphicsExtractor context, int x, int top, int
         WbSidebar.drawShell(context, x, y, width, height);
         int cx = contentX(x);
         int cw = contentWidth(width);
-        int top = y + 18;
+        int top = y + 16;
         int bottom = y + height - 42;
-        context.fill(cx - 10, top, cx + cw + 10, bottom, 0x33141D28);
-        context.fill(cx - 10, top, cx + cw + 10, top + 1, 0x55415364);
-        context.fill(cx - 10, top, cx - 7, bottom, sectionAccent(section));
-        context.fill(cx + cw + 7, top, cx + cw + 10, bottom, 0x33202A3A);
+        context.fill(cx - 8, top, cx + cw + 8, bottom, 0x252E423A);
+        context.fill(cx - 8, top, cx - 6, bottom, sectionAccent(section));
     }
 
 protected void drawSidebar(GuiGraphicsExtractor context, int left, int top) {
@@ -547,33 +519,19 @@ protected void drawSidebar(GuiGraphicsExtractor context, int left, int top) {
     }
 
 protected void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, int width) {
-        int reserved = panelWidth() < 620 && width > 320 ? 190 : 0;
-        WbSectionHeader.draw(context, font, x, y, Math.max(80, width - reserved), section.title(), WbText.ellipsize(font, section.subtitle().getString(), Math.max(40, width - reserved - 8)), sectionAccent(section));
-    }
-
-    protected void drawSectionDropdown(GuiGraphicsExtractor context, int left, int top, int panelWidth, int mouseX, int mouseY) {
-        if (!sectionDropdownOpen || panelWidth >= 620) {
-            return;
-        }
-        int contentX = contentX(left);
-        int contentW = contentWidth(panelWidth);
-        int dropdownW = Math.min(178, Math.max(132, contentW / 3));
-        int x = contentX + contentW - dropdownW;
-        int y = top + 48;
-        WbChrome.drawDropdownPanel(context, x, y, dropdownW, 20, Section.values().length);
-        int rowY = y + 3;
-        for (Section target : Section.values()) {
-            boolean selected = target == section;
-            boolean hovered = WbChrome.contains(x, rowY, dropdownW, 20, mouseX, mouseY);
-            WbChrome.drawDropdownRow(context, x, rowY, dropdownW, 20, selected, hovered, selected ? WbTheme.ACCENT : WbTheme.INFO);
-            rowY += 20;
-        }
+        WbSectionHeader.draw(context, font, x, y, width, section.title(),
+                WbText.ellipsize(font, section.subtitle().getString(), Math.max(40, width - 8)), sectionAccent(section));
     }
 
     protected void drawCard(GuiGraphicsExtractor context, int x, int y, int width, int height, Component title, Component tooltip, int mouseX, int mouseY) {
-        if (WbCard.draw(context, font, x, y, width, height, title, sectionAccent(section), mouseX, mouseY)) {
+        if (WbCard.draw(context, font, x, y, width, height, title, sectionAccent(section), mouseX, mouseY)
+                && mouseY < y + 27) {
             customTooltip = tooltip;
         }
+    }
+
+    protected int captureCardOffset() {
+        return WbLayout.tiny(panelWidth(), panelHeight()) ? 70 : 88;
     }
 
     protected int sectionAccent(Section value) {
@@ -658,17 +616,16 @@ protected void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, int
         int center = size / 2;
         int playerChunkX = minecraft.player != null ? minecraft.player.blockPosition().getX() >> 4 : 0;
         int playerChunkZ = minecraft.player != null ? minecraft.player.blockPosition().getZ() >> 4 : 0;
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal("§a" + Lang.string("worldbinder.common.saved") + " §e" + Lang.string("worldbinder.common.scanning") + " §6" + Lang.string("worldbinder.common.queued") + " §d" + Lang.string("worldbinder.map.player")), x, y, WbTheme.TEXT_MUTED);
-        int gridY = y + 18;
+        int gridY = y;
         for (int dz = -center; dz <= center; dz++) {
             for (int dx = -center; dx <= center; dx++) {
                 long key = ChunkPos.pack(playerChunkX + dx, playerChunkZ + dz);
                 boolean done = doneChunks.contains(key);
                 boolean partial = partialChunks.contains(key);
                 boolean queued = queuedChunks.contains(key);
-                int color = done ? 0xDD55FFAA : (partial ? 0xDDD9A441 : (queued ? 0xAAFFD166 : 0x55333344));
+                int color = done ? WbTheme.OK : (partial ? WbTheme.INFO : (queued ? WbTheme.WARN : WbTheme.ROW));
                 if (dx == 0 && dz == 0) {
-                    color = 0xFFFF55FF;
+                    color = WbTheme.ACCENT;
                 }
                 int px = x + (dx + center) * cell;
                 int py = gridY + (dz + center) * cell;
@@ -679,7 +636,9 @@ protected void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, int
 
 protected void drawLine(GuiGraphicsExtractor context, int x, int y, String label, String value, int color) {
         int max = Math.max(60, contentX(WbLayout.left(width, panelWidth())) + contentWidth(panelWidth()) - x - 16);
-        WbText.drawClipped(context, font, "§7" + label + ": §f" + value, x, y, max, color);
+        int labelWidth = Math.min(90, Math.max(42, max / 3));
+        WbText.drawClipped(context, font, label, x, y, labelWidth - 4, WbTheme.TEXT_DIM);
+        WbText.drawClipped(context, font, value, x + labelWidth, y, max - labelWidth, color);
     }
 
     protected void drawProgress(GuiGraphicsExtractor context, int x, int y, int width, double progress, String detail) {

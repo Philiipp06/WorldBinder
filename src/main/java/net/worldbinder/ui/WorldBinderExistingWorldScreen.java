@@ -10,6 +10,7 @@ import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTheme;
+import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 
@@ -48,12 +49,12 @@ public final class WorldBinderExistingWorldScreen extends Screen {
         addRenderableWidget(WbButton.create(buttonX, y, buttonW, 22, Lang.text("worldbinder.existing.overwrite"),
                 Lang.text("worldbinder.existing.overwrite.tooltip"), b -> {
             if (capture.saveNowConfirmed()) {
-                minecraft.gui.setScreen(new WorldBinderStorageProgressScreen(parent));
+                net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderStorageProgressScreen(parent));
             }
         }));
         addRenderableWidget(WbButton.create(buttonX + buttonW + gap, y, buttonW, 22, Lang.text("worldbinder.gui.cancel"),
                 Lang.text("worldbinder.existing.cancel.tooltip"), b -> {
-            minecraft.gui.setScreen(parent);
+            net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
         }));
     }
 
@@ -77,10 +78,11 @@ public final class WorldBinderExistingWorldScreen extends Screen {
         int left = (width - w) / 2;
         int top = (height - h) / 2;
         WbChrome.drawPanel(context, left, top, w, h);
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.existing.header"), width / 2, top + 18, 0xFFFFFFFF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.existing.message"), left + 30, top + 52, 0xFFE6E6F0);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.existing.target", capture.targetFolderName()), left + 30, top + 74, 0xFFBDB6D9);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.existing.help"), left + 30, top + 96, 0xFF8F86B8);
+        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.existing.header"), width / 2, top + 18, WbTheme.TEXT);
+        WbChrome.drawDivider(context, left + 30, top + 38, w - 60);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.existing.message"), left + 30, top + 52, w - 60, WbTheme.TEXT_SOFT);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.existing.target", capture.targetFolderName()), left + 30, top + 74, w - 60, WbTheme.TEXT_MUTED);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.existing.help"), left + 30, top + 96, w - 60, WbTheme.TEXT_DIM);
         if (WorldBinder.config().confirmExistingWorld) {
             super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         }

@@ -50,12 +50,12 @@ public final class WorldBinderProfilerScreen extends Screen {
         addRenderableWidget(WbButton.create(Math.max(18, width - 108), Math.max(18, height - 32), 90, 22,
                 Lang.text("worldbinder.gui.back"), Lang.text("worldbinder.profiler.back.tooltip"), b -> onClose()));
         addRenderableWidget(WbButton.create(18, Math.max(18, height - 32), 90, 22,
-                Lang.text("worldbinder.section.map"), Lang.text("worldbinder.profiler.map.tooltip"), b -> minecraft.gui.setScreen(new WorldBinderMapScreen(this))));
+                Lang.text("worldbinder.section.map"), Lang.text("worldbinder.profiler.map.tooltip"), b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))));
     }
 
     @Override
     public void onClose() {
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     @Override
@@ -91,8 +91,8 @@ public final class WorldBinderProfilerScreen extends Screen {
             int left = (width - panelW) / 2;
             int top = (height - panelH) / 2;
             drawPanel(context, left, top, panelW, panelH);
-            GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.profiler.header"), width / 2, top + 15, 0xFFFFFFFF);
-            GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.profiler.subheader"), width / 2, top + 34, 0xFFBDB6D9);
+            GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.profiler.header"), width / 2, top + 15, WbTheme.TEXT);
+            GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.profiler.subheader"), width / 2, top + 34, WbTheme.TEXT_MUTED);
 
             SceneCaptureService capture = WorldBinderClient.capture();
             StorageProgress progress = StorageFlow.progress();
@@ -107,10 +107,10 @@ public final class WorldBinderProfilerScreen extends Screen {
 
             int chipGap = 10;
             int chipW = Math.max(92, (contentW - chipGap * 3) / 4);
-            drawMetricChip(context, contentX, contentTop, chipW, Lang.string("worldbinder.profiler.mode"), capture.modeName(), 0xFF55FFAA);
-            drawMetricChip(context, contentX + chipW + chipGap, contentTop, chipW, Lang.string("worldbinder.profiler.progress"), (int) (progress.progress() * 100.0D) + "%", 0xFFFF55FF);
-            drawMetricChip(context, contentX + (chipW + chipGap) * 2, contentTop, chipW, Lang.string("worldbinder.profiler.queue"), Integer.toString(capture.queuedChunks()), capture.highQueuePressure() ? 0xFFFF5555 : 0xFFFFAA33);
-            drawMetricChip(context, contentX + (chipW + chipGap) * 3, contentTop, chipW, Lang.string("worldbinder.profiler.failed"), Integer.toString(StorageProfiler.failedJobs()), StorageProfiler.failedJobs() > 0 ? 0xFFFF5555 : 0xFF8F86B8);
+            drawMetricChip(context, contentX, contentTop, chipW, Lang.string("worldbinder.profiler.mode"), capture.modeName(), WbTheme.ACCENT);
+            drawMetricChip(context, contentX + chipW + chipGap, contentTop, chipW, Lang.string("worldbinder.profiler.progress"), (int) (progress.progress() * 100.0D) + "%", WbTheme.INFO);
+            drawMetricChip(context, contentX + (chipW + chipGap) * 2, contentTop, chipW, Lang.string("worldbinder.profiler.queue"), Integer.toString(capture.queuedChunks()), capture.highQueuePressure() ? WbTheme.ERROR : WbTheme.WARN);
+            drawMetricChip(context, contentX + (chipW + chipGap) * 3, contentTop, chipW, Lang.string("worldbinder.profiler.failed"), Integer.toString(StorageProfiler.failedJobs()), StorageProfiler.failedJobs() > 0 ? WbTheme.ERROR : WbTheme.TEXT_DIM);
 
             int cardsTop = contentTop + 58;
             int cardW = narrow ? contentW : (contentW - 22) / 2;
@@ -129,7 +129,7 @@ public final class WorldBinderProfilerScreen extends Screen {
             line(context, storageX + 16, storageY + 54, Lang.string("worldbinder.profiler.detail"), shorten(localizeDetail(progress.detail()), 48));
             line(context, storageX + 16, storageY + 74, Lang.string("worldbinder.profiler.elapsed"), millis(progress.elapsedMillis()));
             line(context, storageX + 16, storageY + 94, Lang.string("worldbinder.profiler.completed"), Integer.toString(StorageProfiler.completedJobs()));
-            drawProgress(context, storageX + 16, storageY + 124, cardW - 32, progress.progress(), progress.isTerminal() ? 0xFF55FFAA : 0xFFFF55FF);
+            drawProgress(context, storageX + 16, storageY + 124, cardW - 32, progress.progress(), progress.isTerminal() ? WbTheme.OK : WbTheme.ACCENT);
 
             int timingsY = narrow ? storageY + leftCardH + 14 : cardsTop + leftCardH + 18;
             int timingsH = Math.max(126, top + panelH - timingsY - 44);

@@ -1,13 +1,11 @@
 package net.worldbinder.ui.component;
 
-import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.SpriteIconButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -23,8 +21,7 @@ public final class WorldBinderMenuButton extends Button {
     private static final int DEFAULT_GAP = 4;
     private static final int SCREEN_MARGIN = 4;
     private static final Identifier ICON_TEXTURE =
-            Identifier.fromNamespaceAndPath("worldbinder", "icon.png");
-    private static final RenderPipeline ICON_PIPELINE = RenderPipelines.GUI_TEXTURED;
+            Identifier.fromNamespaceAndPath("worldbinder", "textures/gui/logo.png");
 
     public WorldBinderMenuButton(OnPress onPress) {
         super(
@@ -44,20 +41,8 @@ public final class WorldBinderMenuButton extends Button {
         extractDefaultSprite(graphics);
         int iconX = getX() + (getWidth() - ICON_SIZE) / 2;
         int iconY = getY() + (getHeight() - ICON_SIZE) / 2;
-        graphics.blit(
-                ICON_PIPELINE,
-                ICON_TEXTURE,
-                iconX,
-                iconY,
-                0.0F,
-                0.0F,
-                ICON_SIZE,
-                ICON_SIZE,
-                128,
-                128,
-                128,
-                128
-        );
+        graphics.blit(ICON_TEXTURE, iconX, iconY, iconX + ICON_SIZE, iconY + ICON_SIZE,
+                0.0F, 1.0F, 0.0F, 1.0F);
     }
 
     public void placeInIconRow(Screen screen) {

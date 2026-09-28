@@ -326,7 +326,7 @@ public final class WorldBinderColorPickerScreen extends Screen {
 
     private void applyAndClose() {
         onApply.accept(currentColor());
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     private int panelWidth() {
@@ -384,7 +384,7 @@ public final class WorldBinderColorPickerScreen extends Screen {
 
     @Override
     public void onClose() {
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {

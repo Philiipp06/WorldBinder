@@ -1,5 +1,8 @@
 package net.worldbinder.config;
 
+import net.worldbinder.version.TargetMinecraftVersion;
+
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -25,6 +28,40 @@ public final class GameRuleSettings {
 
     public static String[] rules() {
         return RULES.clone();
+    }
+
+    public static String[] rules(String targetVersion) {
+        return Arrays.stream(RULES).filter(rule -> supports(targetVersion, rule)).toArray(String[]::new);
+    }
+
+    public static String[] rules(String targetVersion, int category) {
+        return Arrays.stream(rules(targetVersion)).filter(rule -> category(rule) == category).toArray(String[]::new);
+    }
+
+    public static int category(String rule) {
+        return switch (rule) {
+            case "doDaylightCycle", "doWeatherCycle", "doFireTick", "doVinesSpread" -> 0;
+            case "disableRaids", "doInsomnia", "doMobLoot", "doMobSpawning", "doPatrolSpawning",
+                    "doTraderSpawning", "doWardenSpawning", "forgiveDeadPlayers", "mobGriefing",
+                    "universalAnger", "doEntityDrops", "doTileDrops" -> 1;
+            case "disableElytraMovementCheck", "doImmediateRespawn", "drowningDamage", "fallDamage",
+                    "fireDamage", "keepInventory", "naturalRegeneration", "spectatorsGenerateChunks" -> 2;
+            default -> 3;
+        };
+    }
+
+    public static boolean supports(String targetVersion, String rule) {
+        int dataVersion = TargetMinecraftVersion.resolve(targetVersion).effectiveDataVersion();
+        int first = switch (rule) {
+            case "disableRaids" -> 1968;
+            case "doPatrolSpawning", "doTraderSpawning" -> 2230;
+            case "doImmediateRespawn", "doInsomnia", "drowningDamage", "fallDamage", "fireDamage" -> 2225;
+            case "forgiveDeadPlayers", "universalAnger" -> 2566;
+            case "doVinesSpread" -> 3337;
+            case "doWardenSpawning" -> 3105;
+            default -> 1519;
+        };
+        return dataVersion >= first;
     }
 
     public void load(String raw) {

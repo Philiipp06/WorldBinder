@@ -17,6 +17,9 @@ public final class WbIntegerSlider extends AbstractSliderButton {
     private final IntConsumer valueConsumer;
     private final IntFunction<Component> messageFactory;
     private int currentValue;
+    private float displayedValue;
+    private float hoverProgress;
+    private long lastFrameNanos;
 
     public WbIntegerSlider(Font font, int x, int y, int width, int height, int min, int max, int initialValue,
                            int accent, IntConsumer valueConsumer, IntFunction<Component> messageFactory) {
@@ -28,6 +31,7 @@ public final class WbIntegerSlider extends AbstractSliderButton {
         this.valueConsumer = valueConsumer;
         this.messageFactory = messageFactory;
         currentValue = clamp(initialValue);
+        displayedValue = (float) value;
         updateMessage();
     }
 
@@ -37,25 +41,34 @@ public final class WbIntegerSlider extends AbstractSliderButton {
         int y = getY();
         int width = getWidth();
         int height = getHeight();
-        boolean highlighted = isHoveredOrFocused();
+        long now = System.nanoTime();
+        long elapsed = lastFrameNanos == 0L ? 0L : now - lastFrameNanos;
+        lastFrameNanos = now;
+        hoverProgress = WbMotion.approach(hoverProgress, isHoveredOrFocused() ? 1.0F : 0.0F, elapsed, 16.0F);
+        displayedValue = WbMotion.approach(displayedValue, (float) value, elapsed, 20.0F);
         int activeAccent = active ? accent : WbTheme.TEXT_DISABLED;
         int trackX = x + 8;
         int trackWidth = Math.max(1, width - 16);
-        int trackY = y + height - 6;
-        int filled = (int) Math.round(trackWidth * value);
+        int trackY = y + height - 7;
+        int filled = Math.round(trackWidth * displayedValue);
 
-        context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x66000000);
-        context.fill(x, y, x + width, y + height, active ? 0xAA43566B : 0x55374655);
-        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, highlighted ? WbTheme.BUTTON_HOVER : WbTheme.BUTTON);
-        context.fill(trackX, trackY, trackX + trackWidth, trackY + 2, 0xAA293746);
-        context.fill(trackX, trackY, trackX + filled, trackY + 2, activeAccent);
-        int knobX = Math.max(trackX, Math.min(trackX + trackWidth - 4, trackX + filled - 2));
-        context.fill(knobX, trackY - 2, knobX + 4, trackY + 4, activeAccent);
-        if (isFocused() && active) {
-            context.fill(x, y, x + width, y + 1, WbTheme.FOCUS_RING);
-            context.fill(x, y + height - 1, x + width, y + height, WbTheme.FOCUS_RING);
+        context.fill(x, y, x + width, y + height, active ? WbTheme.panelBorder() : WbTheme.BUTTON_DISABLED);
+        context.fill(x + 1, y + 1, x + width - 1, y + height - 1,
+                WbMotion.mix(WbTheme.BUTTON, WbTheme.BUTTON_HOVER, hoverProgress));
+        context.fill(trackX, trackY, trackX + trackWidth, trackY + 3, WbTheme.FIELD);
+        for (int tick = 0; tick <= 4; tick++) {
+            int tickX = trackX + (trackWidth - 1) * tick / 4;
+            context.fill(tickX, trackY - 2, tickX + 1, trackY, WbTheme.TEXT_DISABLED);
         }
-        GuiText.drawCenteredTextWithShadow(context, font, getMessage(), x + width / 2, y + 3,
+        if (filled > 0) context.fill(trackX, trackY, trackX + filled, trackY + 3, activeAccent);
+        int knobX = Math.max(trackX, Math.min(trackX + trackWidth - 6, trackX + filled - 3));
+        context.fill(knobX - 1, trackY - 3, knobX + 7, trackY + 5, WbTheme.FIELD);
+        context.fill(knobX, trackY - 2, knobX + 6, trackY + 4, activeAccent);
+        if (isFocused() && active) {
+            context.fill(x, y, x + width, y + 1, WbTheme.focusRing());
+            context.fill(x, y + height - 1, x + width, y + height, WbTheme.focusRing());
+        }
+        GuiText.drawCenteredTextWithShadow(context, font, getMessage(), x + width / 2, y + 2,
                 active ? WbTheme.TEXT_SOFT : WbTheme.TEXT_DISABLED);
     }
 

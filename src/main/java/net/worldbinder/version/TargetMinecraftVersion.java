@@ -103,8 +103,11 @@ public final class TargetMinecraftVersion {
             entry("1.21.6", 4435, GenerationProfile.TRIALS_1_21),
             entry("1.21.7", 4438, GenerationProfile.TRIALS_1_21),
             entry("1.21.8", 4440, GenerationProfile.TRIALS_1_21),
+            entry("26.1", 4786, GenerationProfile.CURRENT_26),
+            entry("26.1.1", 4788, GenerationProfile.CURRENT_26),
+            entry("26.1.2", 4790, GenerationProfile.CURRENT_26),
             entry("26.2", 4903, GenerationProfile.CURRENT_26),
-            entry(CURRENT, -1, GenerationProfile.CURRENT_26)
+            entry(CURRENT, 5023, GenerationProfile.CURRENT_26)
     );
 
     private TargetMinecraftVersion() {

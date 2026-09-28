@@ -16,6 +16,7 @@ import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTheme;
+import net.worldbinder.ui.component.WbMotion;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.GuiText;
 
@@ -23,12 +24,12 @@ import java.util.Locale;
 
 public final class WorldBinderWidgetEditorScreen extends Screen {
     private static final int[] ACCENT_PRESETS = {
-            0xFF30D5C8,
-            0xFF66A9FF,
-            0xFFFFB44D,
-            0xFF55D985,
-            0xFFFF5E78,
-            0xFFD084FF
+            WbTheme.ACCENT,
+            WbTheme.INFO,
+            WbTheme.WARN,
+            WbTheme.OK,
+            WbTheme.ERROR,
+            0xFFC39BEE
     };
 
     private final Screen parent;
@@ -39,6 +40,10 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
     private boolean panelCollapsed;
     private boolean dragging;
     private boolean resizing;
+    private boolean movingPanel;
+    private boolean panelPositioned;
+    private int panelLeft;
+    private int panelTop;
     private int dragOffsetX;
     private int dragOffsetY;
     private int resizeStartX;
@@ -89,12 +94,12 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         )));
 
         int tabsY = panelY + (shortPanel ? 29 : 32);
-        int tabW = Math.max(50, (innerW - gap * 2) / 3);
+        int tabW = Math.max(70, (innerW - gap) / 2);
         int index = 0;
         for (WorldBinderWidgetLayout.Widget widget : WorldBinderWidgetLayout.Widget.values()) {
             Button tab = WbButton.create(
-                    innerX + index * (tabW + gap),
-                    tabsY,
+                    innerX + (index % 2) * (tabW + gap),
+                    tabsY + (index / 2) * 23,
                     tabW,
                     20,
                     Component.translatable(widgetKey(widget)),
@@ -105,7 +110,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             index++;
         }
 
-        int enabledY = panelY + (shortPanel ? 53 : 58);
+        int enabledY = panelY + (shortPanel ? 73 : 82);
         Button enabled = WbButton.create(
                 innerX,
                 enabledY,
@@ -123,12 +128,16 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         );
         addRenderableWidget(WbButton.toggle(enabled, WorldBinderWidgetLayout.accentColor(working, selected), WorldBinderWidgetLayout.enabled(working, selected)));
 
-        int scaleY = panelY + (shortPanel ? 77 : 84);
-        addRenderableWidget(new WidgetSlider(innerX, scaleY, innerW, 20, SliderType.SCALE, sliderInitialValue(SliderType.SCALE)));
-        int opacityY = panelY + (shortPanel ? 101 : 110);
-        addRenderableWidget(new WidgetSlider(innerX, opacityY, innerW, 20, SliderType.OPACITY, sliderInitialValue(SliderType.OPACITY)));
+        int scaleY = panelY + (shortPanel ? 97 : 108);
+        addRenderableWidget(WbTooltips.register(
+                new WidgetSlider(innerX, scaleY, innerW, 20, SliderType.SCALE, sliderInitialValue(SliderType.SCALE)),
+                Component.translatable("worldbinder.tooltip.widget_editor.scale")));
+        int opacityY = panelY + (shortPanel ? 121 : 134);
+        addRenderableWidget(WbTooltips.register(
+                new WidgetSlider(innerX, opacityY, innerW, 20, SliderType.OPACITY, sliderInitialValue(SliderType.OPACITY)),
+                Component.translatable("worldbinder.tooltip.widget_editor.opacity")));
 
-        int accentY = panelY + (shortPanel ? 127 : 140);
+        int accentY = panelY + (shortPanel ? 145 : 162);
         addRenderableWidget(WbTooltips.register(
                 new ColorActionButton(
                         innerX,
@@ -142,7 +151,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
                 Component.translatable("worldbinder.tooltip.widget_editor.color")
         ));
 
-        int backgroundY = panelY + (shortPanel ? 152 : 166);
+        int backgroundY = panelY + (shortPanel ? 170 : 188);
         addRenderableWidget(WbTooltips.register(
                 new ColorActionButton(
                         innerX,
@@ -157,7 +166,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         ));
 
         if (!shortPanel) {
-            int paletteY = panelY + 207;
+            int paletteY = panelY + 228;
             int swatchW = Math.max(18, (innerW - gap * (ACCENT_PRESETS.length - 1)) / ACCENT_PRESETS.length);
             for (int i = 0; i < ACCENT_PRESETS.length; i++) {
                 int color = ACCENT_PRESETS[i];
@@ -178,8 +187,8 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             }
         }
 
-        if (!shortPanel || panelH >= 240) {
-            int resetY = panelY + (shortPanel ? 178 : 237);
+        if (!shortPanel || panelH >= 260) {
+            int resetY = panelY + (shortPanel ? 202 : 256);
             addRenderableWidget(WbButton.quiet(WbButton.create(
                     innerX,
                     resetY,
@@ -228,7 +237,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         Component pickerTitle = Component.translatable(background
                 ? "worldbinder.color_picker.background_title"
                 : "worldbinder.color_picker.accent_title");
-        minecraft.gui.setScreen(new WorldBinderColorPickerScreen(
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderColorPickerScreen(
                 this,
                 pickerTitle,
                 color,
@@ -259,6 +268,13 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (insidePanel(event.x(), event.y())) {
+            if (!panelCollapsed && event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT
+                    && event.y() < panelY() + 28 && event.x() < panelX() + panelWidth() - 46) {
+                movingPanel = true;
+                dragOffsetX = (int) Math.round(event.x()) - panelX();
+                dragOffsetY = (int) Math.round(event.y()) - panelY();
+                return true;
+            }
             return super.mouseClicked(event, doubleClick);
         }
         if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
@@ -290,6 +306,12 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
+        if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && movingPanel) {
+            panelLeft = clamp((int) Math.round(event.x()) - dragOffsetX, 8, width - panelWidth() - 8);
+            panelTop = clamp((int) Math.round(event.y()) - dragOffsetY, 8, height - panelHeight() - 8);
+            rebuildControls();
+            return true;
+        }
         if (event.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT && resizing) {
             int deltaX = (int) Math.round(event.x()) - resizeStartX;
             int deltaY = (int) Math.round(event.y()) - resizeStartY;
@@ -317,6 +339,10 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
+        if (movingPanel) {
+            movingPanel = false;
+            return true;
+        }
         if (dragging || resizing) {
             dragging = false;
             resizing = false;
@@ -343,7 +369,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        context.fill(0, 0, width, height, 0x6B07101A);
+        context.fill(0, 0, width, height, 0xB00D1515);
         drawCanvasGrid(context);
 
         for (WorldBinderWidgetLayout.Widget widget : WorldBinderWidgetLayout.Widget.values()) {
@@ -359,27 +385,27 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     private void drawCanvasGrid(GuiGraphicsExtractor context) {
         for (int x = 0; x < width; x += 20) {
-            context.fill(x, 0, x + 1, height, x % 100 == 0 ? 0x243A5268 : 0x122A3C4E);
+            context.fill(x, 0, x + 1, height, x % 100 == 0 ? 0x34547164 : 0x20394A40);
         }
         for (int y = 0; y < height; y += 20) {
-            context.fill(0, y, width, y + 1, y % 100 == 0 ? 0x243A5268 : 0x122A3C4E);
+            context.fill(0, y, width, y + 1, y % 100 == 0 ? 0x34547164 : 0x20394A40);
         }
-        context.fill(width / 2, 0, width / 2 + 1, height, 0x445E7C98);
-        context.fill(0, height / 2, width, height / 2 + 1, 0x445E7C98);
+        context.fill(width / 2, 0, width / 2 + 1, height, 0x556A8A76);
+        context.fill(0, height / 2, width, height / 2 + 1, 0x556A8A76);
     }
 
     private void drawWidget(GuiGraphicsExtractor context, WorldBinderWidgetLayout.Widget widget) {
         WorldBinderHud.drawWidgetPreview(context, minecraft, working, widget);
         WorldBinderHud.WidgetBounds bounds = WorldBinderHud.previewBounds(minecraft, working, widget);
         boolean active = selected == widget;
-        int accent = active ? WorldBinderWidgetLayout.accentColor(working, widget) : 0x884F6B82;
+        int accent = active ? WorldBinderWidgetLayout.accentColor(working, widget) : WbTheme.PANEL_BORDER;
         if (!WorldBinderWidgetLayout.enabled(working, widget)) {
             context.fill(bounds.x(), bounds.y(), bounds.x() + bounds.width(), bounds.y() + bounds.height(), 0x88060A10);
         }
         drawOutline(context, bounds, accent, active ? 2 : 1);
         int labelWidth = Math.min(bounds.width(), Math.max(70, font.width(Component.translatable(widgetKey(widget))) + 44));
         int labelY = Math.max(1, bounds.y() - 13);
-        context.fill(bounds.x(), labelY, bounds.x() + labelWidth, labelY + 12, active ? 0xEE111B27 : 0xB5111B27);
+        context.fill(bounds.x(), labelY, bounds.x() + labelWidth, labelY + 12, active ? WbTheme.PANEL : WbTheme.CARD_ALT);
         context.fill(bounds.x(), labelY, bounds.x() + 2, labelY + 12, accent);
         String state = WorldBinderWidgetLayout.enabled(working, widget)
                 ? WorldBinderWidgetLayout.scale(working, widget) + "%"
@@ -396,7 +422,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         if (active) {
             int handleX = bounds.x() + bounds.width() - 8;
             int handleY = bounds.y() + bounds.height() - 8;
-            context.fill(handleX, handleY, handleX + 8, handleY + 8, 0xFF0A111A);
+            context.fill(handleX, handleY, handleX + 8, handleY + 8, WbTheme.FIELD);
             context.fill(handleX + 2, handleY + 2, handleX + 7, handleY + 7, accent);
         }
     }
@@ -424,6 +450,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
         int innerX = panelX + 12;
         int innerW = panelW - 24;
+        context.fill(panelX + 4, panelY + 3, panelX + panelW - 4, panelY + 5, WbTheme.ACCENT);
         GuiText.drawTextWithShadow(
                 context,
                 font,
@@ -438,7 +465,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
                     font,
                     Component.translatable("worldbinder.widget_editor.palette"),
                     innerX,
-                    panelY + 194,
+                    panelY + 214,
                     innerW,
                     WbTheme.TEXT_DIM
             );
@@ -448,7 +475,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     private void applyAndClose() {
         copyWidgetSettings(working, target);
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     private static void copyWidgetSettings(WorldBinderConfig source, WorldBinderConfig target) {
@@ -470,23 +497,42 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         target.chunkRadarBackgroundColor = source.chunkRadarBackgroundColor;
         target.notificationAccentColor = source.notificationAccentColor;
         target.notificationBackgroundColor = source.notificationBackgroundColor;
+        target.showMovementBadges = source.showMovementBadges;
+        target.movementBadgeScalePercent = source.movementBadgeScalePercent;
+        target.movementBadgeXPercent = source.movementBadgeXPercent;
+        target.movementBadgeYPercent = source.movementBadgeYPercent;
+        target.movementBadgeAccentColor = source.movementBadgeAccentColor;
+        target.movementBadgeBackgroundColor = source.movementBadgeBackgroundColor;
     }
 
     private int panelX() {
-        return WorldBinderWidgetLayout.xPercent(working, selected) < 45
-                ? Math.max(8, width - panelWidth() - 8)
-                : 8;
+        ensurePanelPosition();
+        return clamp(panelLeft, 8, width - panelWidth() - 8);
     }
 
     private int panelY() {
-        return 8;
+        ensurePanelPosition();
+        return clamp(panelTop, 8, height - panelHeight() - 8);
+    }
+
+    private void ensurePanelPosition() {
+        if (!panelPositioned) {
+            panelLeft = WorldBinderWidgetLayout.xPercent(working, selected) < 45
+                    ? Math.max(8, width - panelWidth() - 8) : 8;
+            panelTop = 8;
+            panelPositioned = true;
+        }
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private int panelWidth() {
         if (panelCollapsed) {
             return 44;
         }
-        return Math.max(190, Math.min(212, width - 16));
+        return Math.max(190, Math.min(200, width - 16));
     }
 
     private int panelHeight() {
@@ -508,6 +554,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             case STATUS -> "worldbinder.widget_editor.widget.status";
             case RADAR -> "worldbinder.widget_editor.widget.radar";
             case NOTIFICATIONS -> "worldbinder.widget_editor.widget.notifications";
+            case MOVEMENT -> "worldbinder.widget_editor.widget.movement";
         };
     }
 
@@ -535,7 +582,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public void onClose() {
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     private enum SliderType {
@@ -545,10 +592,14 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     private final class WidgetSlider extends AbstractSliderButton {
         private final SliderType type;
+        private float shownValue;
+        private float hoverProgress;
+        private long lastFrameNanos;
 
         private WidgetSlider(int x, int y, int width, int height, SliderType type, double initialValue) {
             super(x, y, width, height, Component.empty(), initialValue);
             this.type = type;
+            shownValue = (float) initialValue;
             updateMessage();
         }
 
@@ -584,16 +635,24 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             int width = getWidth();
             int height = getHeight();
             int accent = WorldBinderWidgetLayout.accentColor(working, selected);
-            context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x55000000);
-            context.fill(x, y, x + width, y + height, isHoveredOrFocused() ? WbTheme.BUTTON_HOVER : WbTheme.BUTTON);
+            long now = System.nanoTime();
+            long elapsed = lastFrameNanos == 0L ? 0L : now - lastFrameNanos;
+            lastFrameNanos = now;
+            shownValue = WbMotion.approach(shownValue, (float) value, elapsed, 20.0F);
+            hoverProgress = WbMotion.approach(hoverProgress, isHoveredOrFocused() ? 1.0F : 0.0F, elapsed, 16.0F);
+            context.fill(x, y, x + width, y + height, WbTheme.PANEL_BORDER);
+            context.fill(x + 1, y + 1, x + width - 1, y + height - 1,
+                    WbMotion.mix(WbTheme.BUTTON, WbTheme.BUTTON_HOVER, hoverProgress));
             int trackX = x + 8;
-            int trackY = y + height - 5;
+            int trackY = y + height - 7;
             int trackWidth = width - 16;
-            int filled = (int) Math.round(trackWidth * value);
-            context.fill(trackX, trackY, trackX + trackWidth, trackY + 2, 0xAA293746);
-            context.fill(trackX, trackY, trackX + filled, trackY + 2, accent);
-            context.fill(trackX + Math.max(0, filled - 2), trackY - 2, trackX + Math.min(trackWidth, filled + 2), trackY + 4, accent);
-            GuiText.drawCenteredTextWithShadow(context, font, getMessage(), x + width / 2, y + 3, WbTheme.TEXT_SOFT);
+            int filled = Math.round(trackWidth * shownValue);
+            context.fill(trackX, trackY, trackX + trackWidth, trackY + 3, WbTheme.FIELD);
+            if (filled > 0) context.fill(trackX, trackY, trackX + filled, trackY + 3, accent);
+            int knobX = Math.max(trackX, Math.min(trackX + trackWidth - 6, trackX + filled - 3));
+            context.fill(knobX - 1, trackY - 3, knobX + 7, trackY + 5, WbTheme.FIELD);
+            context.fill(knobX, trackY - 2, knobX + 6, trackY + 4, accent);
+            GuiText.drawCenteredTextWithShadow(context, font, getMessage(), x + width / 2, y + 2, WbTheme.TEXT_SOFT);
         }
     }
 
@@ -638,7 +697,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             int y = getY();
             int width = getWidth();
             int height = getHeight();
-            int border = isHoveredOrFocused() ? 0xFFFFFFFF : 0xAA526579;
+            int border = isHoveredOrFocused() ? WbTheme.TEXT : WbTheme.PANEL_BORDER;
             context.fill(x, y, x + width, y + height, border);
             context.fill(x + 2, y + 2, x + width - 2, y + height - 2, color);
             context.fill(x + 3, y + 3, x + width - 3, y + 4, 0x66FFFFFF);

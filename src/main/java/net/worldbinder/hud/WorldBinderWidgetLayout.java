@@ -8,7 +8,8 @@ public final class WorldBinderWidgetLayout {
     public enum Widget {
         STATUS,
         RADAR,
-        NOTIFICATIONS
+        NOTIFICATIONS,
+        MOVEMENT
     }
 
     private WorldBinderWidgetLayout() {
@@ -39,6 +40,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarWidgetXPercent;
             case RADAR -> config.chunkRadarWidgetXPercent;
             case NOTIFICATIONS -> config.notificationWidgetXPercent;
+            case MOVEMENT -> config.movementBadgeXPercent;
         };
     }
 
@@ -47,6 +49,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarWidgetYPercent;
             case RADAR -> config.chunkRadarWidgetYPercent;
             case NOTIFICATIONS -> config.notificationWidgetYPercent;
+            case MOVEMENT -> config.movementBadgeYPercent;
         };
     }
 
@@ -75,6 +78,10 @@ public final class WorldBinderWidgetLayout {
                 config.notificationWidgetXPercent = percentX;
                 config.notificationWidgetYPercent = percentY;
             }
+            case MOVEMENT -> {
+                config.movementBadgeXPercent = percentX;
+                config.movementBadgeYPercent = percentY;
+            }
         }
     }
 
@@ -83,6 +90,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.showBossbarOverlay;
             case RADAR -> config.showChunkRadar;
             case NOTIFICATIONS -> config.effectiveMessageMode().toast();
+            case MOVEMENT -> config.showMovementBadges;
         };
     }
 
@@ -93,6 +101,7 @@ public final class WorldBinderWidgetLayout {
             case NOTIFICATIONS -> config.messageMode = enabled
                     ? (config.effectiveMessageMode().chat() ? WorldBinderConfig.MessageMode.CHAT_AND_TOAST : WorldBinderConfig.MessageMode.TOAST)
                     : (config.effectiveMessageMode().chat() ? WorldBinderConfig.MessageMode.CHAT : WorldBinderConfig.MessageMode.NONE);
+            case MOVEMENT -> config.showMovementBadges = enabled;
         }
     }
 
@@ -101,18 +110,20 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.effectiveBossbarScalePercent();
             case RADAR -> config.effectiveChunkRadarScalePercent();
             case NOTIFICATIONS -> config.effectiveNotificationScalePercent();
+            case MOVEMENT -> Math.max(50, Math.min(180, config.movementBadgeScalePercent));
         };
     }
 
     public static void setScale(WorldBinderConfig config, Widget widget, int scale) {
         int clamped = switch (widget) {
-            case STATUS, RADAR -> Math.max(50, Math.min(180, scale));
+            case STATUS, RADAR, MOVEMENT -> Math.max(50, Math.min(180, scale));
             case NOTIFICATIONS -> Math.max(50, Math.min(160, scale));
         };
         switch (widget) {
             case STATUS -> config.bossbarScalePercent = clamped;
             case RADAR -> config.chunkRadarScalePercent = clamped;
             case NOTIFICATIONS -> config.notificationScalePercent = clamped;
+            case MOVEMENT -> config.movementBadgeScalePercent = clamped;
         }
     }
 
@@ -121,6 +132,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarAccentColor;
             case RADAR -> config.chunkRadarAccentColor;
             case NOTIFICATIONS -> config.notificationAccentColor;
+            case MOVEMENT -> config.movementBadgeAccentColor;
         };
     }
 
@@ -130,6 +142,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarAccentColor = opaque;
             case RADAR -> config.chunkRadarAccentColor = opaque;
             case NOTIFICATIONS -> config.notificationAccentColor = opaque;
+            case MOVEMENT -> config.movementBadgeAccentColor = opaque;
         }
     }
 
@@ -138,6 +151,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarBackgroundColor;
             case RADAR -> config.chunkRadarBackgroundColor;
             case NOTIFICATIONS -> config.notificationBackgroundColor;
+            case MOVEMENT -> config.movementBadgeBackgroundColor;
         };
     }
 
@@ -146,6 +160,7 @@ public final class WorldBinderWidgetLayout {
             case STATUS -> config.bossbarBackgroundColor = color;
             case RADAR -> config.chunkRadarBackgroundColor = color;
             case NOTIFICATIONS -> config.notificationBackgroundColor = color;
+            case MOVEMENT -> config.movementBadgeBackgroundColor = color;
         }
     }
 
@@ -156,24 +171,32 @@ public final class WorldBinderWidgetLayout {
                 config.bossbarScalePercent = 100;
                 config.bossbarWidgetXPercent = 50;
                 config.bossbarWidgetYPercent = 2;
-                config.bossbarAccentColor = 0xFF30D5C8;
-                config.bossbarBackgroundColor = 0xE6121A24;
+                config.bossbarAccentColor = 0xFF49D7BB;
+                config.bossbarBackgroundColor = 0xE6142020;
             }
             case RADAR -> {
                 config.showChunkRadar = true;
                 config.chunkRadarScalePercent = 100;
                 config.chunkRadarWidgetXPercent = 100;
                 config.chunkRadarWidgetYPercent = 12;
-                config.chunkRadarAccentColor = 0xFF66A9FF;
-                config.chunkRadarBackgroundColor = 0xE6111822;
+                config.chunkRadarAccentColor = 0xFF9AC2FF;
+                config.chunkRadarBackgroundColor = 0xE6142020;
             }
             case NOTIFICATIONS -> {
                 setEnabled(config, widget, true);
-                config.notificationScalePercent = 80;
+                config.notificationScalePercent = 100;
                 config.notificationWidgetXPercent = 100;
                 config.notificationWidgetYPercent = 100;
-                config.notificationAccentColor = 0xFF66A9FF;
-                config.notificationBackgroundColor = 0xF0121A24;
+                config.notificationAccentColor = 0xFF9AC2FF;
+                config.notificationBackgroundColor = 0xF0142020;
+            }
+            case MOVEMENT -> {
+                config.showMovementBadges = true;
+                config.movementBadgeScalePercent = 100;
+                config.movementBadgeXPercent = 0;
+                config.movementBadgeYPercent = 0;
+                config.movementBadgeAccentColor = 0xFF84BFFF;
+                config.movementBadgeBackgroundColor = 0xD8121C29;
             }
         }
     }

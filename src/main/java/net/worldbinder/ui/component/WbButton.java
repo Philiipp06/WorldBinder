@@ -8,6 +8,9 @@ import net.minecraft.network.chat.Component;
 import net.worldbinder.util.GuiText;
 
 public final class WbButton {
+    public record MotionState(float hover, float selection) {
+    }
+
     public enum Style {
         DEFAULT,
         PRIMARY,
@@ -44,6 +47,18 @@ public final class WbButton {
             styled.selected = selected;
         }
         return button;
+    }
+
+    public static MotionState motionState(Button button) {
+        return button instanceof StyledButton styled
+                ? new MotionState(styled.hoverProgress, styled.selectionProgress) : null;
+    }
+
+    public static void restoreMotion(Button button, MotionState state) {
+        if (button instanceof StyledButton styled && state != null) {
+            styled.hoverProgress = state.hover();
+            styled.selectionProgress = state.selection();
+        }
     }
 
     public static Button primary(Button button) {
@@ -86,6 +101,9 @@ public final class WbButton {
         private Style style = Style.DEFAULT;
         private int accent = WbTheme.ACCENT;
         private boolean selected;
+        private float hoverProgress;
+        private float selectionProgress;
+        private long lastFrameNanos;
 
         private StyledButton(int x, int y, int width, int height, Component message, OnPress onPress) {
             super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
@@ -93,40 +111,48 @@ public final class WbButton {
 
         @Override
         protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-            boolean highlighted = isHoveredOrFocused();
+            boolean highlighted = isHoveredOrFocused() && active;
+            long now = System.nanoTime();
+            long elapsed = lastFrameNanos == 0L ? 0L : now - lastFrameNanos;
+            lastFrameNanos = now;
+            hoverProgress = WbMotion.approach(hoverProgress, highlighted ? 1.0F : 0.0F, elapsed, 5.0F);
+            selectionProgress = WbMotion.approach(selectionProgress, selected ? 1.0F : 0.0F, elapsed, 6.0F);
             int x = getX();
             int y = getY();
             int width = getWidth();
             int height = getHeight();
             int effectiveAccent = active ? accent : WbTheme.TEXT_DISABLED;
-            int fill = buttonFill(highlighted);
+            int fill = buttonFill();
 
-            context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x66000000);
-            context.fill(x, y, x + width, y + height, active ? 0xAA43566B : 0x55374655);
+            context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x55000000);
+            context.fill(x, y, x + width, y + height, active ? WbTheme.panelBorder() : WbTheme.BUTTON_DISABLED);
             context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fill);
-            context.fill(x + 2, y + 2, x + width - 2, y + 3, highlighted && active ? 0x3FFFFFFF : 0x1FFFFFFF);
 
             if (style == Style.PRIMARY) {
                 context.fill(x, y, x + 3, y + height, effectiveAccent);
-                context.fill(x + 3, y + height - 2, x + width, y + height, 0x5530D5C8);
+                context.fill(x + 3, y + height - 2, x + width, y + height, WbMotion.mix(WbTheme.ACCENT_MUTED, effectiveAccent, hoverProgress));
             } else if (style == Style.DANGER) {
                 context.fill(x, y, x + 3, y + height, WbTheme.ERROR);
             } else if (style == Style.TAB) {
-                context.fill(x, y, x + (selected ? 4 : 2), y + height, selected ? effectiveAccent : 0x55394B5D);
-                if (selected) {
-                    context.fill(x + 6, y + height - 2, x + width - 6, y + height, effectiveAccent);
-                }
+                context.fill(x, y, x + 2 + Math.round(2 * selectionProgress), y + height,
+                        WbMotion.mix(WbTheme.DIVIDER, effectiveAccent, Math.max(hoverProgress * 0.55F, selectionProgress)));
+                int underline = Math.round(width * Math.max(selectionProgress, hoverProgress));
+                if (underline > 0) context.fill(x, y + height - 2, x + underline, y + height, effectiveAccent);
             } else if (style == Style.TOGGLE) {
                 drawToggleIndicator(context, x, y, width, height, effectiveAccent);
             } else if (style == Style.DROPDOWN && !hasTextualChevron()) {
                 drawChevron(context, x + width - 12, y + height / 2 - 1, effectiveAccent);
-            } else if (style != Style.QUIET && (selected || highlighted)) {
-                context.fill(x, y, x + 2, y + height, effectiveAccent);
+            } else if (style != Style.QUIET && (selected || highlighted || hoverProgress > 0.01F)) {
+                context.fill(x, y, x + 2, y + height,
+                        WbMotion.mix(WbTheme.DIVIDER, effectiveAccent, Math.max(selectionProgress, hoverProgress)));
             }
 
             if (isFocused() && active) {
-                context.fill(x, y, x + width, y + 1, WbTheme.FOCUS_RING);
-                context.fill(x, y + height - 1, x + width, y + height, WbTheme.FOCUS_RING);
+                int focus = WbTheme.focusRing();
+                context.fill(x, y, x + width, y + 1, focus);
+                context.fill(x, y + height - 1, x + width, y + height, focus);
+                context.fill(x, y, x + 1, y + height, focus);
+                context.fill(x + width - 1, y, x + width, y + height, focus);
             }
 
             Font font = Minecraft.getInstance().font;
@@ -144,17 +170,15 @@ public final class WbButton {
             return label.endsWith("▼") || label.endsWith("▾");
         }
 
-        private int buttonFill(boolean highlighted) {
+        private int buttonFill() {
             if (!active) {
                 return WbTheme.BUTTON_DISABLED;
             }
-            if (selected) {
-                return highlighted ? WbTheme.BUTTON_PRESSED : WbTheme.CARD_SELECTED;
-            }
             if (style == Style.QUIET) {
-                return highlighted ? 0xC5203040 : 0x7715212D;
+                return WbMotion.mix(0x66252F39, WbTheme.BUTTON_HOVER, hoverProgress);
             }
-            return highlighted ? WbTheme.BUTTON_HOVER : WbTheme.BUTTON;
+            int base = WbMotion.mix(WbTheme.BUTTON, WbTheme.CARD_SELECTED, selectionProgress);
+            return WbMotion.mix(base, selected ? WbTheme.BUTTON_PRESSED : WbTheme.BUTTON_HOVER, hoverProgress);
         }
 
         private void drawToggleIndicator(GuiGraphicsExtractor context, int x, int y, int width, int height, int effectiveAccent) {
@@ -162,9 +186,11 @@ public final class WbButton {
             int pillH = 7;
             int px = x + width - pillW - 5;
             int py = y + (height - pillH) / 2;
-            context.fill(px, py, px + pillW, py + pillH, selected ? 0xAA30D5C8 : 0xAA3A4858);
-            int knobX = selected ? px + pillW - 5 : px + 2;
-            context.fill(knobX, py + 2, knobX + 3, py + 5, selected ? effectiveAccent : WbTheme.TEXT_DIM);
+            context.fill(px, py, px + pillW, py + pillH,
+                    WbMotion.mix(WbTheme.FIELD, effectiveAccent, selectionProgress * 0.55F));
+            int knobX = px + 2 + Math.round((pillW - 7) * selectionProgress);
+            context.fill(knobX, py + 2, knobX + 3, py + 5,
+                    WbMotion.mix(WbTheme.TEXT_DIM, WbTheme.TEXT, selectionProgress));
         }
 
         private void drawChevron(GuiGraphicsExtractor context, int x, int y, int color) {

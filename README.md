@@ -1,16 +1,18 @@
-# WorldBinder 1.4.1
+# WorldBinder 1.5.0
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
 
-> **Release notice:** WorldBinder 1.4.1 continues Minecraft 26.3 support. Fly now starts and stops with double Jump, has smoother motion and a Sprint speed boost. F12 opens Movement Tools directly. The 1.4.0 message routing, Movement Tools and code cleanup remain in place; capture algorithms are unchanged. Exports still depend on the data received by the client and the selected target version.
+> **1.5.0:** Refined menus and navigation use a calmer palette, visible keyboard focus, optional high contrast and reduced motion, grouped Movement Tools, a searchable target-version picker and toast cards that avoid other HUD widgets when space allows. The Widget Editor has a draggable settings panel and configurable icon-and-name badges for active Movement Tools. F9/F10 map layout and chunk inspection were improved; F6 links directly to the full legal notice in F9. Resource reloads keep ready menus and in-world controls interactive by default. One Fabric jar runs on Minecraft 26.1 through 26.3, including the 26.1 patch releases; all five are export targets. Capture algorithms and the 1.4.1 Movement Tools remain unchanged.
+
+The reload setting offers Interactive and Vanilla modes. Interactive keeps a ready menu or world visible and accepts input while resources reload, without an extra WorldBinder progress display. Vanilla keeps Minecraft's blocking loading screen. Early startup and failed reloads retain Minecraft's loading/error handling. The resource reload itself is unchanged.
 
 ## Supported loader
 
-WorldBinder is built and released for **Fabric** on Minecraft **26.3**.
+WorldBinder uses one **Fabric** jar for Minecraft **26.1, 26.1.1, 26.1.2, 26.2 and 26.3**.
 
-For this release line, use Fabric Loader 0.19.5 or newer and Fabric API 0.160.7+26.3 or newer. Forge, NeoForge and Quilt are not supported at this time. WorldBinder is developed and released as a native Fabric mod.
+Use Fabric Loader 0.19.5 or newer and the Fabric API build matching your Minecraft version (for example, 0.145.1+26.1 on 26.1 or 0.160.7+26.3 on 26.3). Forge, NeoForge and Quilt are not supported at this time.
 
 ## Main features
 
@@ -30,14 +32,16 @@ For this release line, use Fabric Loader 0.19.5 or newer and Fabric API 0.160.7+
 - Ctrl+C chunk center coordinate copying
 - Queue Dashboard / Profiler for capture and export telemetry
 - Export validation reports
-- Compact, collapsible HUD Widget Editor with drag positioning, proportional resize controls and visibility toggles
+- Compact, collapsible HUD Widget Editor with a draggable settings panel, widget positioning, proportional resize controls and visibility toggles
 - Visual color picker with HEX/ARGB input, opacity control and per-widget quick colors
 - Refined WorldBinder toast notifications with multi-line text and proportional scaling
 - Central Chat / Toast / Chat & Toast / None notification selection
 - Optional Movement Tools with individual toggles and bounded strength sliders
 - Modernized settings, dropdowns and menu components
+- Keyboard navigation, clear focus rings, high-contrast and reduced-motion options
+- Resource-reload choice: Interactive or Vanilla
 - WorldBinder icon buttons in the Minecraft main menu and pause menu
-- Responsive GUI scaling across different window sizes and GUI scales
+- Fixed virtual GUI sizing across different window sizes and GUI scales
 - Dedicated WorldBinder keybind category in Minecraft Controls
 - German and English language support
 
@@ -64,7 +68,7 @@ Open **Settings > Movement Tools**. Every feature is disabled by default and sav
 
 Enable Fly in Settings, then double-tap Jump to enter or leave flight. Hold Jump to rise, Sneak to descend and Sprint for faster horizontal flight. Landing ends flight. Fly takes priority over other movement helpers without granting or changing creative abilities; native creative flight stays untouched. Spider requires actual wall contact and suppresses ground jumps; Step suppresses Auto Jump, which requires a real obstacle and clearance above it. Glide only limits descent; Air Control only changes steering. Jesus uses per-query collision shapes at the actual source/flowing water height, releases on Sneak and leaves underwater movement to vanilla/Water Speed. Input-driven helpers ignore open menus. These tools are separate from capture processing. On remote servers, server rules and movement validation remain authoritative; No Fall is not a remote-server damage bypass. Only enable tools where explicitly allowed.
 
-Minecraft 26.3 is the runtime target. Minecraft 26.2 remains an explicit export target with its own DataVersion, alongside the existing older export targets.
+The same jar runs on Minecraft 26.1-26.3. Minecraft 26.1, 26.1.1, 26.1.2, 26.2 and 26.3 are explicit export targets with their own DataVersions, alongside older export targets. Available gamerules follow the selected export target; 26.x exports translate legacy gamerule names to the modern registry keys.
 
 ## Default keybinds
 
@@ -168,7 +172,7 @@ Helpful reports include:
 
 ## Build from source
 
-WorldBinder requires Java 25, Fabric Loader 0.19.5 or newer and Fabric API 0.160.7+26.3 or newer for the Minecraft 26.3 release line.
+WorldBinder requires Java 25, Fabric Loader 0.19.5 or newer and a Fabric API build matching Minecraft 26.1-26.3. The build targets 26.3 while compatibility tests load the same packaged jar on the earlier releases.
 
 ```bash
 ./gradlew clean build
@@ -178,6 +182,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.4.1 is the current development release line for Minecraft 26.3.
+WorldBinder 1.5.0 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.5.0 release texts are in `Publish/`; 1.4.x files remain as historical release records.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

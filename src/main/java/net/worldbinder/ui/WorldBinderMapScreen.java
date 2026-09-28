@@ -35,12 +35,15 @@ public final class WorldBinderMapScreen extends Screen {
     private int panChunkX = 0;
     private int panChunkZ = 0;
     private boolean followPlayer = true;
+    private double panOffsetX;
+    private double panOffsetY;
     private long selectedChunk = Long.MIN_VALUE;
     private boolean filterMissing;
     private boolean filterIncomplete;
     private boolean filterEntities;
     private boolean filterBlockEntities;
     private boolean filtersOpen;
+    private int toolbarBottomY;
     private Button missingFilterButton;
     private Button incompleteFilterButton;
     private Button entitiesFilterButton;
@@ -102,7 +105,10 @@ public final class WorldBinderMapScreen extends Screen {
         int y = top;
         int rightLimit = width - margin;
 
-        Button follow = button(x, y, buttonW, Lang.string("worldbinder.map.follow"), Component.translatable("worldbinder.map.tooltip.follow"), b -> followPlayer = true);
+        Button follow = button(x, y, buttonW, Lang.string("worldbinder.map.follow"), Component.translatable("worldbinder.map.tooltip.follow"), b -> {
+            followPlayer = true;
+            panOffsetX = panOffsetY = 0;
+        });
         addRenderableWidget(follow);
         x += buttonW + gap;
         Button player = button(x, y, buttonW, Lang.string("worldbinder.map.player"), Component.translatable("worldbinder.map.tooltip.player"), b -> {
@@ -111,6 +117,7 @@ public final class WorldBinderMapScreen extends Screen {
                 panChunkX = mc.player.blockPosition().getX() >> 4;
                 panChunkZ = mc.player.blockPosition().getZ() >> 4;
                 followPlayer = true;
+                panOffsetX = panOffsetY = 0;
             }
         });
         addRenderableWidget(player);
@@ -145,6 +152,7 @@ public final class WorldBinderMapScreen extends Screen {
             filtersOpen = !filtersOpen;
             rebuildWidgets();
         }));
+        toolbarBottomY = y + rowH;
 
         int goY = y;
         int goW = 68;
@@ -217,6 +225,7 @@ public final class WorldBinderMapScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         zoom = Math.max(1, Math.min(12, zoom + (verticalAmount > 0 ? 1 : -1)));
+        panOffsetX = panOffsetY = 0;
         return true;
     }
 
@@ -224,16 +233,34 @@ public final class WorldBinderMapScreen extends Screen {
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
         WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
         MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        int realWidth = width;
+        int realHeight = height;
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
+        try {
         if (virtualEvent.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
+            if (chunkAt(virtualEvent.x(), virtualEvent.y()) == Long.MIN_VALUE) {
+                return super.mouseDragged(virtualEvent, uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
+            }
             offsetX = uiScale.toVirtualDelta(offsetX);
             offsetY = uiScale.toVirtualDelta(offsetY);
             followPlayer = false;
             int chunkPixels = Math.max(16, 16 * zoom);
-            panChunkX -= (int) Math.round(offsetX / Math.max(1.0D, chunkPixels));
-            panChunkZ -= (int) Math.round(offsetY / Math.max(1.0D, chunkPixels));
+            panOffsetX += offsetX;
+            panOffsetY += offsetY;
+            int chunksX = (int) (panOffsetX / chunkPixels);
+            int chunksZ = (int) (panOffsetY / chunkPixels);
+            panChunkX -= chunksX;
+            panChunkZ -= chunksZ;
+            panOffsetX -= chunksX * chunkPixels;
+            panOffsetY -= chunksZ * chunkPixels;
             return true;
         }
-        return super.mouseDragged(virtualEvent, offsetX, offsetY);
+        return super.mouseDragged(virtualEvent, uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
     }
 
     @Override
@@ -280,7 +307,7 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     public void onClose() {
-        minecraft.gui.setScreen(parent);
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
     @Override
@@ -312,6 +339,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (followPlayer) {
             panChunkX = playerChunkX;
             panChunkZ = playerChunkZ;
+            panOffsetX = panOffsetY = 0;
         }
 
         net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.map.title"), width / 2, 14, WbTheme.TEXT);
@@ -336,16 +364,16 @@ public final class WorldBinderMapScreen extends Screen {
         int hoveredZ = 0;
 
         context.enableScissor(mapX, mapY, mapX + mapW, mapY + mapH);
-        for (int dz = -radiusZ; dz <= radiusZ; dz++) {
-            for (int dx = -radiusX; dx <= radiusX; dx++) {
+        for (int dz = -radiusZ - 1; dz <= radiusZ + 1; dz++) {
+            for (int dx = -radiusX - 1; dx <= radiusX + 1; dx++) {
                 int cx = panChunkX + dx;
                 int cz = panChunkZ + dz;
                 long key = ChunkPos.pack(cx, cz);
                 ChunkSnapshot snapshot = snapshots.get(key);
                 ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, cx == playerChunkX && cz == playerChunkZ);
                 if (!passesFilter(key, snapshot, done, partial, queued, failed)) continue;
-                int chunkX = mapX + (dx + radiusX) * chunkPixels;
-                int chunkY = mapY + (dz + radiusZ) * chunkPixels;
+                int chunkX = mapX + (dx + radiusX) * chunkPixels + (int) Math.round(panOffsetX);
+                int chunkY = mapY + (dz + radiusZ) * chunkPixels + (int) Math.round(panOffsetY);
                 drawChunk(context, snapshot, chunkX, chunkY, zoom, fallbackChunkColor(status), WorldBinder.config().f10MapLayerMode, reducedUiDetail);
                 boolean playerChunk = cx == playerChunkX && cz == playerChunkZ;
                 boolean importantBorder = playerChunk || key == selectedChunk || status == ChunkCaptureStatus.DONE || status == ChunkCaptureStatus.PARTIAL || status == ChunkCaptureStatus.FAILED || zoom >= 3;
@@ -364,6 +392,16 @@ public final class WorldBinderMapScreen extends Screen {
         }
         context.disableScissor();
 
+        if (done.isEmpty() && partial.isEmpty() && queued.isEmpty() && failed.isEmpty() && snapshots.isEmpty()) {
+            String title = Lang.string("worldbinder.map.empty_title");
+            context.fill(mapX + 8, mapY + mapH / 2 - 28, mapX + mapW - 8,
+                    mapY + mapH / 2 + 36, 0xE615202C);
+            WbText.drawClipped(context, font, title, mapX + 18, mapY + mapH / 2 - 20,
+                    mapW - 36, WbTheme.TEXT);
+            WbText.drawWrapped(context, font, Lang.string("worldbinder.map.empty_hint"),
+                    mapX + 18, mapY + mapH / 2, mapW - 36, WbTheme.TEXT_SOFT, 3);
+        }
+
         refreshPanelsIfNeeded(capture, hoveredKey != null ? hoveredKey : selectedChunk, snapshots, done, partial, queued, failed);
         if (leftPanelW > 0) {
             drawLegend(context, 16, mapY + 6);
@@ -377,7 +415,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (hoveredKey != null) {
             drawChunkTooltip(context, virtualMouseX, virtualMouseY, hoveredKey, hoveredX, hoveredZ, snapshots, done, partial, queued, failed);
         }
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(Lang.string("worldbinder.map.center_line", panChunkX, panChunkZ, playerChunkX, playerChunkZ, zoom, followPlayer ? Lang.string("worldbinder.map.following") : Lang.string("worldbinder.map.free_pan"))), mapX, mapY + mapH + 20, 0xFFE6E6F0);
+        WbText.drawClipped(context, font, Lang.string("worldbinder.map.center_line", panChunkX, panChunkZ, playerChunkX, playerChunkZ, zoom, followPlayer ? Lang.string("worldbinder.map.following") : Lang.string("worldbinder.map.free_pan")), mapX, mapY + mapH + 11, mapW, WbTheme.TEXT_SOFT);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {
             width = realWidth;
@@ -395,15 +433,20 @@ public final class WorldBinderMapScreen extends Screen {
         ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, false);
         int centerX = chunkMiddleBlock(exactChunkX);
         int centerZ = chunkMiddleBlock(exactChunkZ);
-        String[] lines = new String[]{
-                Lang.string("worldbinder.map.tooltip.chunk_line", exactChunkX, exactChunkZ),
-                Lang.string("worldbinder.map.tooltip.center_line", centerX, centerZ),
-                Lang.string("worldbinder.map.tooltip.copy_center"),
-                Lang.string("worldbinder.map.tooltip.status_line", statusLabel(status)),
-                Lang.string("worldbinder.map.tooltip.blocks_line", snapshot == null ? "0" : snapshot.savedBlocks + " / " + snapshot.scannedBlocks),
-                Lang.string("worldbinder.map.tooltip.entities_line", snapshot == null ? "0" : Integer.toString(snapshot.entityCount)),
-                Lang.string("worldbinder.map.tooltip.blockentities_line", snapshot == null ? "0" : Integer.toString(snapshot.blockEntityCount))
-        };
+        java.util.List<String> details = new java.util.ArrayList<>();
+        details.add(Lang.string("worldbinder.map.tooltip.chunk_line", exactChunkX, exactChunkZ));
+        details.add(Lang.string("worldbinder.map.tooltip.status_line", statusLabel(status)));
+        details.add(Lang.string("worldbinder.map.tooltip.center_line", centerX, centerZ));
+        if (snapshot == null) {
+            details.add(Lang.string("worldbinder.map.tooltip.not_recorded"));
+        } else {
+            details.add(Lang.string("worldbinder.map.tooltip.blocks_line", snapshot.savedBlocks + " / " + snapshot.scannedBlocks));
+            details.add(Lang.string("worldbinder.map.tooltip.samples_line", snapshot.sampleCount(), 256));
+            details.add(Lang.string("worldbinder.map.tooltip.entities_line", snapshot.entityCount));
+            details.add(Lang.string("worldbinder.map.tooltip.blockentities_line", snapshot.blockEntityCount));
+        }
+        details.add(Lang.string("worldbinder.map.tooltip.copy_center"));
+        String[] lines = details.toArray(String[]::new);
         int w = 0;
         for (String line : lines) {
             w = Math.max(w, font.width(line));
@@ -415,7 +458,7 @@ public final class WorldBinderMapScreen extends Screen {
         int accent = status == ChunkCaptureStatus.DONE ? WbTheme.OK : status == ChunkCaptureStatus.FAILED ? WbTheme.ERROR : WbTheme.ACCENT;
         WbChrome.drawInset(context, x, y, w, h, accent, true);
         for (int i = 0; i < lines.length; i++) {
-            net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(lines[i]), x + 10, y + 10 + i * 12, i == 1 ? 0xFFE6E6F0 : 0xFFBDB6D9);
+            net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(lines[i]), x + 10, y + 10 + i * 12, i == 1 ? WbTheme.TEXT_SOFT : WbTheme.TEXT_MUTED);
         }
     }
 
@@ -452,8 +495,8 @@ public final class WorldBinderMapScreen extends Screen {
         int radiusX = chunksX / 2;
         int radiusZ = chunksZ / 2;
         if (mouseX < mapX || mouseY < mapY || mouseX >= mapX + mapW || mouseY >= mapY + mapH) return Long.MIN_VALUE;
-        int gridX = (int) ((mouseX - mapX) / chunkPixels) - radiusX;
-        int gridZ = (int) ((mouseY - mapY) / chunkPixels) - radiusZ;
+        int gridX = (int) Math.floor((mouseX - mapX - panOffsetX) / chunkPixels) - radiusX;
+        int gridZ = (int) Math.floor((mouseY - mapY - panOffsetY) / chunkPixels) - radiusZ;
         return ChunkPos.pack(panChunkX + gridX, panChunkZ + gridZ);
     }
 
@@ -467,21 +510,8 @@ public final class WorldBinderMapScreen extends Screen {
         return height < 390 ? 42 : 52;
     }
 
-    private int toolbarRows() {
-        if (width < 360) {
-            return 4;
-        }
-        if (width < 520) {
-            return 3;
-        }
-        if (width < 760) {
-            return 2;
-        }
-        return 1;
-    }
-
     private int statusY() {
-        return controlsTop() + toolbarRows() * 28 + 8;
+        return toolbarBottomY + 8;
     }
 
     private int statusChipRows() {
@@ -592,7 +622,6 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private ChunkCaptureStatus statusOf(long key, ChunkSnapshot snapshot, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed, boolean player) {
-        if (player) return ChunkCaptureStatus.DONE;
         if (failed.contains(key) || (snapshot != null && snapshot.exportError)) return ChunkCaptureStatus.FAILED;
         if (partial.contains(key)) return activeScanLabel(snapshot);
         if (queued.contains(key)) return ChunkCaptureStatus.QUEUED;
@@ -873,6 +902,7 @@ public final class WorldBinderMapScreen extends Screen {
             panChunkX = Integer.parseInt(goX.getValue().trim());
             panChunkZ = Integer.parseInt(goZ.getValue().trim());
             followPlayer = false;
+            panOffsetX = panOffsetY = 0;
         } catch (NumberFormatException ignored) {
         }
     }
@@ -883,6 +913,7 @@ public final class WorldBinderMapScreen extends Screen {
             panChunkX = first.chunkX;
             panChunkZ = first.chunkZ;
             followPlayer = false;
+            panOffsetX = panOffsetY = 0;
         }
     }
 

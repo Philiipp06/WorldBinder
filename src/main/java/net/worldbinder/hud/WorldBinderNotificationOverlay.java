@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class WorldBinderNotificationOverlay {
-    private static final int BASE_WIDTH = 280;
+    private static final int BASE_WIDTH = 300;
     private static final int MIN_HEIGHT = 34;
     private static final int MARGIN = 8;
     private static final int GAP = 5;
@@ -29,9 +29,9 @@ public final class WorldBinderNotificationOverlay {
     public static LayoutResult draw(
             GuiGraphicsExtractor context,
             Minecraft client,
-            int topClearancePixels,
-            int occupiedRightTopPixels,
-            int occupiedRightBottomPixels
+            WorldBinderHud.WidgetBounds statusBounds,
+            WorldBinderHud.WidgetBounds radarBounds,
+            WorldBinderHud.WidgetBounds movementBounds
     ) {
         WorldBinderConfig config = WorldBinder.config();
         if (!config.effectiveMessageMode().toast()) {
@@ -48,46 +48,80 @@ public final class WorldBinderNotificationOverlay {
         int physicalMaxHeight = Math.max(1, Math.round(MAX_HEIGHT * scale));
         int anchorY = MARGIN + Math.round((screenH - MARGIN * 2) * config.effectiveWidgetPositionPercent(config.notificationWidgetYPercent) / 100.0F);
         boolean bottomAligned = config.notificationWidgetYPercent > 50;
-        int availableHeight = bottomAligned ? anchorY - MARGIN : screenH - MARGIN - anchorY;
-        int availableSlots = Math.min(4, Math.max(0, (availableHeight + physicalGap) / (physicalMaxHeight + physicalGap)));
+        int availableSlots = Math.min(4, Math.max(0,
+                (screenH - MARGIN * 2 + physicalGap) / (physicalMaxHeight + physicalGap)));
         List<WorldBinderNotifications.Entry> entries = WorldBinderNotifications.visible(availableSlots);
         if (entries.isEmpty()) {
             return LayoutResult.EMPTY;
         }
 
-        int cursor = anchorY;
-        int occupiedTop = Integer.MAX_VALUE;
-        int occupiedBottom = Integer.MIN_VALUE;
-        long now = System.currentTimeMillis();
-
+        List<EntryLayout> layouts = new ArrayList<>(entries.size());
+        int stackHeight = Math.max(0, (entries.size() - 1) * physicalGap);
         for (WorldBinderNotifications.Entry entry : entries) {
             EntryLayout layout = layout(font, entry, BASE_WIDTH, BASE_WIDTH);
+            layouts.add(layout);
+            stackHeight += Math.max(1, Math.round(layout.height() * scale));
+        }
+        int x = WorldBinderWidgetLayout.positionX(screenW, physicalWidth,
+                config.effectiveWidgetPositionPercent(config.notificationWidgetXPercent));
+        int desiredTop = bottomAligned ? anchorY - stackHeight : anchorY;
+        WorldBinderHud.WidgetBounds hotbarBounds = client.player == null ? null
+                : new WorldBinderHud.WidgetBounds(screenW / 2 - 100, screenH - 45, 200, 45);
+        int stackTop = chooseStackTop(desiredTop, stackHeight, screenH, x, physicalWidth,
+                statusBounds, radarBounds, movementBounds, hotbarBounds);
+        int cursor = bottomAligned ? stackTop + stackHeight : stackTop;
+        long now = System.currentTimeMillis();
+
+        for (int i = 0; i < entries.size(); i++) {
+            WorldBinderNotifications.Entry entry = entries.get(i);
+            EntryLayout layout = layouts.get(i);
             int physicalHeight = Math.max(1, Math.round(layout.height() * scale));
             int y = bottomAligned ? cursor - physicalHeight : cursor;
-            if (y < MARGIN || y + physicalHeight > screenH - MARGIN) {
-                break;
-            }
-
             double visibility = visibility(entry, now);
             int slide = (int) Math.round((1.0D - visibility) * 22.0D * scale);
-            int x = WorldBinderWidgetLayout.positionX(
-                    screenW,
-                    physicalWidth,
-                    config.effectiveWidgetPositionPercent(config.notificationWidgetXPercent)
-            );
-            x += config.notificationWidgetXPercent >= 50 ? slide : -slide;
-            drawScaledEntry(context, font, config, entry, layout, x, y, scale, now, visibility);
-            occupiedTop = Math.min(occupiedTop, y);
-            occupiedBottom = Math.max(occupiedBottom, y + physicalHeight);
+            int animatedX = clamp(x + (config.notificationWidgetXPercent >= 50 ? slide : -slide),
+                    MARGIN, Math.max(MARGIN, screenW - MARGIN - physicalWidth));
+            drawScaledEntry(context, font, config, entry, layout, animatedX, y, scale, now, visibility);
             cursor = bottomAligned ? y - physicalGap : y + physicalHeight + physicalGap;
         }
-        if (occupiedTop == Integer.MAX_VALUE) {
-            return LayoutResult.EMPTY;
+        return new LayoutResult(stackTop, stackTop + stackHeight);
+    }
+
+    public static int chooseStackTop(int desired, int stackHeight, int screenHeight, int x, int width,
+                              WorldBinderHud.WidgetBounds... obstacles) {
+        int min = MARGIN;
+        int max = Math.max(min, screenHeight - MARGIN - stackHeight);
+        int bestTop = clamp(desired, min, max);
+        long bestScore = placementScore(bestTop, desired, stackHeight, x, width, obstacles);
+        for (WorldBinderHud.WidgetBounds obstacle : obstacles) {
+            if (obstacle == null) continue;
+            int[] candidates = {obstacle.y() - stackHeight - GAP, obstacle.y() + obstacle.height() + GAP};
+            for (int candidate : candidates) {
+                int top = clamp(candidate, min, max);
+                long score = placementScore(top, desired, stackHeight, x, width, obstacles);
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestTop = top;
+                }
+            }
         }
-        return new LayoutResult(
-                Math.max(0, occupiedTop),
-                Math.min(screenH, occupiedBottom)
-        );
+        return bestTop;
+    }
+
+    private static long placementScore(int top, int desired, int height, int x, int width,
+                                       WorldBinderHud.WidgetBounds... obstacles) {
+        long overlap = 0L;
+        for (WorldBinderHud.WidgetBounds obstacle : obstacles) {
+            overlap += overlapArea(top, height, x, width, obstacle);
+        }
+        return overlap * 10_000L + Math.abs(top - desired);
+    }
+
+    private static long overlapArea(int top, int height, int x, int width, WorldBinderHud.WidgetBounds bounds) {
+        if (bounds == null) return 0L;
+        int overlapX = Math.max(0, Math.min(x + width, bounds.x() + bounds.width()) - Math.max(x, bounds.x()));
+        int overlapY = Math.max(0, Math.min(top + height, bounds.y() + bounds.height()) - Math.max(top, bounds.y()));
+        return (long) overlapX * overlapY;
     }
 
     public static int preferredWidth(WorldBinderConfig config, int screenWidth, int screenHeight) {
@@ -180,13 +214,13 @@ public final class WorldBinderNotificationOverlay {
         int statusColor = statusColor(entry.type());
         context.fill(x + 2, y + 3, x + width + 2, y + height + 3, fade(0x78000000, visibility));
         context.fill(x, y, x + width, y + height, fade(config.notificationBackgroundColor, visibility));
-        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fade(0x3D2B3A4A, visibility));
-        context.fill(x, y, x + 2, y + height, fade(accent, visibility));
-        context.fill(x + 2, y, x + width, y + 1, fade(accent, visibility * 0.78D));
+        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fade(0x243C5747, visibility));
+        context.fill(x, y, x + 3, y + height, fade(statusColor, visibility));
+        context.fill(x + 3, y, x + width, y + 1, fade(accent, visibility));
 
         int iconLeft = x + 7;
         int iconTop = y + 8;
-        context.fill(iconLeft, iconTop, iconLeft + 17, iconTop + 17, fade(0xB8070B10, visibility));
+        context.fill(iconLeft, iconTop, iconLeft + 17, iconTop + 17, fade(WbTheme.FIELD, visibility));
         context.fill(iconLeft, iconTop, iconLeft + 2, iconTop + 17, fade(statusColor, visibility));
         GuiText.drawCenteredTextWithShadow(
                 context,
@@ -306,7 +340,7 @@ public final class WorldBinderNotificationOverlay {
 
     private static float notificationScale(WorldBinderConfig config, int screenWidth, int screenHeight) {
         float responsive = Math.max(
-                0.55F,
+                0.70F,
                 Math.min(1.0F, Math.min(screenWidth / 960.0F, screenHeight / 540.0F))
         );
         float requested = responsive * config.effectiveNotificationScalePercent() / 100.0F;

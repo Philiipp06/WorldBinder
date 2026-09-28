@@ -3,7 +3,7 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder 1.4.1 is a client-side Fabric tool for permitted world capture, visual HUD customization, chunk mapping, archive recovery, validation and target-version world export.",
+  "description": "WorldBinder 1.5.0 is a client-side Fabric tool for permitted world capture, visual HUD customization, chunk mapping, archive recovery, validation and target-version world export.",
   "authors": [
     "Philiipp06"
   ],
@@ -25,12 +25,12 @@
   },
   "depends": {
     "fabricloader": ">=0.19.5",
-    "minecraft": "~26.3",
+    "minecraft": ">=26.1 <=26.3",
     "java": ">=25",
-    "fabric-api": ">=0.160.7+26.3"
+    "fabric-api": ">=0.145.1"
   },
   "suggests": {
-    "modmenu": ">=21.0.0-beta.1"
+    "modmenu": ">=18.0.0"
   },
   "mixins": [
     "worldbinder.mixins.json"

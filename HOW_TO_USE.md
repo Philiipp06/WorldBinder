@@ -1,4 +1,4 @@
-# WorldBinder 1.4.1 — How to Use
+# WorldBinder 1.5.0 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -6,9 +6,9 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 ## 1. Install WorldBinder
 
-1. Install Minecraft 26.3 with Fabric Loader 0.19.5 or newer.
-2. Install Fabric API 0.160.7+26.3 or newer.
-3. Place the WorldBinder jar into your `mods` folder.
+1. Install Minecraft 26.1, 26.1.1, 26.1.2, 26.2 or 26.3 with Fabric Loader 0.19.5 or newer.
+2. Install a Fabric API build for that Minecraft version (for example, 0.145.1+26.1 for 26.1 or 0.160.7+26.3 for 26.3).
+3. Place the same WorldBinder 1.5.0 jar into your `mods` folder on any of those versions.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
 
@@ -40,7 +40,9 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.4.1 retains the responsive virtual GUI canvas, settings, dropdowns and menus introduced in previous releases while its internals remain organized into smaller components. Its visual HUD Widget Editor keeps overlay placement stable across fullscreen, windowed mode and different GUI scales.
+WorldBinder 1.5.0 keeps the fixed virtual GUI canvas, so menus remain at a stable size across fullscreen, windowed mode and GUI scales. F9 uses the visible sidebar for navigation. To choose an export target, select **Minecraft version** in Capture or General settings, search the supported releases (including 26.1 through 26.3) and choose one. Recent versions appear first. The Gamerules page only shows rules available for the selected target. The HUD Widget Editor continues to provide live placement, size and color controls.
+
+Use **Tab** and **Shift+Tab** to move focus between controls. Focused buttons, fields and sliders have a visible outline; **Enter** or **Space** activates a focused button. **Ctrl+Tab** and **Ctrl+Shift+Tab** switch F9 sections or Settings tabs. In **Settings > Display & Input**, enable **High contrast** or **Reduce motion** independently; both are off by default. Save to keep your choices.
 
 ## Messages and Movement Tools
 
@@ -81,7 +83,7 @@ Open **Settings** from the Control Center and review:
 - custom toast duration (40–250%)
 - the HUD Widget Editor for status, radar and notification widgets
 
-Open **Settings > HUD & Map > HUD Widget Editor** to customize overlays. Select a widget from the compact panel or click it directly in the preview. Collapse the panel whenever you need the complete canvas, drag a widget to position it, and use the bottom-right handle or size slider to scale its complete frame, text and contents proportionally. Click either color row to open the visual color picker, choose a color or enter HEX/ARGB directly, then select **Apply** to return the changes to Settings and **Save** to write the configuration.
+Open **Settings > HUD & Map > HUD Widget Editor** to customize status, radar, notification and Movement Tool overlays. Drag the settings panel by its header to clear the part of the canvas you are editing, or collapse it. Select a widget from the panel or click it directly in the preview. Drag a widget to position it, and use the bottom-right handle or size slider to scale its complete frame, text and contents proportionally. Active Movement Tools appear as small, stacked badges; the Movement widget controls their position, scale, colors and visibility. Click either color row to open the visual color picker, choose a color or enter HEX/ARGB directly, then select **Apply** to return the changes to Settings and **Save** to write the configuration.
 
 Recommended presets:
 
@@ -95,6 +97,7 @@ Recommended presets:
 ## 4. Start a capture
 
 You can start a world download from the Capture screen or with **F6**.
+The F6 quick-start dialog shows the short usage notice. Select **Full legal notice** to open the detailed notice in F9; closing F9 returns to F6 with the entered archive name intact.
 
 WorldBinder will collect chunks, block states, block entities, visible entities, chunk coverage and available metadata while you move through the world. The client can only save what the server actually sends to it.
 
@@ -176,6 +179,8 @@ A warning does not always mean the export is unusable. It means the result shoul
 
 ## 9. Resource packs
 
+In Settings > Safety > Resource Pack, **Reload display** offers Interactive and Vanilla. Interactive is the default: a ready menu or world stays visible and usable while resources reload, with no separate WorldBinder percentage indicator. Vanilla keeps Minecraft's original blocking loading screen. Old Compact choices and unmarked legacy Vanilla values migrate to Interactive; explicitly choose Vanilla again if you prefer it. During early startup without a ready screen and on reload errors, Minecraft's loading/error handling remains in place. No mode changes the resource reload itself.
+
 If the server sent a resource pack and WorldBinder could access it, the pack is exported as:
 
 ```text
@@ -202,7 +207,7 @@ Useful reports include:
 - Minecraft version
 - WorldBinder version
 - Fabric Loader and Fabric API version
-- whether Fabric API 0.160.7+26.3 or newer is installed
+- which Minecraft-matched Fabric API build is installed
 - selected target output version
 - capture mode and performance preset
 - whether the issue happened in singleplayer, Paper or Multiverse

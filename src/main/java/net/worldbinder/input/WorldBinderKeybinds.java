@@ -25,49 +25,65 @@ public final class WorldBinderKeybinds {
     private static boolean storagePopupOpenedForCurrentJob;
     private static StorageStage lastStorageStage = StorageStage.IDLE;
 
+    private static InputConstants.Type keyboardType() {
+        try {
+            return InputConstants.Type.valueOf("KEYBOARD");
+        } catch (IllegalArgumentException ignored) {
+            return InputConstants.Type.valueOf("KEYSYM");
+        }
+    }
+
+    private static int keyCode(String field) {
+        try {
+            return InputConstants.class.getField(field).getInt(null);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Missing Minecraft key: " + field, exception);
+        }
+    }
+
     private WorldBinderKeybinds() {
     }
 
     public static void register(SelectionManager selections, SceneCaptureService capture, ScenePlacementService placement, SceneLibrary library) {
         KeyMapping openMenu = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_menu",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F9,
+                keyboardType(),
+                keyCode("KEY_F9"),
                 WORLD_BINDER_CATEGORY,
                 0
         ));
         KeyMapping setFirst = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_1",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F7,
+                keyboardType(),
+                keyCode("KEY_F7"),
                 WORLD_BINDER_CATEGORY,
                 1
         ));
         KeyMapping setSecond = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.set_pos_2",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F8,
+                keyboardType(),
+                keyCode("KEY_F8"),
                 WORLD_BINDER_CATEGORY,
                 2
         ));
         KeyMapping quickCapture = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.quick_capture_world",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F6,
+                keyboardType(),
+                keyCode("KEY_F6"),
                 WORLD_BINDER_CATEGORY,
                 3
         ));
         KeyMapping openMap = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_map",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F10,
+                keyboardType(),
+                keyCode("KEY_F10"),
                 WORLD_BINDER_CATEGORY,
                 4
         ));
         KeyMapping openMovement = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.worldbinder.open_movement",
-                InputConstants.Type.KEYBOARD,
-                InputConstants.KEY_F12,
+                keyboardType(),
+                keyCode("KEY_F12"),
                 WORLD_BINDER_CATEGORY,
                 5
         ));
@@ -79,12 +95,12 @@ public final class WorldBinderKeybinds {
                     storagePopupOpenedForCurrentJob = false;
                 }
             }
-            if (client.player == null && StorageFlow.progress().isRunning() && !storagePopupOpenedForCurrentJob && !(client.gui.screen() instanceof WorldBinderStorageProgressScreen)) {
+            if (client.player == null && StorageFlow.progress().isRunning() && !storagePopupOpenedForCurrentJob && !(net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderStorageProgressScreen)) {
                 storagePopupOpenedForCurrentJob = true;
-                client.gui.setScreen(new WorldBinderStorageProgressScreen(client.gui.screen()));
+                net.worldbinder.compat.ClientCompat.setScreen(client, new WorldBinderStorageProgressScreen(net.worldbinder.compat.ClientCompat.screen(client)));
             }
             while (openMenu.consumeClick()) {
-                Minecraft.getInstance().gui.setScreen(new WorldBinderScreen(selections, capture, placement, library));
+                net.worldbinder.compat.ClientCompat.setScreen(Minecraft.getInstance(), new WorldBinderScreen(selections, capture, placement, library));
             }
             while (setFirst.consumeClick()) {
                 selections.setFirstFromCrosshair();
@@ -97,17 +113,17 @@ public final class WorldBinderKeybinds {
                 if (capture.isRoamingCapture()) {
                     capture.finishActiveCapture();
                 } else {
-                    mc.gui.setScreen(new WorldBinderLegalStartScreen(mc.gui.screen(),
+                    net.worldbinder.compat.ClientCompat.setScreen(mc, new WorldBinderLegalStartScreen(net.worldbinder.compat.ClientCompat.screen(mc),
                             name -> capture.toggleRoamingCapture(name),
                             "Start saving",
                             WorldBinder.config().defaultArchiveName));
                 }
             }
             while (openMap.consumeClick()) {
-                Minecraft.getInstance().gui.setScreen(new WorldBinderMapScreen(Minecraft.getInstance().gui.screen()));
+                net.worldbinder.compat.ClientCompat.setScreen(Minecraft.getInstance(), new WorldBinderMapScreen(net.worldbinder.compat.ClientCompat.screen(Minecraft.getInstance())));
             }
             while (openMovement.consumeClick()) {
-                client.gui.setScreen(WorldBinderConfigScreen.movement(client.gui.screen()));
+                net.worldbinder.compat.ClientCompat.setScreen(client, WorldBinderConfigScreen.movement(net.worldbinder.compat.ClientCompat.screen(client)));
             }
             capture.tick();
             placement.tick();

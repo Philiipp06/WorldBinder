@@ -8,6 +8,7 @@ import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTheme;
+import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
 import net.worldbinder.util.PathOpener;
@@ -54,7 +55,7 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         }));
         addRenderableWidget(WbButton.create(left + panelW - buttonW - 10, y, buttonW, 22, Component.translatable("gui.done"),
                 Component.translatable("worldbinder.storage.done.tooltip"), button -> {
-            minecraft.gui.setScreen(parent);
+            net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
         }));
     }
 
@@ -83,19 +84,20 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         int top = (height - h) / 2;
         WbChrome.drawPanel(context, left, top, w, h);
         context.fill(left, top, left + w, top + 2, progress.isTerminal() ? WbTheme.OK : WbTheme.ACCENT);
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.storage.title"), width / 2, top + 16, 0xFFFFFFFF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.stage", progress.stage().label()), left + 28, top + 48, 0xFFEDE9FF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.task", progress.detail()), left + 28, top + 68, 0xFFBDB6D9);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.elapsed", StorageProgress.formatMillis(progress.elapsedMillis())), left + 28, top + 88, 0xFFBDB6D9);
+        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.storage.title"), width / 2, top + 16, WbTheme.TEXT);
+        WbChrome.drawDivider(context, left + 28, top + 38, w - 56);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.storage.stage", progress.stage().label()), left + 28, top + 48, w - 56, WbTheme.TEXT_SOFT);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.storage.task", progress.detail()), left + 28, top + 68, w - 56, WbTheme.TEXT_MUTED);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.storage.elapsed", StorageProgress.formatMillis(progress.elapsedMillis())), left + 28, top + 88, w > 430 ? 220 : w - 56, WbTheme.TEXT_MUTED);
         int remainingX = w > 430 ? left + 260 : left + 28;
         int remainingY = w > 430 ? top + 88 : top + 104;
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.remaining", progress.etaText()), remainingX, remainingY, 0xFFBDB6D9);
+        WbText.drawClipped(context, font, Lang.text("worldbinder.storage.remaining", progress.etaText()), remainingX, remainingY, w > 430 ? w - 288 : w - 56, WbTheme.TEXT_MUTED);
         Path target = progress.target();
         if (target != null) {
             String path = target.toAbsolutePath().toString();
             int maxChars = w < 360 ? 38 : 74;
             if (path.length() > maxChars) path = "..." + path.substring(path.length() - maxChars + 3);
-            net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.storage.target", path), left + 28, top + 122, 0xFF8F86B8);
+            WbText.drawClipped(context, font, Lang.text("worldbinder.storage.target", path), left + 28, top + 122, w - 56, WbTheme.TEXT_DIM);
         }
         int barX = left + 28;
         int barY = top + 138;
@@ -103,8 +105,8 @@ public final class WorldBinderStorageProgressScreen extends Screen {
         int barH = 12;
         int filled = (int) (barW * Math.max(0.0D, Math.min(1.0D, progress.progress())));
         WbChrome.drawProgressTrack(context, barX, barY, barW, barH, filled, progress.isTerminal() ? WbTheme.OK : WbTheme.ACCENT);
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.literal((int) (progress.progress() * 100.0D) + "%"), width / 2, barY + 2, 0xFFFFFFFF);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.storage.hint"), left + 28, top + 154, 0xFF8F86B8);
+        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.literal((int) (progress.progress() * 100.0D) + "%"), width / 2, barY + 2, WbTheme.TEXT);
+        WbText.drawClipped(context, font, Component.translatable("worldbinder.storage.hint"), left + 28, top + 154, w - 56, WbTheme.TEXT_DIM);
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
         } finally {
             width = realWidth;

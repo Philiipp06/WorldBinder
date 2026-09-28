@@ -27,7 +27,7 @@ public class GameMenuScreenMixin {
         boolean paused = running && WorldBinderClient.capture().isPaused();
 
         WorldBinderMenuButton openButton = new WorldBinderMenuButton(ignored ->
-                client.gui.setScreen(new WorldBinderScreen(
+                net.worldbinder.compat.ClientCompat.setScreen(client, new WorldBinderScreen(
                         WorldBinderClient.selections(),
                         WorldBinderClient.capture(),
                         WorldBinderClient.placement(),
@@ -41,7 +41,7 @@ public class GameMenuScreenMixin {
         if (running) {
             Button pauseButton = Button.builder(Component.translatable(paused ? "worldbinder.gui.resume_capture" : "worldbinder.gui.pause_capture"), b -> {
                 WorldBinderClient.capture().togglePause();
-                client.gui.setScreen(null);
+                net.worldbinder.compat.ClientCompat.setScreen(client, null);
             }).bounds(10, self.height - 30, 98, 20)
               .tooltip(Tooltip.create(Component.translatable("worldbinder.tooltip.pause_capture")))
               .build();

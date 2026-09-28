@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import net.worldbinder.config.GameRuleSettings;
 import net.worldbinder.config.WorldBinderConfig;
 import net.worldbinder.ui.component.WbChrome;
+import net.worldbinder.ui.component.WbBrand;
 import net.worldbinder.ui.component.WbEditBox;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbText;
@@ -14,14 +15,13 @@ import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.GuiText;
 import net.worldbinder.util.Lang;
-import net.worldbinder.version.TargetMinecraftVersion;
 
 abstract class WorldBinderConfigScreenView extends Screen {
     protected static final int NUMERIC_TEXT_MAX_LENGTH = 16;
     protected static final int MIN_CONTENT_WIDTH = 180;
     protected static final int SETTINGS_SIDEBAR_WIDTH = 178;
 
-    protected enum Tab { GENERAL, PERFORMANCE, HUD, SAFETY, MOVEMENT }
+    protected enum Tab { GENERAL, PERFORMANCE, HUD, SAFETY, MOVEMENT, DISPLAY }
     protected enum SafetyPage { CORE, EXPORT, RESOURCE_PACK, GAMERULES }
 
     protected final Screen parent;
@@ -29,7 +29,6 @@ abstract class WorldBinderConfigScreenView extends Screen {
     protected final SafetyPage safetyPage;
     protected final WorldBinderConfig draft;
     protected EditBox defaultName;
-    protected EditBox targetVersion;
     protected EditBox radiusChunks;
     protected EditBox minY;
     protected EditBox maxY;
@@ -52,7 +51,8 @@ abstract class WorldBinderConfigScreenView extends Screen {
     protected final GameRuleSettings gameRules = new GameRuleSettings();
     protected int scrollOffset;
     protected int maxScroll;
-    protected boolean targetVersionDropdownOpen;
+    protected int movementGroup;
+    protected int gameRuleCategory;
     protected Component validationError;
 
     protected WorldBinderConfigScreenView(Screen parent, Tab tab, SafetyPage safetyPage,
@@ -102,24 +102,28 @@ abstract class WorldBinderConfigScreenView extends Screen {
     }
 
     protected boolean useSidebar(int panelWidth) {
-        return panelWidth >= 700;
+        return panelWidth >= 430;
+    }
+
+    protected int settingsSidebarWidth(int panelWidth) {
+        return panelWidth < 700 ? 130 : SETTINGS_SIDEBAR_WIDTH;
     }
 
     protected int contentAreaX(int left, int panelWidth) {
-        return useSidebar(panelWidth) ? left + SETTINGS_SIDEBAR_WIDTH + 20 : left + 24;
+        return useSidebar(panelWidth) ? left + settingsSidebarWidth(panelWidth) + (panelWidth < 700 ? 14 : 20) : left + 24;
     }
 
     protected int contentAreaWidth(int panelWidth) {
-        int reserved = useSidebar(panelWidth) ? SETTINGS_SIDEBAR_WIDTH + 44 : 48;
+        int reserved = useSidebar(panelWidth) ? settingsSidebarWidth(panelWidth) + (panelWidth < 700 ? 32 : 44) : 48;
         return Math.max(MIN_CONTENT_WIDTH, panelWidth - reserved);
     }
 
     protected int contentBaseY(int top, int panelWidth) {
         if (useSidebar(panelWidth)) {
-            return top + (tab == Tab.SAFETY ? 102 : 68);
+            return top + (tab == Tab.SAFETY || tab == Tab.MOVEMENT ? (panelWidth < 700 ? 122 : 102) : 68);
         }
         int navHeight = navRows(panelWidth) * 26;
-        int safetyHeight = tab == Tab.SAFETY ? (panelWidth < 430 ? 54 : 28) : 0;
+        int safetyHeight = tab == Tab.SAFETY || tab == Tab.MOVEMENT ? (panelWidth < 430 ? 54 : 28) : 0;
         return top + (compact() ? 52 : 62) + navHeight + safetyHeight + 20;
     }
 
@@ -129,22 +133,6 @@ abstract class WorldBinderConfigScreenView extends Screen {
 
     protected int navRows(int panelWidth) {
         return (Tab.values().length + navColumns(panelWidth) - 1) / navColumns(panelWidth);
-    }
-
-    protected int targetVersionColumns(int width) {
-        if (width < 260) {
-            return 2;
-        }
-        if (width < 430) {
-            return 3;
-        }
-        return 4;
-    }
-
-    protected int targetVersionDropdownHeight(int width) {
-        int cols = targetVersionColumns(width);
-        int rows = (TargetMinecraftVersion.FINAL_RELEASES.size() + cols - 1) / cols;
-        return rows * 22 + 2;
     }
 
     protected int labelWidth(int contentW) {
@@ -187,9 +175,11 @@ abstract class WorldBinderConfigScreenView extends Screen {
         }
         if (panelHeight > 390 && panelWidth > 520) {
             if (useSidebar(panelWidth)) {
-                GuiText.drawTextWithShadow(context, font, Component.translatable("worldbinder.config.subheader"), contentX, top + 31, WbTheme.TEXT_DIM);
+                WbText.drawClipped(context, font, Component.translatable(tabDescriptionKey(tab)), contentX,
+                        top + 31, contentW, WbTheme.mutedText());
             } else {
-                GuiText.drawCenteredTextWithShadow(context, font, Component.translatable("worldbinder.config.subheader"), left + panelWidth / 2, top + 32, WbTheme.TEXT_DIM);
+                GuiText.drawCenteredTextWithShadow(context, font, Component.translatable(tabDescriptionKey(tab)),
+                        left + panelWidth / 2, top + 32, WbTheme.mutedText());
             }
         }
         int cardBottom = top + panelHeight - 48;
@@ -201,7 +191,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             if (tab == Tab.PERFORMANCE) drawPerformanceLabels(context, formX, contentY, formW);
             if (tab == Tab.HUD) drawHudLabels(context, formX, contentY, formW);
             if (tab == Tab.SAFETY) drawSafetyLabels(context, formX, contentY, formW);
-            drawTargetVersionDropdown(context, formX, contentY, formW, virtualMouseX, virtualMouseY);
+            if (tab == Tab.DISPLAY) drawDisplayLabels(context, formX, contentY, formW);
             drawInputChrome(context, virtualMouseX, virtualMouseY);
         } finally {
             context.disableScissor();
@@ -228,6 +218,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case HUD -> "worldbinder.config.hud_title";
             case SAFETY -> safetyTitle();
             case MOVEMENT -> "worldbinder.config.tab.movement";
+            case DISPLAY -> "worldbinder.config.tab.display";
         };
     }
 
@@ -237,7 +228,8 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case PERFORMANCE -> WbTheme.ACCENT_RIGHT;
             case HUD -> WbTheme.INFO;
             case SAFETY -> WbTheme.WARN;
-            case MOVEMENT -> WbTheme.OK;
+            case MOVEMENT -> WbTheme.INFO;
+            case DISPLAY -> WbTheme.ACCENT_DARK;
         };
     }
 
@@ -248,6 +240,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case HUD -> "worldbinder.config.tab.hud";
             case SAFETY -> "worldbinder.config.tab.safety";
             case MOVEMENT -> "worldbinder.config.tab.movement";
+            case DISPLAY -> "worldbinder.config.tab.display";
         };
     }
 
@@ -271,41 +264,37 @@ abstract class WorldBinderConfigScreenView extends Screen {
 
     protected void drawGeneralLabels(GuiGraphicsExtractor c, int x, int y, int w) {
         int fullW = Math.max(120, Math.min(w, 520));
-        int targetDropdownOffset = targetVersionDropdownOpen ? targetVersionDropdownHeight(fullW) + 10 : 0;
-        int numericW = Math.max(90, Math.min(130, (fullW - 48) / 3));
-        int numericGap = Math.max(18, Math.min(28, (fullW - numericW * 3) / 2));
+        int numericGap = 10;
+        int numericW = (fullW - numericGap * 2) / 3;
         label(c, x, y + 34, "worldbinder.gui.archive_name");
         label(c, x, y + 86, "worldbinder.gui.target_output_version");
-        clippedLabel(c, x, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.radius");
-        clippedLabel(c, x + numericW + numericGap + 8, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.y_min");
-        clippedLabel(c, x + (numericW + numericGap) * 2 + 8, y + 150 + targetDropdownOffset, numericW, "worldbinder.config.y_max");
-        wrapped(c, x, y + 128 + targetDropdownOffset, w, "worldbinder.config.target_value", draft.targetVersionLabel());
+        clippedLabel(c, x, y + 150, numericW, "worldbinder.config.radius");
+        clippedLabel(c, x + numericW + numericGap, y + 150, numericW, "worldbinder.config.y_min");
+        clippedLabel(c, x + (numericW + numericGap) * 2, y + 150, numericW, "worldbinder.config.y_max");
+        wrapped(c, x, y + 128, w, "worldbinder.config.target_value", draft.targetVersionLabel());
     }
 
     protected void drawPerformanceLabels(GuiGraphicsExtractor c, int x, int y, int w) {
         int cols = w < 420 ? 2 : 4;
         int formY = y + (cols == 2 ? 96 : 78);
-        int fieldW = Math.max(62, Math.min(90, (w - 24) / 4));
-        int fieldGap = Math.max(8, Math.min(24, (w - fieldW * 4) / 3));
-
-        performanceLabel(c, x, formY, fieldW, "worldbinder.config.blocks_per_tick");
-        performanceLabel(c, x + (fieldW + fieldGap), formY, fieldW, "worldbinder.config.commands_per_tick");
-        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY, fieldW, "worldbinder.config.ms_budget");
-        performanceLabel(c, x + (fieldW + fieldGap) * 3, formY, fieldW, "worldbinder.config.target_fps");
-
-        performanceLabel(c, x, formY + 52, fieldW, "worldbinder.config.new_chunks");
-        performanceLabel(c, x + (fieldW + fieldGap), formY + 52, fieldW, "worldbinder.config.queue_limit");
-        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY + 52, fieldW, "worldbinder.config.hot_chunks");
-
-        performanceLabel(c, x, formY + 104, fieldW, "worldbinder.config.capture_ms");
-        performanceLabel(c, x + (fieldW + fieldGap), formY + 104, fieldW, "worldbinder.config.ui_ms");
-        performanceLabel(c, x + (fieldW + fieldGap) * 2, formY + 104, fieldW, "worldbinder.config.archive_ms");
-
-        if (isTextInContentArea(y + 252)) WbText.drawWrapped(c, font, draft.presetDescription(), x, y + 252, w, WbTheme.TEXT_DIM, 2);
+        int gap = 10;
+        int fieldW = (w - gap * (cols - 1)) / cols;
+        String[] labels = {
+                "worldbinder.config.blocks_per_tick", "worldbinder.config.commands_per_tick",
+                "worldbinder.config.ms_budget", "worldbinder.config.target_fps",
+                "worldbinder.config.new_chunks", "worldbinder.config.queue_limit",
+                "worldbinder.config.hot_chunks", "worldbinder.config.capture_ms",
+                "worldbinder.config.ui_ms", "worldbinder.config.archive_ms"
+        };
+        for (int i = 0; i < labels.length; i++) {
+            performanceLabel(c, x + (i % cols) * (fieldW + gap), formY + (i / cols) * 52, fieldW, labels[i]);
+        }
+        int hintY = formY + ((labels.length + cols - 1) / cols) * 52 + 2;
+        if (isTextInContentArea(hintY)) WbText.drawWrapped(c, font, draft.presetDescription(), x, hintY, w, WbTheme.TEXT_DIM, 2);
     }
 
     protected void performanceLabel(GuiGraphicsExtractor c, int x, int y, int width, String text) {
-        clippedLabel(c, x, y, width + 18, text);
+        clippedLabel(c, x, y, width, text);
     }
 
     protected void drawHudLabels(GuiGraphicsExtractor c, int x, int y, int w) {
@@ -313,7 +302,10 @@ abstract class WorldBinderConfigScreenView extends Screen {
         int cols = w < 430 ? 2 : 4;
         int fieldW = Math.max(70, Math.min(112, (w - gap * (cols - 1)) / cols));
         label(c, x, y + 32, "worldbinder.config.widget_editor_section");
-        wrapped(c, x + Math.min(w, Math.max(220, w / 2)) + 14, y + 48, Math.max(80, w - Math.min(w, Math.max(220, w / 2)) - 14), "worldbinder.config.widget_editor_hint");
+        if (w >= 600) {
+            wrapped(c, x + Math.min(w, Math.max(220, w / 2)) + 14, y + 48,
+                    w - Math.min(w, Math.max(220, w / 2)) - 14, "worldbinder.config.widget_editor_hint");
+        }
 
         int radarLabelY = y + 116;
         clippedLabel(c, x, radarLabelY, fieldW, "worldbinder.config.radar_size");
@@ -336,7 +328,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
         if (safetyPage == SafetyPage.CORE) {
             label(c, x, subY + 30, "worldbinder.config.recovery_interval");
         } else if (safetyPage == SafetyPage.RESOURCE_PACK) {
-            if (isTextInContentArea(subY + 96)) WbText.drawWrapped(c, font, Lang.string("worldbinder.config.pack_page_hint"), x, subY + 96, w, WbTheme.TEXT_DIM, 3);
+            if (isTextInContentArea(subY + 128)) WbText.drawWrapped(c, font, Lang.string("worldbinder.config.pack_page_hint"), x, subY + 128, w, WbTheme.TEXT_DIM, 3);
         } else if (safetyPage == SafetyPage.GAMERULES) {
         }
     }
@@ -360,19 +352,22 @@ abstract class WorldBinderConfigScreenView extends Screen {
     }
 
     protected void drawCard(GuiGraphicsExtractor c, int x, int y, int w, int h, Component title, int accent) {
-        WbChrome.drawCard(c, font, x, y, w, h, title, accent, false);
+        c.fill(x, y, x + 2, y + h, accent);
+        c.fill(x + 12, y + 30, x + w - 10, y + 31, WbTheme.DIVIDER);
+        WbText.drawClipped(c, font, title, x + 14, y + 10, w - 28, WbTheme.TEXT);
     }
 
     protected void drawContentSections(GuiGraphicsExtractor c, int x, int y, int w) {
         int innerW = Math.max(80, w - 8);
         if (tab == Tab.GENERAL) {
-            int dropdownOffset = targetVersionDropdownOpen ? targetVersionDropdownHeight(Math.max(120, Math.min(w, 520))) + 10 : 0;
-            drawSectionSurface(c, x + 4, y + 26, innerW, 174 + dropdownOffset, WbTheme.ACCENT);
-            drawSectionSurface(c, x + 4, y + 208 + dropdownOffset, innerW, 98, WbTheme.ACCENT_DARK);
+            drawSectionSurface(c, x + 4, y + 26, innerW, 174, WbTheme.ACCENT);
+            drawSectionSurface(c, x + 4, y + 208, innerW, 98, WbTheme.ACCENT_DARK);
         } else if (tab == Tab.PERFORMANCE) {
-            drawSectionSurface(c, x + 4, y + 18, innerW, 56, WbTheme.ACCENT_RIGHT);
-            drawSectionSurface(c, x + 4, y + 82, innerW, 166, WbTheme.ACCENT_DARK);
-            drawSectionSurface(c, x + 4, y + 254, innerW, 48, WbTheme.INFO);
+            int cols = w - 24 < 420 ? 2 : 4;
+            int formY = cols == 2 ? 96 : 78;
+            int rows = (10 + cols - 1) / cols;
+            drawSectionSurface(c, x + 4, y + 18, innerW, cols == 2 ? 74 : 56, WbTheme.ACCENT_RIGHT);
+            drawSectionSurface(c, x + 4, y + formY - 5, innerW, rows * 52 + 8, WbTheme.ACCENT_DARK);
         } else if (tab == Tab.HUD) {
             int formW = Math.max(MIN_CONTENT_WIDTH - 24, w - 24);
             int cols = formW < 430 ? 2 : 4;
@@ -383,14 +378,49 @@ abstract class WorldBinderConfigScreenView extends Screen {
             drawSectionSurface(c, x + 4, mapY + 6, innerW, 94, WbTheme.ACCENT);
             drawSectionSurface(c, x + 4, notificationY - 8, innerW, 130, WbTheme.INFO);
         } else if (tab == Tab.MOVEMENT) {
-            // The movement list uses the shared controls without extra section framing.
+            drawMovementSections(c, x, y, w);
+        } else if (tab == Tab.DISPLAY) {
+            drawSectionSurface(c, x + 4, y + 18, innerW, 158, WbTheme.ACCENT_DARK);
+        } else if (safetyPage == SafetyPage.GAMERULES) {
+            drawSectionSurface(c, x + 4, y + 22, innerW, 42, WbTheme.WARN);
+            WbText.drawClipped(c, font, Lang.string("worldbinder.gamerules.target", draft.targetMinecraftVersion),
+                    x + 16, y + 32, w - 32, WbTheme.TEXT_MUTED);
         } else if (safetyPage == SafetyPage.CORE) {
             drawSectionSurface(c, x + 4, y + 26, innerW, 142, WbTheme.WARN);
         } else if (safetyPage == SafetyPage.EXPORT) {
             drawSectionSurface(c, x + 4, y + 28, innerW, 96, WbTheme.ACCENT_RIGHT);
         } else if (safetyPage == SafetyPage.RESOURCE_PACK) {
-            drawSectionSurface(c, x + 4, y + 28, innerW, 124, WbTheme.WARN);
+            drawSectionSurface(c, x + 4, y + 28, innerW, 156, WbTheme.WARN);
         }
+    }
+
+    protected void drawDisplayLabels(GuiGraphicsExtractor c, int x, int y, int w) {
+        clippedLabel(c, x, y + 28, w, "worldbinder.config.display.title");
+        if (isTextInContentArea(y + 142)) {
+            WbText.drawWrapped(c, font, Lang.string("worldbinder.config.display.apply"), x, y + 142,
+                    w, WbTheme.mutedText(), 2);
+        }
+    }
+
+    private void drawMovementSections(GuiGraphicsExtractor c, int x, int y, int w) {
+        int rowY = y + 22;
+        MovementSettingsLayout.Group group = MovementSettingsLayout.GROUPS.get(movementGroup);
+            if (isTextInContentArea(rowY)) {
+                String heading = Lang.string(group.titleKey());
+                WbText.drawClipped(c, font, heading, x + 16, rowY, w - 32, WbTheme.TEXT_MUTED);
+                int dividerX = x + 26 + font.width(heading);
+                if (dividerX < x + w - 12) WbChrome.drawDivider(c, dividerX, rowY + 8, x + w - 12 - dividerX);
+            }
+            rowY += MovementSettingsLayout.HEADING_HEIGHT;
+            for (net.worldbinder.movement.MovementTool tool : group.tools()) {
+                drawSectionSurface(c, x + 4, rowY - 4, w - 8,
+                        MovementSettingsLayout.ROW_HEIGHT - 8, WbTheme.INFO);
+                if (isTextInContentArea(rowY + 27)) {
+                    WbText.drawClipped(c, font, Lang.string(tool.key() + ".tooltip"), x + 12,
+                            rowY + 27, w - 24, WbTheme.TEXT_DIM);
+                }
+                rowY += MovementSettingsLayout.ROW_HEIGHT;
+            }
     }
 
     protected void drawSectionSurface(GuiGraphicsExtractor c, int x, int y, int w, int h, int accent) {
@@ -421,27 +451,28 @@ abstract class WorldBinderConfigScreenView extends Screen {
         if (useSidebar(panelWidth)) {
             int sidebarX = left + 8;
             int sidebarY = top + 49;
-            int sidebarW = SETTINGS_SIDEBAR_WIDTH - 8;
+            int sidebarW = settingsSidebarWidth(panelWidth) - 8;
             int sidebarH = panelHeight() - 99;
-            WbChrome.drawSectionSurface(c, sidebarX, sidebarY, sidebarW, sidebarH, tabAccent(tab));
-            WbText.draw(c, font, "WORLDBINDER", sidebarX + 12, sidebarY + 12, WbTheme.TEXT);
-            WbText.draw(c, font, Component.translatable("worldbinder.config.navigation"), sidebarX + 12, sidebarY + 27, WbTheme.TEXT_DIM);
-            WbChrome.drawDivider(c, sidebarX + 12, sidebarY + 42, sidebarW - 24);
-            WbText.drawWrapped(c, font, Component.translatable(tabDescriptionKey(tab)), sidebarX + 12, sidebarY + sidebarH - 52, sidebarW - 24, WbTheme.TEXT_DIM, 3);
+            c.fill(sidebarX + sidebarW - 1, sidebarY, sidebarX + sidebarW, sidebarY + sidebarH, WbTheme.DIVIDER);
+            WbBrand.draw(c, font, sidebarX + 12, sidebarY + 1, sidebarW - 24);
+            WbChrome.drawDivider(c, sidebarX + 12, sidebarY + 39, sidebarW - 24);
+            if (panelHeight() >= 390) {
+                WbText.drawWrapped(c, font, Component.translatable(tabDescriptionKey(tab)),
+                        sidebarX + 12, sidebarY + sidebarH - 52, sidebarW - 24, WbTheme.TEXT_DIM, 3);
+            }
             return;
         }
 
         int y = top + (compact() ? 42 : 52);
         int cols = navColumns(panelWidth);
-        int gap = 6;
         int navW = panelWidth - 36;
-        WbChrome.drawSectionSurface(c, left + 18, y - 4, navW, navRows(panelWidth) * 26 + 5, tabAccent(tab));
-        if (tab != Tab.SAFETY) {
+        WbChrome.drawDivider(c, left + 18, y - 5, navW);
+        if (tab != Tab.SAFETY && tab != Tab.MOVEMENT) {
             return;
         }
         int safetyY = y + navRows(panelWidth) * 26 + 6;
         int safetyRows = panelWidth < 430 ? 2 : 1;
-        WbChrome.drawSectionSurface(c, left + 18, safetyY - 4, navW, safetyRows * 24 + 5, WbTheme.WARN);
+        WbChrome.drawDivider(c, left + 18, safetyY - 4, navW);
     }
 
     protected String tabDescriptionKey(Tab value) {
@@ -451,30 +482,8 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case HUD -> "worldbinder.config.navigation.hud";
             case SAFETY -> "worldbinder.config.navigation.safety";
             case MOVEMENT -> "worldbinder.config.navigation.movement";
+            case DISPLAY -> "worldbinder.config.navigation.display";
         };
-    }
-
-    protected void drawTargetVersionDropdown(GuiGraphicsExtractor c, int x, int y, int w, int mouseX, int mouseY) {
-        if (tab != Tab.GENERAL || !targetVersionDropdownOpen) {
-            return;
-        }
-        int fullW = Math.max(120, Math.min(w, 520));
-        int dropdownY = y + 128;
-        int cols = targetVersionColumns(fullW);
-        int gap = 5;
-        int optionW = Math.max(58, (fullW - gap * (cols - 1)) / cols);
-        int rows = (TargetMinecraftVersion.FINAL_RELEASES.size() + cols - 1) / cols;
-        WbChrome.drawDropdownPanel(c, x, dropdownY - 4, fullW, 22, rows);
-        for (int i = 0; i < TargetMinecraftVersion.FINAL_RELEASES.size(); i++) {
-            TargetMinecraftVersion.Entry entry = TargetMinecraftVersion.FINAL_RELEASES.get(i);
-            int col = i % cols;
-            int row = i / cols;
-            int rowX = x + col * (optionW + gap);
-            int rowY = dropdownY + row * 22;
-            boolean selected = entry.name().equals(TargetMinecraftVersion.normalize(draft.targetMinecraftVersion));
-            boolean hovered = WbChrome.contains(rowX, rowY, optionW, 19, mouseX, mouseY);
-            WbChrome.drawDropdownRow(c, rowX, rowY, optionW, 19, selected, hovered, selected ? WbTheme.ACCENT : WbTheme.INFO);
-        }
     }
 
 }

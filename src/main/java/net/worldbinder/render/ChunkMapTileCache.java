@@ -22,7 +22,7 @@ public final class ChunkMapTileCache {
         }
         CachedTile tile = tiles.get(key);
         long version = snapshot.renderVersion();
-        if (tile == null || tile.version != version) {
+        if (tile == null || tile.version != version || tile.snapshot != snapshot) {
             tile = new CachedTile(version, snapshot);
             tiles.put(key, tile);
             trim();
@@ -43,13 +43,14 @@ public final class ChunkMapTileCache {
 
     private static final class CachedTile {
         private final long version;
+        private final ChunkSnapshot snapshot;
         private final int average;
-        private final int[] lod4;
         private final int[] lod8;
         private final int[] lod16;
 
         private CachedTile(long version, ChunkSnapshot snapshot) {
             this.version = version;
+            this.snapshot = snapshot;
             this.average = snapshot.averageColor();
             this.lod16 = new int[16 * 16];
             for (int z = 0; z < 16; z++) {
@@ -58,16 +59,11 @@ public final class ChunkMapTileCache {
                 }
             }
             this.lod8 = downsample(lod16, 16, 8);
-            this.lod4 = downsample(lod16, 16, 4);
         }
 
         private void draw(GuiGraphicsExtractor context, int x, int y, int size) {
             if (size <= 24) {
                 context.fill(x, y, x + size, y + size, average);
-                return;
-            }
-            if (size <= 48) {
-                drawGrid(context, x, y, size, lod4, 4);
                 return;
             }
             if (size <= 80) {
