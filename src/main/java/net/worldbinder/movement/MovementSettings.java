@@ -31,6 +31,22 @@ public final class MovementSettings {
     public void enabled(MovementTool tool, boolean enabled) { normalize(); tools.get(tool).enabled = enabled; }
     public void value(MovementTool tool, double value) { normalize(); tools.get(tool).value = tool.clamp(value); }
 
+    public int enabledCount() {
+        int count = 0;
+        for (MovementTool tool : MovementTool.values()) {
+            if (enabled(tool)) count++;
+        }
+        return count;
+    }
+
+    public void disableAll() {
+        for (MovementTool tool : MovementTool.values()) enabled(tool, false);
+    }
+
+    public void resetValues() {
+        for (MovementTool tool : MovementTool.values()) value(tool, tool.initial);
+    }
+
     private static final class Setting {
         boolean enabled;
         double value;

@@ -4,7 +4,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
+import net.worldbinder.WorldBinder;
 import net.worldbinder.util.GuiText;
 
 public final class WbButton {
@@ -29,8 +32,8 @@ public final class WbButton {
     }
 
     public static Button create(int x, int y, int width, int height, Component label, Component tooltip, Button.OnPress action) {
-        int safeWidth = Math.max(34, width);
-        return WbTooltips.register(new StyledButton(x, y, safeWidth, Math.max(18, height), label, action), tooltip);
+        int safeWidth = Math.max(20, width);
+        return WbTooltips.register(new StyledButton(x, y, safeWidth, Math.max(16, height), label, action), tooltip);
     }
 
     public static Button style(Button button, Style style, int accent, boolean selected) {
@@ -45,6 +48,50 @@ public final class WbButton {
     public static Button selected(Button button, boolean selected) {
         if (button instanceof StyledButton styled) {
             styled.selected = selected;
+        }
+        return button;
+    }
+
+    public static boolean isSelected(Button button) {
+        return button instanceof StyledButton styled && styled.selected;
+    }
+
+    /** Adds a pixel icon in front of the label (hidden when icons are disabled in the Interface settings). */
+    public static Button icon(Button button, WbIcon icon) {
+        if (button instanceof StyledButton styled) {
+            styled.icon = icon;
+        }
+        return button;
+    }
+
+    /** Icon-only square button; the label stays available for narration and tests. */
+    public static Button iconOnly(Button button, WbIcon icon) {
+        if (button instanceof StyledButton styled) {
+            styled.icon = icon;
+            styled.iconOnly = true;
+        }
+        return button;
+    }
+
+    /** Transparent hit area: no surface or label, only the toggle switch (if any) and focus glow. */
+    public static Button ghost(Button button) {
+        if (button instanceof StyledButton styled) {
+            styled.ghost = true;
+        }
+        return button;
+    }
+
+    public static Button alignLeft(Button button) {
+        if (button instanceof StyledButton styled) {
+            styled.leftAligned = true;
+        }
+        return button;
+    }
+
+    /** Small right-aligned badge text (for counts or shortcut hints). */
+    public static Button badge(Button button, String badge) {
+        if (button instanceof StyledButton styled) {
+            styled.badge = badge == null || badge.isBlank() ? null : badge;
         }
         return button;
     }
@@ -67,6 +114,10 @@ public final class WbButton {
 
     public static Button quiet(Button button) {
         return style(button, Style.QUIET, WbTheme.INFO, false);
+    }
+
+    public static Button danger(Button button) {
+        return style(button, Style.DANGER, WbTheme.ERROR, false);
     }
 
     public static Button dropdown(Button button, int accent, boolean open) {
@@ -101,105 +152,204 @@ public final class WbButton {
         private Style style = Style.DEFAULT;
         private int accent = WbTheme.ACCENT;
         private boolean selected;
+        private boolean leftAligned;
+        private boolean iconOnly;
+        private boolean ghost;
+        private WbIcon icon;
+        private String badge;
         private float hoverProgress;
         private float selectionProgress;
+        private float pressProgress = 1.0F;
         private long lastFrameNanos;
+        private boolean wasHovered;
 
         private StyledButton(int x, int y, int width, int height, Component message, OnPress onPress) {
             super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
         }
 
         @Override
+        public void onPress(InputWithModifiers input) {
+            pressProgress = 0.0F;
+            super.onPress(input);
+        }
+
+        @Override
+        public void playDownSound(SoundManager soundManager) {
+            if (style == Style.TOGGLE) {
+                WbSounds.toggle(!selected);
+            } else if (style == Style.TAB) {
+                WbSounds.tab();
+            } else if (style == Style.DROPDOWN) {
+                WbSounds.dropdown(!selected);
+            } else {
+                WbSounds.click(soundManager);
+            }
+        }
+
+        @Override
         protected void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             boolean highlighted = isHoveredOrFocused() && active;
+            if (isHovered() && active && !wasHovered) {
+                WbSounds.hover();
+            }
+            wasHovered = isHovered() && active;
             long now = System.nanoTime();
             long elapsed = lastFrameNanos == 0L ? 0L : now - lastFrameNanos;
             lastFrameNanos = now;
-            hoverProgress = WbMotion.approach(hoverProgress, highlighted ? 1.0F : 0.0F, elapsed, 5.0F);
-            selectionProgress = WbMotion.approach(selectionProgress, selected ? 1.0F : 0.0F, elapsed, 6.0F);
+            hoverProgress = WbMotion.approach(hoverProgress, highlighted ? 1.0F : 0.0F, elapsed, 14.0F);
+            selectionProgress = WbMotion.approach(selectionProgress, selected ? 1.0F : 0.0F, elapsed, 12.0F);
+            pressProgress = WbMotion.approach(pressProgress, 1.0F, elapsed, 7.0F);
             int x = getX();
             int y = getY();
             int width = getWidth();
             int height = getHeight();
-            int effectiveAccent = active ? accent : WbTheme.TEXT_DISABLED;
-            int fill = buttonFill();
+            int effectiveAccent = active ? (style == Style.DANGER ? WbTheme.ERROR : accent) : WbTheme.TEXT_DISABLED;
+            if (ghost) {
+                if (hoverProgress > 0.01F) {
+                    WbChrome.rounded(context, x, y, width, height, WbTheme.withAlpha(effectiveAccent, Math.round(0x16 * hoverProgress)));
+                }
+                if (style == Style.TOGGLE) {
+                    WbChrome.drawSwitch(context, x + width - 27, y + (height - 10) / 2, selectionProgress, effectiveAccent, active);
+                }
+                if (isFocused() && active) {
+                    WbChrome.glow(context, x, y, width, height, effectiveAccent, 1.0F);
+                }
+                return;
+            }
 
-            context.fill(x + 1, y + 2, x + width + 1, y + height + 2, 0x55000000);
-            context.fill(x, y, x + width, y + height, active ? WbTheme.panelBorder() : WbTheme.BUTTON_DISABLED);
-            context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fill);
+            drawSurface(context, x, y, width, height, effectiveAccent);
 
-            if (style == Style.PRIMARY) {
-                context.fill(x, y, x + 3, y + height, effectiveAccent);
-                context.fill(x + 3, y + height - 2, x + width, y + height, WbMotion.mix(WbTheme.ACCENT_MUTED, effectiveAccent, hoverProgress));
-            } else if (style == Style.DANGER) {
-                context.fill(x, y, x + 3, y + height, WbTheme.ERROR);
-            } else if (style == Style.TAB) {
-                context.fill(x, y, x + 2 + Math.round(2 * selectionProgress), y + height,
-                        WbMotion.mix(WbTheme.DIVIDER, effectiveAccent, Math.max(hoverProgress * 0.55F, selectionProgress)));
-                int underline = Math.round(width * Math.max(selectionProgress, hoverProgress));
-                if (underline > 0) context.fill(x, y + height - 2, x + underline, y + height, effectiveAccent);
-            } else if (style == Style.TOGGLE) {
-                drawToggleIndicator(context, x, y, width, height, effectiveAccent);
-            } else if (style == Style.DROPDOWN && !hasTextualChevron()) {
-                drawChevron(context, x + width - 12, y + height / 2 - 1, effectiveAccent);
-            } else if (style != Style.QUIET && (selected || highlighted || hoverProgress > 0.01F)) {
-                context.fill(x, y, x + 2, y + height,
-                        WbMotion.mix(WbTheme.DIVIDER, effectiveAccent, Math.max(selectionProgress, hoverProgress)));
+            if (pressProgress < 0.99F && !WbMotion.reduced()) {
+                float ripple = WbMotion.easeOutCubic(pressProgress);
+                int alpha = Math.round(0x50 * (1.0F - ripple));
+                int inset = Math.round((1.0F - ripple) * Math.min(width, height) / 3.0F);
+                WbChrome.rounded(context, x + inset, y + Math.min(inset, height / 3), width - inset * 2,
+                        height - Math.min(inset, height / 3) * 2, WbTheme.withAlpha(effectiveAccent, alpha));
             }
 
             if (isFocused() && active) {
-                int focus = WbTheme.focusRing();
-                context.fill(x, y, x + width, y + 1, focus);
-                context.fill(x, y + height - 1, x + width, y + height, focus);
-                context.fill(x, y, x + 1, y + height, focus);
-                context.fill(x + width - 1, y, x + width, y + height, focus);
+                WbChrome.glow(context, x, y, width, height, effectiveAccent, 1.0F);
             }
 
+            drawLabel(context, x, y, width, height, effectiveAccent);
+        }
+
+        private void drawSurface(GuiGraphicsExtractor context, int x, int y, int width, int height, int effectiveAccent) {
+            if (style == Style.TAB) {
+                float emphasis = Math.max(selectionProgress, hoverProgress * 0.55F);
+                if (emphasis > 0.01F) {
+                    WbChrome.rounded(context, x, y, width, height,
+                            WbTheme.alpha(WbMotion.mix(WbTheme.withAlpha(effectiveAccent, 0x30), WbTheme.withAlpha(effectiveAccent, 0x48), selectionProgress), emphasis));
+                }
+                int barHeight = Math.round((height - 6) * Math.max(selectionProgress, hoverProgress * 0.4F));
+                if (barHeight > 0) {
+                    int barY = y + (height - barHeight) / 2;
+                    WbChrome.rounded(context, x, barY, 3, barHeight, effectiveAccent);
+                }
+                return;
+            }
+            if (style == Style.QUIET) {
+                int fill = WbMotion.mix(0x40202A36, WbTheme.BUTTON_HOVER, hoverProgress);
+                WbChrome.rounded(context, x, y, width, height, active ? fill : WbTheme.BUTTON_DISABLED);
+                if (hoverProgress > 0.01F) {
+                    WbChrome.roundedOutline(context, x, y, width, height, WbTheme.alpha(WbTheme.panelBorder(), hoverProgress));
+                }
+                return;
+            }
+            WbChrome.rounded(context, x, y + 1, width, height, 0x55000000);
+            int border = !active ? WbTheme.BUTTON_DISABLED
+                    : WbMotion.mix(WbTheme.panelBorder(), effectiveAccent, Math.max(hoverProgress * 0.6F, selectionProgress * 0.75F));
+            WbChrome.rounded(context, x, y, width, height, border);
+            int top;
+            int bottom;
+            if (!active) {
+                top = bottom = WbTheme.BUTTON_DISABLED;
+            } else if (style == Style.PRIMARY) {
+                int base = WbMotion.mix(WbTheme.ACCENT_DEEP, effectiveAccent, 0.15F + hoverProgress * 0.25F);
+                top = WbTheme.brighten(base, 0.08F);
+                bottom = WbTheme.darken(base, 0.12F);
+            } else if (style == Style.DANGER) {
+                int base = WbMotion.mix(0xF0402026, 0xFA5A2A32, hoverProgress);
+                top = WbTheme.brighten(base, 0.06F);
+                bottom = base;
+            } else {
+                int base = WbMotion.mix(WbTheme.BUTTON, WbTheme.CARD_SELECTED, selectionProgress);
+                base = WbMotion.mix(base, selected ? WbTheme.BUTTON_PRESSED : WbTheme.BUTTON_HOVER, hoverProgress);
+                top = WbMotion.mix(base, 0xFFFFFFFF, 0.05F);
+                bottom = base;
+            }
+            WbChrome.roundedGradient(context, x + 1, y + 1, width - 2, height - 2, top, bottom);
+            context.fill(x + 3, y + 1, x + width - 3, y + 2, active ? 0x1AFFFFFF : 0x08FFFFFF);
+            if (style == Style.PRIMARY && active) {
+                context.fill(x + 3, y + height - 2, x + width - 3, y + height - 1,
+                        WbTheme.alpha(WbTheme.withAlpha(effectiveAccent, 0xFF), 0.45F + hoverProgress * 0.55F));
+            } else if (style == Style.DANGER) {
+                context.fill(x + 1, y + 3, x + 3, y + height - 3, effectiveAccent);
+            } else if (style == Style.DEFAULT && (selected || hoverProgress > 0.01F)) {
+                int barHeight = Math.round((height - 6) * Math.max(selectionProgress, hoverProgress));
+                context.fill(x + 1, y + (height - barHeight) / 2, x + 3, y + (height + barHeight) / 2, effectiveAccent);
+            }
+        }
+
+        private void drawLabel(GuiGraphicsExtractor context, int x, int y, int width, int height, int effectiveAccent) {
             Font font = Minecraft.getInstance().font;
-            int rightReserved = style == Style.TOGGLE ? 24 : style == Style.DROPDOWN && !hasTextualChevron() ? 18 : 0;
-            int horizontalPadding = 6;
-            int labelWidth = Math.max(1, width - horizontalPadding * 2 - rightReserved);
-            String label = WbText.ellipsize(font, getMessage().getString(), labelWidth);
-            int textColor = active ? selected ? WbTheme.TEXT : WbTheme.TEXT_SOFT : WbTheme.TEXT_DISABLED;
-            int labelCenter = x + horizontalPadding + labelWidth / 2;
-            GuiText.drawCenteredTextWithShadow(context, font, label, labelCenter, y + (height - font.lineHeight) / 2, textColor);
+            boolean showIcon = icon != null && (iconOnly || WorldBinder.config().uiShowIcons);
+            int textColor = active
+                    ? (selected || style == Style.PRIMARY ? WbTheme.TEXT : WbMotion.mix(WbTheme.TEXT_SOFT, WbTheme.TEXT, hoverProgress))
+                    : WbTheme.TEXT_DISABLED;
+            int iconColor = active ? WbMotion.mix(WbMotion.mix(WbTheme.TEXT_MUTED, effectiveAccent, 0.55F), effectiveAccent,
+                    Math.max(hoverProgress, selectionProgress)) : WbTheme.TEXT_DISABLED;
+            if (iconOnly && icon != null) {
+                int scale = height >= 22 && width >= 22 ? 2 : 1;
+                int size = WbIcon.SIZE * scale;
+                icon.drawShadowed(context, x + (width - size) / 2, y + (height - size) / 2, scale,
+                        active ? WbMotion.mix(WbTheme.TEXT_SOFT, effectiveAccent, Math.max(hoverProgress, selectionProgress)) : WbTheme.TEXT_DISABLED);
+                return;
+            }
+            int leftPad = style == Style.TAB ? 9 : 7;
+            int rightReserved = 0;
+            if (style == Style.TOGGLE) {
+                rightReserved = 26;
+                WbChrome.drawSwitch(context, x + width - 25, y + (height - 10) / 2, selectionProgress, effectiveAccent, active);
+            } else if (style == Style.DROPDOWN && !hasTextualChevron()) {
+                rightReserved = 16;
+                int cx = x + width - 13;
+                int cy = y + (height - WbIcon.SIZE) / 2;
+                if (selected) {
+                    context.pose().pushMatrix();
+                    context.pose().translate(cx, cy + WbIcon.SIZE);
+                    context.pose().scale(1.0F, -1.0F);
+                    WbIcon.CHEVRON_DOWN.draw(context, 0, 0, 1, effectiveAccent);
+                    context.pose().popMatrix();
+                } else {
+                    WbIcon.CHEVRON_DOWN.draw(context, cx, cy, 1, WbMotion.mix(WbTheme.TEXT_MUTED, effectiveAccent, 0.4F + hoverProgress * 0.6F));
+                }
+            }
+            if (badge != null) {
+                int badgeW = font.width(badge) + 8;
+                int bx = x + width - rightReserved - badgeW - 4;
+                WbChrome.rounded(context, bx, y + (height - 11) / 2, badgeW, 11, WbTheme.withAlpha(effectiveAccent, 0x40));
+                context.text(font, badge, bx + 4, y + (height - 11) / 2 + 2, WbMotion.mix(effectiveAccent, WbTheme.TEXT, 0.5F), false);
+                rightReserved += badgeW + 6;
+            }
+            int iconSpace = showIcon ? WbIcon.SIZE + 5 : 0;
+            int available = Math.max(1, width - leftPad * 2 - rightReserved - iconSpace);
+            String label = WbText.ellipsize(font, getMessage().getString(), available);
+            int labelWidth = font.width(label);
+            int textY = y + (height - font.lineHeight) / 2 + 1;
+            boolean left = leftAligned || style == Style.TAB || style == Style.TOGGLE;
+            int contentX = left ? x + leftPad
+                    : x + leftPad + Math.max(0, (width - leftPad * 2 - rightReserved - iconSpace - labelWidth) / 2);
+            if (showIcon) {
+                icon.draw(context, contentX, y + (height - WbIcon.SIZE) / 2, 1, iconColor);
+                contentX += iconSpace;
+            }
+            GuiText.drawTextWithShadow(context, font, label, contentX, textY, textColor);
         }
 
         private boolean hasTextualChevron() {
             String label = getMessage().getString().stripTrailing();
             return label.endsWith("▼") || label.endsWith("▾");
-        }
-
-        private int buttonFill() {
-            if (!active) {
-                return WbTheme.BUTTON_DISABLED;
-            }
-            if (style == Style.QUIET) {
-                return WbMotion.mix(0x66252F39, WbTheme.BUTTON_HOVER, hoverProgress);
-            }
-            int base = WbMotion.mix(WbTheme.BUTTON, WbTheme.CARD_SELECTED, selectionProgress);
-            return WbMotion.mix(base, selected ? WbTheme.BUTTON_PRESSED : WbTheme.BUTTON_HOVER, hoverProgress);
-        }
-
-        private void drawToggleIndicator(GuiGraphicsExtractor context, int x, int y, int width, int height, int effectiveAccent) {
-            int pillW = 12;
-            int pillH = 7;
-            int px = x + width - pillW - 5;
-            int py = y + (height - pillH) / 2;
-            context.fill(px, py, px + pillW, py + pillH,
-                    WbMotion.mix(WbTheme.FIELD, effectiveAccent, selectionProgress * 0.55F));
-            int knobX = px + 2 + Math.round((pillW - 7) * selectionProgress);
-            context.fill(knobX, py + 2, knobX + 3, py + 5,
-                    WbMotion.mix(WbTheme.TEXT_DIM, WbTheme.TEXT, selectionProgress));
-        }
-
-        private void drawChevron(GuiGraphicsExtractor context, int x, int y, int color) {
-            context.fill(x, y, x + 7, y + 1, color);
-            context.fill(x + 1, y + 1, x + 6, y + 2, color);
-            context.fill(x + 2, y + 2, x + 5, y + 3, color);
-            if (selected) {
-                context.fill(x + 2, y - 1, x + 5, y, color);
-            }
         }
     }
 }

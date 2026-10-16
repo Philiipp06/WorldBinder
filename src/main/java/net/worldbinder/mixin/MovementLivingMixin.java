@@ -19,6 +19,10 @@ public abstract class MovementLivingMixin {
         LivingEntity entity = (LivingEntity)(Object)this;
         if (MovementController.local(entity) && (MovementController.flight(entity) || MovementController.spiderActive(entity))) ci.cancel();
     }
+    @Inject(method = "jumpFromGround", at = @At("RETURN"))
+    private void worldbinder$jumpBoost(CallbackInfo ci) {
+        net.worldbinder.movement.AirMotion.afterGroundJump((LivingEntity)(Object)this);
+    }
     @Inject(method = "handleOnClimbable", at = @At("RETURN"), cancellable = true)
     private void worldbinder$ladderSpeed(Vec3 input, CallbackInfoReturnable<Vec3> cir) {
         LivingEntity entity = (LivingEntity)(Object)this;

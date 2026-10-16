@@ -26,6 +26,7 @@ public final class WorldBinderClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         WorldBinder.init();
+        net.worldbinder.ui.component.WbTheme.refresh();
         selectionManager = new SelectionManager();
         sceneLibrary = new SceneLibrary();
         captureService = new SceneCaptureService(selectionManager, sceneLibrary);
@@ -35,8 +36,15 @@ public final class WorldBinderClient implements ClientModInitializer {
         WorldBinderKeybinds.register(selectionManager, captureService, placementService, sceneLibrary);
         ClientTickEvents.END_CLIENT_TICK.register(FlightMotion::tick);
         ClientTickEvents.END_CLIENT_TICK.register(WorldBinderClient::showRecoveryNoticeOnce);
+        ClientTickEvents.END_CLIENT_TICK.register(client -> net.worldbinder.render.MapExplorer.get().tick(client));
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> WorldBinderNotifications.clear());
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> WorldBinderNotifications.clear());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            WorldBinderNotifications.clear();
+            client.execute(() -> {
+                net.worldbinder.render.MapRegionTextures.shared().clear();
+                net.worldbinder.render.MapExplorer.get().clear();
+            });
+        });
     }
 
     private static void showRecoveryNoticeOnce(Minecraft client) {

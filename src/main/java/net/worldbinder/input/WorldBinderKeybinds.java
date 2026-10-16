@@ -88,7 +88,28 @@ public final class WorldBinderKeybinds {
                 5
         ));
 
+        KeyMapping toggleMovementMaster = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.worldbinder.toggle_movement",
+                keyboardType(),
+                InputConstants.UNKNOWN.getValue(),
+                WORLD_BINDER_CATEGORY,
+                6
+        ));
+        java.util.EnumMap<net.worldbinder.movement.MovementTool, KeyMapping> toolKeys = new java.util.EnumMap<>(net.worldbinder.movement.MovementTool.class);
+        int order = 7;
+        for (net.worldbinder.movement.MovementTool tool : net.worldbinder.movement.MovementTool.values()) {
+            toolKeys.put(tool, KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                    tool.keybindKey(),
+                    keyboardType(),
+                    InputConstants.UNKNOWN.getValue(),
+                    WORLD_BINDER_CATEGORY,
+                    order++
+            )));
+        }
+        MovementKeys.register(toggleMovementMaster, toolKeys);
+
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            MovementKeys.tick(client);
             if (StorageFlow.progress().stage() != lastStorageStage) {
                 lastStorageStage = StorageFlow.progress().stage();
                 if (lastStorageStage == StorageStage.SNAPSHOT) {
@@ -115,7 +136,7 @@ public final class WorldBinderKeybinds {
                 } else {
                     net.worldbinder.compat.ClientCompat.setScreen(mc, new WorldBinderLegalStartScreen(net.worldbinder.compat.ClientCompat.screen(mc),
                             name -> capture.toggleRoamingCapture(name),
-                            "Start saving",
+                            net.worldbinder.util.Lang.string("worldbinder.gui.start_saving"),
                             WorldBinder.config().defaultArchiveName));
                 }
             }

@@ -212,39 +212,37 @@ public final class WorldBinderNotificationOverlay {
         int height = layout.height();
         int accent = config.notificationAccentColor;
         int statusColor = statusColor(entry.type());
-        context.fill(x + 2, y + 3, x + width + 2, y + height + 3, fade(0x78000000, visibility));
-        context.fill(x, y, x + width, y + height, fade(config.notificationBackgroundColor, visibility));
-        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, fade(0x243C5747, visibility));
-        context.fill(x, y, x + 3, y + height, fade(statusColor, visibility));
-        context.fill(x + 3, y, x + width, y + 1, fade(accent, visibility));
+        float alpha = (float) visibility;
+        net.worldbinder.ui.component.WbChrome.softShadow(context, x, y, width, height, Math.round(0x90 * alpha));
+        net.worldbinder.ui.component.WbChrome.rounded(context, x, y, width, height,
+                fade(net.worldbinder.ui.component.WbMotion.mix(WbTheme.panelBorder(), statusColor, 0.45F), visibility));
+        net.worldbinder.ui.component.WbChrome.roundedGradient(context, x + 1, y + 1, width - 2, height - 2,
+                fade(net.worldbinder.ui.component.WbMotion.mix(config.notificationBackgroundColor, statusColor, 0.10F), visibility),
+                fade(config.notificationBackgroundColor, visibility));
+        context.fill(x + 1, y + 3, x + 3, y + height - 3, fade(statusColor, visibility));
 
-        int iconLeft = x + 7;
-        int iconTop = y + 8;
-        context.fill(iconLeft, iconTop, iconLeft + 17, iconTop + 17, fade(WbTheme.FIELD, visibility));
-        context.fill(iconLeft, iconTop, iconLeft + 2, iconTop + 17, fade(statusColor, visibility));
-        GuiText.drawCenteredTextWithShadow(
-                context,
-                font,
-                Component.literal(icon(entry.type())),
-                iconLeft + 9,
-                iconTop + 4,
-                fade(statusColor, visibility)
-        );
+        int iconLeft = x + 8;
+        int iconTop = y + 7;
+        net.worldbinder.ui.component.WbChrome.rounded(context, iconLeft, iconTop, 18, 18, fade(WbTheme.withAlpha(statusColor, 0x30), visibility));
+        net.worldbinder.ui.component.WbChrome.roundedOutline(context, iconLeft, iconTop, 18, 18, fade(WbTheme.withAlpha(statusColor, 0x90), visibility));
+        icon(entry.type()).draw(context, iconLeft + 2, iconTop + 2, 2, fade(statusColor, visibility));
 
-        int textX = x + 30;
-        GuiText.drawTextWithShadow(context, font, layout.title(), textX, y + 5, fade(WbTheme.TEXT, visibility));
+        int textX = x + 32;
+        context.text(font, Component.literal(layout.title()).withStyle(net.minecraft.ChatFormatting.BOLD), textX, y + 6,
+                fade(net.worldbinder.ui.component.WbMotion.mix(statusColor, WbTheme.TEXT, 0.55F), visibility), true);
         for (int i = 0; i < layout.lines().size(); i++) {
             int color = i == 0 ? WbTheme.TEXT_SOFT : WbTheme.TEXT_MUTED;
-            GuiText.drawTextWithShadow(context, font, layout.lines().get(i), textX, y + 17 + i * 10, fade(color, visibility));
+            GuiText.drawTextWithShadow(context, font, layout.lines().get(i), textX, y + 18 + i * 10, fade(color, visibility));
         }
 
-        int trackX = x + 2;
-        int trackY = y + height - 2;
-        int trackWidth = width - 4;
+        int trackX = x + 4;
+        int trackY = y + height - 3;
+        int trackWidth = width - 8;
         int fillWidth = (int) Math.round(trackWidth * (1.0D - entry.lifeProgress(now)));
-        context.fill(trackX, trackY, trackX + trackWidth, trackY + 2, fade(0x66070B10, visibility));
+        context.fill(trackX, trackY, trackX + trackWidth, trackY + 1, fade(0x55070B10, visibility));
         if (fillWidth > 0) {
-            context.fill(trackX, trackY, trackX + Math.min(trackWidth, fillWidth), trackY + 2, fade(accent, visibility));
+            net.worldbinder.ui.component.WbChrome.hGradient(context, trackX, trackY, Math.min(trackWidth, fillWidth), 1,
+                    fade(WbTheme.withAlpha(accent, 0x60), visibility), fade(accent, visibility));
         }
     }
 
@@ -267,12 +265,12 @@ public final class WorldBinderNotificationOverlay {
         };
     }
 
-    private static String icon(WorldBinderNotifications.Type type) {
+    private static net.worldbinder.ui.component.WbIcon icon(WorldBinderNotifications.Type type) {
         return switch (type) {
-            case INFO -> "i";
-            case SUCCESS -> "OK";
-            case WARN -> "!";
-            case ERROR -> "X";
+            case INFO -> net.worldbinder.ui.component.WbIcon.INFO;
+            case SUCCESS -> net.worldbinder.ui.component.WbIcon.CHECK;
+            case WARN -> net.worldbinder.ui.component.WbIcon.WARNING;
+            case ERROR -> net.worldbinder.ui.component.WbIcon.CLOSE;
         };
     }
 

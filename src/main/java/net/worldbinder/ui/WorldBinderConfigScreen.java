@@ -1,6 +1,7 @@
 package net.worldbinder.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.input.KeyEvent;
@@ -9,19 +10,24 @@ import net.minecraft.network.chat.Component;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.config.GameRuleSettings;
 import net.worldbinder.config.WorldBinderConfig;
+import net.worldbinder.input.MovementKeys;
+import net.worldbinder.movement.MovementProfile;
 import net.worldbinder.movement.MovementSettings;
 import net.worldbinder.movement.MovementTool;
 import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbEditBox;
+import net.worldbinder.ui.component.WbIcon;
 import net.worldbinder.ui.component.WbIntegerSlider;
 import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbSounds;
 import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
 import net.worldbinder.util.Lang;
-import net.worldbinder.version.TargetMinecraftVersion;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
@@ -31,6 +37,11 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     private static final String SHOWCASE_RULES = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;"
             + "doInsomnia=false;doPatrolSpawning=false;doTraderSpawning=false;doWardenSpawning=false;"
             + "doFireTick=false;mobGriefing=false;doTileDrops=false;doEntityDrops=false;randomTickSpeed=0";
+    private static final long CONFIRM_WINDOW_MILLIS = 4000L;
+    private static int rememberedMovementGroup;
+
+    private long discardArmedMillis;
+    private long resetArmedMillis;
 
     public WorldBinderConfigScreen(Screen parent) {
         this(parent, Tab.GENERAL, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
@@ -52,6 +63,10 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return new WorldBinderConfigScreen(parent, Tab.HUD, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
     }
 
+    public static WorldBinderConfigScreen display(Screen parent) {
+        return new WorldBinderConfigScreen(parent, Tab.DISPLAY, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
+    }
+
     public static WorldBinderConfigScreen safety(Screen parent) {
         return new WorldBinderConfigScreen(parent, Tab.SAFETY, SafetyPage.CORE, 0, copyConfig(WorldBinder.config()));
     }
@@ -63,11 +78,21 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     private WorldBinderConfigScreen(Screen parent, Tab tab, SafetyPage safetyPage, int scrollOffset, WorldBinderConfig draft) {
         super(parent, tab, safetyPage, scrollOffset,
                 draft == null ? copyConfig(WorldBinder.config()) : draft);
+        movementGroup = Math.max(0, Math.min(MOVEMENT_OPTIONS_GROUP, rememberedMovementGroup));
     }
 
     private static WorldBinderConfig copyConfig(WorldBinderConfig source) {
         WorldBinderConfig copy = WorldBinder.GSON.fromJson(WorldBinder.GSON.toJson(source), WorldBinderConfig.class);
         return copy == null ? new WorldBinderConfig() : copy;
+    }
+
+    @Override
+    protected boolean computeDirty() {
+        try {
+            return gameRules.isDirty() || !WorldBinder.GSON.toJson(draft).equals(WorldBinder.GSON.toJson(WorldBinder.config()));
+        } catch (RuntimeException exception) {
+            return false;
+        }
     }
 
     @Override
@@ -88,6 +113,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     private void initScaled() {
         WorldBinderConfig config = draft;
         gameRules.load(config.gameRulesOverride);
+        decorations.clear();
 
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
@@ -110,36 +136,57 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         if (tab == Tab.MOVEMENT) initMovement(config, formX, contentY, formW);
         if (tab == Tab.DISPLAY) initDisplay(config, formX, contentY, formW);
 
-        int buttonW = compact() ? 76 : 92;
-        int bottomY = top + panelHeight - 32;
-        addRenderableWidget(WbButton.primary(button(left + panelWidth - buttonW * 2 - 26, bottomY, buttonW, 22, "worldbinder.config.save", "worldbinder.tooltip.config.save", button -> {
-            if (saveConfig()) {
-                net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
-            }
-        })));
-        addRenderableWidget(WbButton.quiet(button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22, "worldbinder.config.cancel", "worldbinder.tooltip.config.back", button -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent))));
+        addFooter(left, top, panelWidth, panelHeight);
         addSettingsNavigation(left, top, panelWidth);
+    }
+
+    private void addFooter(int left, int top, int panelWidth, int panelHeight) {
+        int buttonW = footerButtonWidth();
+        int bottomY = top + panelHeight - 32;
+        Button save = WbButton.icon(WbButton.primary(button(left + panelWidth - buttonW * 2 - 26, bottomY, buttonW, 22,
+                "worldbinder.config.save", "worldbinder.tooltip.config.save", button -> {
+                    if (saveConfig()) {
+                        WbSounds.success();
+                        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
+                    }
+                })), WbIcon.SAVE);
+        WbTooltips.hint(save, Component.literal("Ctrl + S"));
+        addRenderableWidget(save);
+        boolean discardArmed = System.currentTimeMillis() - discardArmedMillis < CONFIRM_WINDOW_MILLIS;
+        Button cancel = button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22,
+                discardArmed ? "worldbinder.config.discard_confirm" : "worldbinder.config.cancel",
+                "worldbinder.tooltip.config.back", button -> requestClose());
+        addRenderableWidget(discardArmed ? WbButton.danger(cancel) : WbButton.icon(WbButton.quiet(cancel), WbIcon.CLOSE));
+        WbTooltips.hint(cancel, Component.literal("Esc"));
+
+        boolean resetArmed = System.currentTimeMillis() - resetArmedMillis < CONFIRM_WINDOW_MILLIS;
+        int resetW = footerResetWidth();
+        Button reset = button(footerButtonsLeft(left, panelWidth), bottomY, resetW, 22,
+                resetArmed ? "worldbinder.config.reset_confirm" : "worldbinder.config.reset_tab",
+                "worldbinder.tooltip.config.reset_tab", button -> resetTab());
+        addRenderableWidget(resetArmed ? WbButton.danger(reset) : WbButton.icon(WbButton.quiet(reset), WbIcon.RESET));
     }
 
     private void addSettingsNavigation(int left, int top, int panelWidth) {
         if (useSidebar(panelWidth)) {
-            int tabX = left + 16;
-            int tabY = top + (panelHeight() < 390 ? 88 : 82);
-            int step = panelHeight() < 390 ? Math.max(21, (panelHeight() - 124) / Tab.values().length) : 40;
-            int tabH = panelHeight() < 390 ? 22 : 32;
-            int tabW = settingsSidebarWidth(panelWidth) - 28;
+            int tabX = left + 14;
+            int tabY = top + (panelHeight() < 390 ? 62 : 64);
+            int available = panelHeight() - (panelHeight() >= 390 ? 140 : 110);
+            int step = Math.max(22, Math.min(30, available / Tab.values().length));
+            int tabH = Math.min(24, step - 4);
+            int tabW = settingsSidebarWidth(panelWidth) - 26;
             int index = 0;
             for (Tab target : Tab.values()) {
-                Button navigation = WbButton.create(
-                        tabX,
-                        tabY + index * step,
-                        tabW,
-                        tabH,
+                Button navigation = WbButton.create(tabX, tabY + index * step, tabW, tabH,
                         Component.translatable(tabLabelKey(target)),
-                        Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(tabLabelKey(target))),
-                        button -> openSection(target, target == Tab.SAFETY ? safetyPage : SafetyPage.CORE)
-                );
-                addRenderableWidget(WbButton.tab(navigation, tabAccent(target), tab == target));
+                        Component.translatable(tabDescriptionKey(target)),
+                        button -> openSection(target, target == Tab.SAFETY ? safetyPage : SafetyPage.CORE));
+                WbButton.icon(WbButton.tab(navigation, tabAccent(target), tab == target), tabIcon(target));
+                if (target == Tab.MOVEMENT && draft.movement != null && draft.movement.enabledCount() > 0) {
+                    WbButton.badge(navigation, Integer.toString(draft.movement.enabledCount()));
+                }
+                WbTooltips.hint(navigation, Component.literal("Ctrl + Tab"));
+                addRenderableWidget(navigation);
                 index++;
             }
             if (tab == Tab.SAFETY) {
@@ -160,29 +207,34 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             int col = index % cols;
             int row = index / cols;
             Button navigation = WbButton.create(tabX + col * (tabW + gap), y + row * 26, tabW, 22, Component.translatable(tabLabelKey(target)),
-                    Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(tabLabelKey(target))),
+                    Component.translatable(tabDescriptionKey(target)),
                     button -> openSection(target, target == Tab.SAFETY ? safetyPage : SafetyPage.CORE));
-            addRenderableWidget(WbButton.tab(navigation, tabAccent(target), tab == target));
+            addRenderableWidget(WbButton.icon(WbButton.tab(navigation, tabAccent(target), tab == target), tabIcon(target)));
             index++;
         }
-        if (tab != Tab.SAFETY && tab != Tab.MOVEMENT) {
+        if (!hasSubNavigation()) {
             return;
         }
+        int subY = y + navRows(panelWidth) * 26 + 6;
         if (tab == Tab.MOVEMENT) {
-            addCompactMovementNavigation(tabX, y + navRows(panelWidth) * 26 + 6, panelWidth, gap);
+            int groups = MOVEMENT_OPTIONS_GROUP + 1;
+            int subCols = panelWidth < 430 ? 3 : groups;
+            int buttonW = (panelWidth - 36 - gap * (subCols - 1)) / subCols;
+            for (int i = 0; i < groups; i++) {
+                addMovementGroupButton(tabX + (i % subCols) * (buttonW + gap), subY + (i / subCols) * 24, buttonW, i);
+            }
             return;
         }
-        int safetyY = y + navRows(panelWidth) * 26 + 6;
         int safetyCols = panelWidth < 430 ? 2 : 4;
         int safetyW = Math.max(90, (panelWidth - 36 - gap * (safetyCols - 1)) / safetyCols);
         int safetyIndex = 0;
         for (SafetyPage target : SafetyPage.values()) {
             int col = safetyIndex % safetyCols;
             int row = safetyIndex / safetyCols;
-            Button navigation = WbButton.create(tabX + col * (safetyW + gap), safetyY + row * 24, safetyW, 20, Component.translatable(safetyLabelKey(target)),
+            Button navigation = WbButton.create(tabX + col * (safetyW + gap), subY + row * 24, safetyW, 20, Component.translatable(safetyLabelKey(target)),
                     Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(safetyLabelKey(target))),
                     button -> openSection(Tab.SAFETY, target));
-            addRenderableWidget(WbButton.tab(navigation, WbTheme.WARN, safetyPage == target));
+            addRenderableWidget(WbButton.icon(WbButton.tab(navigation, WbTheme.WARN, safetyPage == target), safetyIcon(target)));
             safetyIndex++;
         }
     }
@@ -204,7 +256,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                     Component.translatable("worldbinder.tooltip.config.tab", Component.translatable(safetyLabelKey(target))),
                     button -> openSection(Tab.SAFETY, target)
             );
-            addRenderableWidget(WbButton.tab(navigation, WbTheme.WARN, safetyPage == target));
+            addRenderableWidget(WbButton.icon(WbButton.tab(navigation, WbTheme.WARN, safetyPage == target), safetyIcon(target)));
             index++;
         }
     }
@@ -212,35 +264,41 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     private void addMovementNavigation(int top, int panelWidth) {
         int x = contentAreaX(WbLayout.left(width, panelWidth), panelWidth);
         int contentWidth = contentAreaWidth(panelWidth);
-        int cols = contentWidth < 400 ? 2 : MovementSettingsLayout.GROUPS.size();
+        int groups = MOVEMENT_OPTIONS_GROUP + 1;
+        int cols = contentWidth < 400 ? 3 : groups;
         int gap = 6;
         int buttonW = (contentWidth - gap * (cols - 1)) / cols;
-        for (int index = 0; index < MovementSettingsLayout.GROUPS.size(); index++) {
+        for (int index = 0; index < groups; index++) {
             addMovementGroupButton(x + (index % cols) * (buttonW + gap),
                     top + 59 + (index / cols) * 26, buttonW, index);
         }
     }
 
-    private void addCompactMovementNavigation(int x, int y, int panelWidth, int gap) {
-        int cols = panelWidth < 430 ? 2 : MovementSettingsLayout.GROUPS.size();
-        int buttonW = (panelWidth - 36 - gap * (cols - 1)) / cols;
-        for (int index = 0; index < MovementSettingsLayout.GROUPS.size(); index++) {
-            addMovementGroupButton(x + (index % cols) * (buttonW + gap),
-                    y + (index / cols) * 24, buttonW, index);
-        }
-    }
-
     private void addMovementGroupButton(int x, int y, int width, int index) {
-        String key = MovementSettingsLayout.GROUPS.get(index).titleKey();
+        boolean options = index >= MOVEMENT_OPTIONS_GROUP;
+        String key = options ? "worldbinder.config.movement.group.options" : MovementTool.Category.values()[index].titleKey;
         Button navigation = WbButton.create(x, y, width, 22, Component.translatable(key),
-                Component.translatable(key), button -> {
+                Component.translatable(options ? "worldbinder.config.movement.group.options.tooltip" : key + ".tooltip"), button -> {
                     if (applyFieldsToDraft()) {
                         movementGroup = index;
+                        rememberedMovementGroup = index;
                         scrollOffset = 0;
+                        pageChangedMillis = System.currentTimeMillis();
                         rebuildConfigWidgets();
                     }
                 });
-        addRenderableWidget(WbButton.tab(navigation, WbTheme.INFO, movementGroup == index));
+        int accent = options ? WbTheme.TEXT_MUTED : categoryAccent(MovementTool.Category.values()[index]);
+        WbButton.icon(WbButton.tab(navigation, accent, movementGroup == index), categoryIcon(index));
+        if (!options && width >= 120) {
+            int enabled = 0;
+            int total = 0;
+            for (MovementTool tool : MovementTool.Category.values()[index].tools()) {
+                total++;
+                if (draft.movement.enabled(tool)) enabled++;
+            }
+            WbButton.badge(navigation, enabled + "/" + total);
+        }
+        addRenderableWidget(navigation);
     }
 
     private void openSection(Tab targetTab, SafetyPage targetPage) {
@@ -250,9 +308,11 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderConfigScreen(parent, targetTab, targetPage, 0, draft));
     }
 
+    // ------------------------------------------------------------------ General
+
     private void initGeneral(WorldBinderConfig config, int x, int y, int w) {
         int fullW = Math.max(120, Math.min(w, 520));
-        defaultName = field(x, y + 48, fullW, config.defaultArchiveName, 64); addContentWidget(defaultName);
+        defaultName = field(x, y + 48, fullW, config.defaultArchiveName, 64, "worldbinder.tooltip.archive_name"); addContentWidget(defaultName);
 
         int targetW = Math.min(fullW, Math.max(180, w / 2));
         Button targetDropdown = WbButton.create(x, y + 100, targetW, 23,
@@ -264,14 +324,14 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                     net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderVersionPickerScreen(this,
                             config.targetMinecraftVersion, selected -> config.targetMinecraftVersion = selected));
                 });
-        addContentWidget(WbButton.dropdown(targetDropdown, WbTheme.ACCENT, false));
+        addContentWidget(WbButton.icon(WbButton.dropdown(targetDropdown, WbTheme.ACCENT, false), WbIcon.GLOBE));
 
         int numericGap = 10;
         int numericW = (fullW - numericGap * 2) / 3;
         int numericY = y + 164;
-        radiusChunks = field(x, numericY, numericW, Integer.toString(config.roamingRadiusChunks), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(radiusChunks);
-        minY = field(x + numericW + numericGap, numericY, numericW, Integer.toString(config.captureMinY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(minY);
-        maxY = field(x + (numericW + numericGap) * 2, numericY, numericW, Integer.toString(config.captureMaxY), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(maxY);
+        radiusChunks = field(x, numericY, numericW, Integer.toString(config.roamingRadiusChunks), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radius"); addContentWidget(radiusChunks);
+        minY = field(x + numericW + numericGap, numericY, numericW, Integer.toString(config.captureMinY), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.y_min"); addContentWidget(minY);
+        maxY = field(x + (numericW + numericGap) * 2, numericY, numericW, Integer.toString(config.captureMaxY), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.y_max"); addContentWidget(maxY);
 
         int gridY = y + 218;
         addToggleGrid(x, gridY, w, 2,
@@ -283,15 +343,17 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                 toggleSpec("worldbinder.config.append_timestamp", "worldbinder.tooltip.config.append_timestamp", () -> config.appendTimestampToArchiveName, v -> config.appendTimestampToArchiveName = v));
     }
 
+    // ------------------------------------------------------------------ Performance
+
     private void initPerformance(WorldBinderConfig config, int x, int y, int w) {
         int cols = w < 420 ? 2 : 4;
         int gap = 8;
         int presetW = Math.max(64, (w - gap * (cols - 1)) / cols);
         int presetY = y + 28;
-        addContentWidget(preset(x, presetY, presetW, "worldbinder.gui.preset_safe", WorldBinderConfig.PerformancePreset.SAFE, "worldbinder.tooltip.preset_safe"));
-        addContentWidget(preset(x + (presetW + gap), presetY, presetW, "worldbinder.gui.preset_balanced", WorldBinderConfig.PerformancePreset.BALANCED, "worldbinder.tooltip.preset_balanced"));
-        addContentWidget(preset(x + (presetW + gap) * (cols == 2 ? 0 : 2), presetY + (cols == 2 ? 30 : 0), presetW, "worldbinder.gui.preset_fast", WorldBinderConfig.PerformancePreset.FAST, "worldbinder.tooltip.preset_fast"));
-        addContentWidget(preset(x + (presetW + gap) * (cols == 2 ? 1 : 3), presetY + (cols == 2 ? 30 : 0), presetW, "worldbinder.gui.preset_extreme", WorldBinderConfig.PerformancePreset.EXTREME, "worldbinder.tooltip.preset_extreme"));
+        addContentWidget(preset(x, presetY, presetW, "worldbinder.gui.preset_safe", WorldBinderConfig.PerformancePreset.SAFE, "worldbinder.tooltip.preset_safe", WbIcon.SHIELD));
+        addContentWidget(preset(x + (presetW + gap), presetY, presetW, "worldbinder.gui.preset_balanced", WorldBinderConfig.PerformancePreset.BALANCED, "worldbinder.tooltip.preset_balanced", WbIcon.STAR));
+        addContentWidget(preset(x + (presetW + gap) * (cols == 2 ? 0 : 2), presetY + (cols == 2 ? 30 : 0), presetW, "worldbinder.gui.preset_fast", WorldBinderConfig.PerformancePreset.FAST, "worldbinder.tooltip.preset_fast", WbIcon.SPEED));
+        addContentWidget(preset(x + (presetW + gap) * (cols == 2 ? 1 : 3), presetY + (cols == 2 ? 30 : 0), presetW, "worldbinder.gui.preset_extreme", WorldBinderConfig.PerformancePreset.EXTREME, "worldbinder.tooltip.preset_extreme", WbIcon.PERFORMANCE));
 
         int formY = y + (cols == 2 ? 96 : 78);
         int fieldGap = 10;
@@ -320,21 +382,17 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         maxCaptureWorkMs = fields[7]; maxUiWorkMs = fields[8]; maxArchiveWorkMs = fields[9];
     }
 
+    // ------------------------------------------------------------------ HUD & Map
+
     private void initHud(WorldBinderConfig config, int x, int y, int w) {
         int editorW = Math.min(w, Math.max(220, w / 2));
-        addContentWidget(WbButton.primary(button(
-                x,
-                y + 48,
-                editorW,
-                24,
-                "worldbinder.config.widget_editor",
-                "worldbinder.tooltip.config.widget_editor",
+        addContentWidget(WbButton.icon(WbButton.primary(button(x, y + 48, editorW, 24,
+                "worldbinder.config.widget_editor", "worldbinder.tooltip.config.widget_editor",
                 button -> {
                     if (applyFieldsToDraft()) {
                         net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderWidgetEditorScreen(this, draft));
                     }
-                }
-        )));
+                })), WbIcon.HUD));
 
         int gap = 12;
         int cols = w < 430 ? 2 : 4;
@@ -348,61 +406,306 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         radarUpdateRate = field(secondRowX + fieldW + gap, secondRowY, fieldW, Integer.toString(config.radarUpdateRate), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.radar_update_rate"); addContentWidget(radarUpdateRate);
 
         int mapY = y + (cols == 2 ? 244 : 196);
-        addButtonGrid(x, mapY + 30, w, 3,
+        int gridCols = Math.min(3, w < 300 ? 1 : w < 430 ? 2 : 3);
+        int buttonRows = addButtonGrid(x, mapY + 30, w, 3,
                 modeButton(0, 0, 100, "worldbinder.config.f10_view", () -> config.f10MapLayerMode, v -> config.f10MapLayerMode = v),
                 modeButton(0, 0, 100, "worldbinder.config.radar_view", () -> config.radarLayerMode, v -> config.radarLayerMode = v),
                 radarDetailButton(0, 0, 100, "worldbinder.config.radar_detail", () -> config.radarDetailMode, v -> config.radarDetailMode = v),
                 toggle(0, 0, 100, 22, "worldbinder.config.markers", "worldbinder.tooltip.config.markers", () -> config.showWorldGizmos, v -> config.showWorldGizmos = v));
+        addToggleGrid(x, mapY + 30 + buttonRows * 30, w, gridCols,
+                toggleSpec("worldbinder.config.map.hillshade", "worldbinder.tooltip.config.map.hillshade", () -> config.mapHillshade, v -> config.mapHillshade = v),
+                toggleSpec("worldbinder.config.map.grid", "worldbinder.tooltip.config.map.grid", () -> config.mapShowGrid, v -> config.mapShowGrid = v),
+                toggleSpec("worldbinder.config.map.status", "worldbinder.tooltip.config.map.status", () -> config.mapShowStatusOverlay, v -> config.mapShowStatusOverlay = v),
+                toggleSpec("worldbinder.config.map.players", "worldbinder.tooltip.config.map.players", () -> config.mapShowPlayers, v -> config.mapShowPlayers = v),
+                toggleSpec("worldbinder.config.map.sidebar", "worldbinder.tooltip.config.map.sidebar", () -> config.mapShowSidebar, v -> config.mapShowSidebar = v),
+                toggleSpec("worldbinder.config.map.smooth", "worldbinder.tooltip.config.map.smooth", () -> config.mapSmoothCamera, v -> config.mapSmoothCamera = v));
 
-        int notificationY = mapY + 112;
+        int notificationY = mapY + hudMapSectionHeight(w);
         notificationDuration = field(x, notificationY + 32, fieldW, Integer.toString(config.notificationDurationPercent), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.notification_duration");
         addContentWidget(notificationDuration);
         int modeY = notificationY + 64;
         int modeW = Math.max(60, (w - 6) / 2);
         int modeIndex = 0;
+        WbIcon[] modeIcons = {WbIcon.INFO, WbIcon.HUD, WbIcon.STAR, WbIcon.CLOSE};
         for (WorldBinderConfig.MessageMode mode : WorldBinderConfig.MessageMode.values()) {
             Button choice = WbButton.create(x + (modeIndex % 2) * (modeW + 6), modeY + (modeIndex / 2) * 26,
-                    modeW, 22, Component.translatable("worldbinder.messages." + mode.name().toLowerCase(java.util.Locale.ROOT)),
+                    modeW, 22, Component.translatable("worldbinder.messages." + mode.name().toLowerCase(Locale.ROOT)),
                     Component.translatable("worldbinder.messages.tooltip"), b -> {
                         if (applyFieldsToDraft()) {
                             config.messageMode = mode;
                             rebuildConfigWidgets();
                         }
                     });
-            addContentWidget(WbButton.tab(choice, WbTheme.INFO, config.effectiveMessageMode() == mode));
+            addContentWidget(WbButton.icon(WbButton.tab(choice, WbTheme.INFO, config.effectiveMessageMode() == mode), modeIcons[modeIndex % modeIcons.length]));
             modeIndex++;
         }
     }
 
-    private void initMovement(WorldBinderConfig config, int x, int y, int w) {
-        if (config.movement == null) config.movement = new MovementSettings();
-        int rowY = y + 22;
-        MovementSettingsLayout.Group group = MovementSettingsLayout.GROUPS.get(movementGroup);
-            rowY += MovementSettingsLayout.HEADING_HEIGHT;
-            for (MovementTool tool : group.tools()) {
-                addContentWidget(toggle(x, rowY, w, 22, tool.key(), tool.key() + ".tooltip",
-                        () -> config.movement.enabled(tool), enabled -> config.movement.enabled(tool, enabled)));
-                if (tool.adjustable()) {
-                    WbIntegerSlider slider = new WbIntegerSlider(font, x, rowY + 43, w, 22,
-                            (int)(tool.min * 10), (int)(tool.max * 10), (int)Math.round(config.movement.value(tool) * 10),
-                            WbTheme.OK, value -> config.movement.value(tool, value / 10.0),
-                            value -> Component.translatable(tool == MovementTool.STEP
-                                    ? "worldbinder.movement.blocks" : "worldbinder.movement.multiplier",
-                                    String.format(java.util.Locale.ROOT, "%.1f", value / 10.0)));
-                    addContentWidget(WbTooltips.register(slider, Component.translatable(tool.key() + ".tooltip")));
-                }
-                rowY += MovementSettingsLayout.ROW_HEIGHT;
-            }
+    // ------------------------------------------------------------------ Movement
+
+    private int movementCardColumns(int w) {
+        return w >= 520 ? 2 : 1;
     }
 
-    private void initDisplay(WorldBinderConfig config, int x, int y, int w) {
-        addContentWidget(toggle(x, y + 54, w, 24, "worldbinder.config.display.contrast",
-                "worldbinder.tooltip.config.display.contrast", () -> config.highContrastUi,
-                value -> config.highContrastUi = value));
-        addContentWidget(toggle(x, y + 94, w, 24, "worldbinder.config.display.motion",
-                "worldbinder.tooltip.config.display.motion", () -> config.reducedUiMotion,
-                value -> config.reducedUiMotion = value));
+    private int movementGroupHeight(int w) {
+        if (movementGroup >= MOVEMENT_OPTIONS_GROUP) {
+            return 404;
+        }
+        List<MovementTool> tools = MovementTool.Category.values()[movementGroup].tools();
+        int cols = movementCardColumns(w);
+        int height = movementCardsTop(w);
+        for (int i = 0; i < tools.size(); i += cols) {
+            height += movementRowHeight(tools, i, cols) + 8;
+        }
+        return height + 8;
     }
+
+    private static int movementCardsTop(int w) {
+        return w >= 440 ? 112 : 162;
+    }
+
+    private static int movementRowHeight(List<MovementTool> tools, int start, int cols) {
+        boolean adjustable = false;
+        for (int i = start; i < Math.min(tools.size(), start + cols); i++) {
+            adjustable |= tools.get(i).adjustable();
+        }
+        return adjustable ? 76 : 56;
+    }
+
+    private void initMovement(WorldBinderConfig config, int x, int y, int w) {
+        if (config.movement == null) config.movement = new MovementSettings();
+        if (movementGroup >= MOVEMENT_OPTIONS_GROUP) {
+            initMovementOptions(config, x, y, w);
+            return;
+        }
+        boolean wideHeader = w >= 440;
+        section(x - 8, y + 22, w + 16, wideHeader ? 82 : 132, WbTheme.OK, WbIcon.POWER, "worldbinder.config.movement.quick",
+                wideHeader ? "worldbinder.config.movement.quick.sub" : null);
+        int masterW = wideHeader ? Math.max(150, Math.min(260, w / 2 - 4)) : w;
+        addContentWidget(toggle(x, y + 44, masterW, 22, "worldbinder.config.movement.master", "worldbinder.tooltip.config.movement.master",
+                () -> config.movementMasterEnabled, v -> config.movementMasterEnabled = v));
+        int smallW = wideHeader ? Math.max(80, Math.min(120, (w - masterW - 16) / 2)) : (w - 6) / 2;
+        int smallY = wideHeader ? y + 44 : y + 70;
+        addContentWidget(WbButton.icon(WbButton.danger(button(x + w - smallW, smallY, smallW, 22, "worldbinder.config.movement.all_off",
+                "worldbinder.tooltip.config.movement.all_off", b -> {
+                    config.movement.disableAll();
+                    rebuildConfigWidgets();
+                })), WbIcon.STOP));
+        addContentWidget(WbButton.icon(WbButton.quiet(button(x + w - smallW * 2 - 6, smallY, smallW, 22, "worldbinder.config.movement.reset_values",
+                "worldbinder.tooltip.config.movement.reset_values", b -> {
+                    config.movement.resetValues();
+                    rebuildConfigWidgets();
+                })), WbIcon.RESET));
+        MovementProfile[] profiles = MovementProfile.values();
+        int profileGap = 6;
+        int profileCols = wideHeader ? profiles.length : 3;
+        int profileW = (w - profileGap * (profileCols - 1)) / profileCols;
+        int profileY = wideHeader ? y + 74 : y + 98;
+        WbIcon[] profileIcons = {WbIcon.GLOBE, WbIcon.CHEST, WbIcon.PARKOUR, WbIcon.JESUS, WbIcon.ELYTRA_BOOST};
+        for (int i = 0; i < profiles.length; i++) {
+            MovementProfile profile = profiles[i];
+            Button button = WbButton.create(x + (i % profileCols) * (profileW + profileGap), profileY + (i / profileCols) * 24, profileW, 20, Component.translatable(profile.key),
+                    Component.translatable(profile.key + ".tooltip"), b -> {
+                        profile.applyTo(config.movement);
+                        config.movementMasterEnabled = true;
+                        statusMessage = Component.translatable("worldbinder.config.movement.profile_applied", Component.translatable(profile.key));
+                        statusMessageMillis = System.currentTimeMillis();
+                        rebuildConfigWidgets();
+                    });
+            addContentWidget(WbButton.icon(button, profileIcons[i % profileIcons.length]));
+        }
+
+        List<MovementTool> tools = MovementTool.Category.values()[movementGroup].tools();
+        int cols = movementCardColumns(w);
+        int gap = 8;
+        int cardW = (w + 16 - gap * (cols - 1)) / cols;
+        int rowY = y + movementCardsTop(w);
+        for (int i = 0; i < tools.size(); i += cols) {
+            int rowH = movementRowHeight(tools, i, cols);
+            for (int c = 0; c < cols && i + c < tools.size(); c++) {
+                MovementTool tool = tools.get(i + c);
+                int cardX = x - 8 + c * (cardW + gap);
+                toolCard(cardX, rowY, cardW, rowH, tool);
+                int hitH = tool.adjustable() ? 40 : rowH;
+                Button toggle = toggle(cardX, rowY, cardW, hitH, tool.key(), tool.tooltipKey(),
+                        () -> config.movement.enabled(tool), enabled -> config.movement.enabled(tool, enabled));
+                WbButton.ghost(toggle);
+                WbButton.style(toggle, WbButton.Style.TOGGLE, categoryAccent(tool.category), config.movement.enabled(tool));
+                WbTooltips.register(toggle, Component.translatable(tool.key()), Component.translatable(tool.tooltipKey()));
+                String bound = MovementKeys.boundKey(tool);
+                WbTooltips.hint(toggle, bound == null ? Component.translatable("worldbinder.tooltip.hint.movement_key")
+                        : Component.translatable("worldbinder.tooltip.hint.movement_bound", bound));
+                addContentWidget(toggle);
+                if (tool.adjustable()) {
+                    WbIntegerSlider slider = new WbIntegerSlider(font, cardX + 10, rowY + 46, cardW - 20, 22,
+                            (int) Math.round(tool.min * 10), (int) Math.round(tool.max * 10), (int) Math.round(config.movement.value(tool) * 10),
+                            categoryAccent(tool.category), value -> config.movement.value(tool, value / 10.0),
+                            value -> Component.translatable(tool.unit.key, formatToolValue(tool, value / 10.0)));
+                    addContentWidget(WbTooltips.register(slider, Component.translatable(tool.key()), Component.translatable(tool.tooltipKey())));
+                }
+            }
+            rowY += rowH + gap;
+        }
+    }
+
+    private static String formatToolValue(MovementTool tool, double value) {
+        if (tool.unit == MovementTool.Unit.GRAVITY) {
+            return Math.round(value * 100) + "%";
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private void initMovementOptions(WorldBinderConfig config, int x, int y, int w) {
+        int cols = w < 430 ? 1 : 2;
+        int sectionX = x - 8;
+        int sectionW = w + 16;
+        section(sectionX, y + 22, sectionW, 112, WbTheme.OK, WbIcon.POWER, "worldbinder.config.movement.options.behaviour", null);
+        addToggleGrid(x, y + 44, w, cols,
+                toggleSpec("worldbinder.config.movement.master", "worldbinder.tooltip.config.movement.master", () -> config.movementMasterEnabled, v -> config.movementMasterEnabled = v),
+                toggleSpec("worldbinder.config.movement.feedback", "worldbinder.tooltip.config.movement.feedback", () -> config.movementToggleFeedback, v -> config.movementToggleFeedback = v),
+                toggleSpec("worldbinder.config.movement.disable_servers", "worldbinder.tooltip.config.movement.disable_servers", () -> config.movementDisableOnServers, v -> config.movementDisableOnServers = v));
+        textBlock(x, y + (cols == 1 ? 136 : 106), w, 2, Lang.string("worldbinder.config.movement.options.note"), WbTheme.TEXT_DIM);
+
+        int hudY = y + (cols == 1 ? 170 : 146);
+        section(sectionX, hudY, sectionW, 112, WbTheme.INFO, WbIcon.HUD, "worldbinder.config.movement.options.hud", null);
+        addToggleGrid(x, hudY + 22, w, cols,
+                toggleSpec("worldbinder.config.movement.show_badges", "worldbinder.tooltip.config.movement.show_badges", () -> config.showMovementBadges, v -> config.showMovementBadges = v),
+                toggleSpec("worldbinder.config.movement.show_values", "worldbinder.tooltip.config.movement.show_values", () -> config.movementHudShowValues, v -> config.movementHudShowValues = v));
+        int styleY = hudY + 22 + (cols == 1 ? 60 : 30);
+        int halfW = cols == 1 ? w : (w - 8) / 2;
+        Button style = WbButton.create(x, styleY, halfW, 22,
+                Component.translatable("worldbinder.config.movement.hud_style", hudStyleLabel(config.effectiveMovementHudStyle())),
+                Component.translatable("worldbinder.tooltip.config.movement.hud_style"), b -> {
+                    WorldBinderConfig.MovementHudStyle[] styles = WorldBinderConfig.MovementHudStyle.values();
+                    config.movementHudStyle = styles[(config.effectiveMovementHudStyle().ordinal() + 1) % styles.length];
+                    b.setMessage(fit(Component.translatable("worldbinder.config.movement.hud_style", hudStyleLabel(config.movementHudStyle)), b.getWidth()));
+                });
+        addContentWidget(WbButton.icon(WbButton.dropdown(style, WbTheme.INFO, false), WbIcon.LAYERS));
+        addContentWidget(WbButton.icon(button(cols == 1 ? x : x + halfW + 8, cols == 1 ? styleY + 30 : styleY, halfW, 22,
+                "worldbinder.config.widget_editor", "worldbinder.tooltip.config.widget_editor", b -> {
+                    if (applyFieldsToDraft()) {
+                        net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderWidgetEditorScreen(this, draft));
+                    }
+                }), WbIcon.HUD));
+
+        int keysY = hudY + (cols == 1 ? 160 : 124);
+        section(sectionX, keysY, sectionW, 96, WbTheme.ACCENT, WbIcon.KEY, "worldbinder.config.movement.options.keys", null);
+        textBlock(x, keysY + 24, w, 2, Lang.string("worldbinder.config.movement.options.keys_hint"), WbTheme.mutedText());
+        addContentWidget(WbButton.icon(WbButton.primary(button(x, keysY + 56, Math.min(w, 240), 22,
+                "worldbinder.config.movement.open_keybinds", "worldbinder.tooltip.config.movement.open_keybinds", b -> {
+                    if (applyFieldsToDraft()) {
+                        net.worldbinder.compat.ClientCompat.setScreen(minecraft,
+                                new net.minecraft.client.gui.screens.options.controls.KeyBindsScreen(this, minecraft.options));
+                    }
+                })), WbIcon.KEY));
+    }
+
+    private static Component hudStyleLabel(WorldBinderConfig.MovementHudStyle style) {
+        return Component.translatable("worldbinder.config.movement.hud_style." + style.name().toLowerCase(Locale.ROOT));
+    }
+
+    // ------------------------------------------------------------------ Interface (Display)
+
+    private void initDisplay(WorldBinderConfig config, int x, int y, int w) {
+        int sectionX = x - 8;
+        int sectionW = w + 16;
+        int half = (w - 8) / 2;
+        boolean narrow = w < 430;
+
+        // Theme
+        section(sectionX, y + 22, sectionW, 96, WbTheme.ACCENT, WbIcon.PALETTE, "worldbinder.config.display.theme", "worldbinder.config.display.theme.sub");
+        WbTheme.Accent[] accents = WbTheme.Accent.values();
+        int presetCount = accents.length - 1;
+        int swatchCols = w < 640 ? 4 : presetCount;
+        int swatchGap = 6;
+        int swatchW = (w - swatchGap * (swatchCols - 1)) / swatchCols;
+        for (int i = 0; i < presetCount; i++) {
+            WbTheme.Accent accent = accents[i];
+            Button swatch = WbButton.create(x + (i % swatchCols) * (swatchW + swatchGap), y + 44 + (i / swatchCols) * 24, swatchW, 20,
+                    Component.translatable("worldbinder.config.display.accent." + accent.name().toLowerCase(Locale.ROOT)),
+                    Component.translatable("worldbinder.tooltip.config.display.accent"), b -> {
+                        config.uiAccent = accent;
+                        rebuildConfigWidgets();
+                    });
+            addContentWidget(WbButton.icon(WbButton.tab(swatch, accent.primary, config.effectiveUiAccent() == accent), WbIcon.STAR));
+        }
+        int customY = y + 44 + ((presetCount + swatchCols - 1) / swatchCols) * 24 + 4;
+        Button custom = WbButton.create(x, customY, Math.min(w, 220), 22,
+                Component.translatable("worldbinder.config.display.custom_accent"),
+                Component.translatable("worldbinder.tooltip.config.display.custom_accent"), b -> {
+                    if (!applyFieldsToDraft()) return;
+                    net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderColorPickerScreen(this,
+                            Component.translatable("worldbinder.config.display.custom_accent"), config.uiCustomAccentColor, false, color -> {
+                        config.uiCustomAccentColor = 0xFF000000 | (color & 0xFFFFFF);
+                        config.uiAccent = WbTheme.Accent.CUSTOM;
+                    }));
+                });
+        addContentWidget(WbButton.icon(WbButton.tab(custom, 0xFF000000 | (config.uiCustomAccentColor & 0xFFFFFF),
+                config.effectiveUiAccent() == WbTheme.Accent.CUSTOM), WbIcon.PALETTE));
+        int afterTheme = customY + 34;
+
+        // Background & motion
+        int motionY = afterTheme;
+        section(sectionX, motionY, sectionW, narrow ? 170 : 116, WbTheme.ACCENT_DARK, WbIcon.MOTION, "worldbinder.config.display.motion_section", null);
+        addContentWidget(slider(x, motionY + 22, narrow ? w : half, 20, 100, config.uiBackdropOpacityPercent, WbTheme.ACCENT_DARK,
+                v -> config.uiBackdropOpacityPercent = v, v -> Component.translatable("worldbinder.config.display.backdrop", v + "%"),
+                "worldbinder.tooltip.config.display.backdrop"));
+        addContentWidget(slider(narrow ? x : x + half + 8, narrow ? motionY + 50 : motionY + 22, narrow ? w : half, 50, 200, config.uiAnimationSpeedPercent, WbTheme.ACCENT_DARK,
+                v -> config.uiAnimationSpeedPercent = v, v -> Component.translatable("worldbinder.config.display.animation_speed", String.format(Locale.ROOT, "%.1fx", v / 100.0)),
+                "worldbinder.tooltip.config.display.animation_speed"));
+        int toggleY = motionY + (narrow ? 80 : 52);
+        addToggleGrid(x, toggleY, w, narrow ? 2 : 2,
+                toggleSpec("worldbinder.config.display.transitions", "worldbinder.tooltip.config.display.transitions", () -> config.uiScreenTransitions, v -> config.uiScreenTransitions = v),
+                toggleSpec("worldbinder.config.display.motion", "worldbinder.tooltip.config.display.motion", () -> config.reducedUiMotion, v -> config.reducedUiMotion = v),
+                toggleSpec("worldbinder.config.display.contrast", "worldbinder.tooltip.config.display.contrast", () -> config.highContrastUi, v -> config.highContrastUi = v),
+                toggleSpec("worldbinder.config.display.icons", "worldbinder.tooltip.config.display.icons", () -> config.uiShowIcons, v -> config.uiShowIcons = v));
+        int afterMotion = motionY + (narrow ? 180 : 126);
+
+        // Sounds
+        int soundY = afterMotion;
+        section(sectionX, soundY, sectionW, narrow ? 140 : 110, WbTheme.OK, WbIcon.SOUND, "worldbinder.config.display.sounds", null);
+        addToggleGrid(x, soundY + 22, w, narrow ? 2 : 3,
+                toggleSpec("worldbinder.config.display.ui_sounds", "worldbinder.tooltip.config.display.ui_sounds", () -> config.uiSounds, v -> config.uiSounds = v),
+                toggleSpec("worldbinder.config.display.hover_sounds", "worldbinder.tooltip.config.display.hover_sounds", () -> config.uiHoverSounds, v -> config.uiHoverSounds = v),
+                toggleSpec("worldbinder.config.display.notification_sounds", "worldbinder.tooltip.config.display.notification_sounds", () -> config.notificationSounds, v -> config.notificationSounds = v));
+        int volumeY = soundY + (narrow ? 82 : 52);
+        addContentWidget(slider(x, volumeY, narrow ? w : half, 0, 200, config.uiSoundVolumePercent, WbTheme.OK,
+                v -> config.uiSoundVolumePercent = v, v -> Component.translatable("worldbinder.config.display.volume", v + "%"),
+                "worldbinder.tooltip.config.display.volume"));
+        addContentWidget(WbButton.icon(WbButton.quiet(button(narrow ? x : x + half + 8, narrow ? volumeY + 28 : volumeY, narrow ? w : half, 22,
+                "worldbinder.config.display.test_sound", "worldbinder.tooltip.config.display.test_sound", b -> WbSounds.success())), WbIcon.PLAY));
+        int afterSounds = soundY + (narrow ? 150 : 120);
+
+        // Tooltips
+        int tooltipY = afterSounds;
+        section(sectionX, tooltipY, sectionW, narrow ? 112 : 84, WbTheme.INFO, WbIcon.INFO, "worldbinder.config.display.tooltips", null);
+        addToggleGrid(x, tooltipY + 22, w, 2,
+                toggleSpec("worldbinder.config.display.tooltips_enabled", "worldbinder.tooltip.config.display.tooltips_enabled", () -> config.tooltipsEnabled, v -> config.tooltipsEnabled = v),
+                toggleSpec("worldbinder.config.display.tooltip_hints", "worldbinder.tooltip.config.display.tooltip_hints", () -> config.tooltipShowHints, v -> config.tooltipShowHints = v));
+        addContentWidget(slider(x, tooltipY + (narrow ? 82 : 52), narrow ? w : half, 0, 30, config.tooltipDelayMs / 50, WbTheme.INFO,
+                v -> config.tooltipDelayMs = v * 50, v -> Component.translatable("worldbinder.config.display.tooltip_delay", (v * 50) + " ms"),
+                "worldbinder.tooltip.config.display.tooltip_delay"));
+        textBlock(x, tooltipY + (narrow ? 122 : 94), w, 2, Lang.string("worldbinder.config.display.apply"), WbTheme.TEXT_DIM);
+    }
+
+    private int displayHeight(int w) {
+        boolean narrow = w < 430;
+        int presetCount = WbTheme.Accent.values().length - 1;
+        int swatchCols = w < 640 ? 4 : presetCount;
+        int customY = 44 + ((presetCount + swatchCols - 1) / swatchCols) * 24 + 4;
+        int afterTheme = customY + 34;
+        int afterMotion = afterTheme + (narrow ? 180 : 126);
+        int afterSounds = afterMotion + (narrow ? 150 : 120);
+        return afterSounds + (narrow ? 150 : 122);
+    }
+
+    private WbIntegerSlider slider(int x, int y, int w, int min, int max, int value, int accent,
+                                   java.util.function.IntConsumer setter, java.util.function.IntFunction<Component> label, String tooltipKey) {
+        WbIntegerSlider slider = new WbIntegerSlider(font, x, y, w, 22, min, max, value, accent, setter, label);
+        return WbTooltips.register(slider, Component.translatable(tooltipKey));
+    }
+
+    // ------------------------------------------------------------------ Safety
 
     private void initSafety(WorldBinderConfig config, int x, int y, int w) {
         int contentY = y + 28;
@@ -414,7 +717,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
 
     private void initSafetyCore(WorldBinderConfig config, int x, int y, int w) {
         int labelW = labelWidth(w);
-        recoverySeconds = field(x + labelW, y + 26, Math.min(90, w - labelW), Integer.toString(config.recoveryAutosaveSeconds), NUMERIC_TEXT_MAX_LENGTH); addContentWidget(recoverySeconds);
+        recoverySeconds = field(x + labelW, y + 26, Math.min(90, w - labelW), Integer.toString(config.recoveryAutosaveSeconds), NUMERIC_TEXT_MAX_LENGTH, "worldbinder.tooltip.config.recovery_interval"); addContentWidget(recoverySeconds);
         addToggleGrid(x, y + 76, w, 3,
                 toggleSpec("worldbinder.config.adaptive_throttle", "worldbinder.tooltip.config.adaptive", () -> config.adaptiveThrottle, v -> { config.adaptiveThrottle = v; config.adaptivePerformance = v; }),
                 toggleSpec("worldbinder.config.server_safety", "worldbinder.tooltip.config.safety", () -> config.serverSafetyMode, v -> config.serverSafetyMode = v),
@@ -449,24 +752,24 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                     pressed.setMessage(fit(Component.translatable("worldbinder.config.reload_display.value",
                             reloadDisplayLabel(config.reloadDisplayMode)), pressed.getWidth()));
                 });
-        return WbButton.dropdown(button, WbTheme.INFO, false);
+        return WbButton.icon(WbButton.dropdown(button, WbTheme.INFO, false), WbIcon.RECOVERY);
     }
 
     private static Component reloadDisplayLabel(WorldBinderConfig.ReloadDisplayMode mode) {
         WorldBinderConfig.ReloadDisplayMode effective = mode == null
                 ? WorldBinderConfig.ReloadDisplayMode.HIDDEN : mode;
-        return Component.translatable("worldbinder.config.reload_display." + effective.name().toLowerCase(java.util.Locale.ROOT));
+        return Component.translatable("worldbinder.config.reload_display." + effective.name().toLowerCase(Locale.ROOT));
     }
 
     private void initGameRules(WorldBinderConfig config, int x, int y, int w) {
         int categoryCols = w < 420 ? 2 : 4;
         int presetW = Math.max(72, (w - 16) / 3);
-        addIfVisible(WbButton.tab(button(x, y + 54, presetW, 22, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe",
-                b -> applyGameRulePreset(SAFE_RULES)), WbTheme.INFO, false), y + 54, 22);
-        addIfVisible(WbButton.tab(button(x + presetW + 8, y + 54, presetW, 22, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla",
-                b -> applyGameRulePreset(null)), WbTheme.ACCENT, false), y + 54, 22);
-        addIfVisible(WbButton.tab(button(x + (presetW + 8) * 2, y + 54, presetW, 22, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase",
-                b -> applyGameRulePreset(SHOWCASE_RULES)), WbTheme.WARN, false), y + 54, 22);
+        addIfVisible(WbButton.icon(WbButton.tab(button(x, y + 54, presetW, 22, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe",
+                b -> applyGameRulePreset(SAFE_RULES)), WbTheme.INFO, false), WbIcon.SHIELD), y + 54, 22);
+        addIfVisible(WbButton.icon(WbButton.tab(button(x + presetW + 8, y + 54, presetW, 22, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla",
+                b -> applyGameRulePreset(null)), WbTheme.ACCENT, false), WbIcon.GLOBE), y + 54, 22);
+        addIfVisible(WbButton.icon(WbButton.tab(button(x + (presetW + 8) * 2, y + 54, presetW, 22, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase",
+                b -> applyGameRulePreset(SHOWCASE_RULES)), WbTheme.WARN, false), WbIcon.EYE), y + 54, 22);
 
         int categoryY = y + 86;
         int categoryGap = 6;
@@ -480,6 +783,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                         if (applyFieldsToDraft()) {
                             gameRuleCategory = selected;
                             scrollOffset = 0;
+                            pageChangedMillis = System.currentTimeMillis();
                             rebuildConfigWidgets();
                         }
                     });
@@ -488,19 +792,9 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         }
 
         int sliderY = categoryY + (categoryCols == 2 ? 62 : 36);
-        addIfVisible(new WbIntegerSlider(
-                font,
-                x,
-                sliderY,
-                Math.min(w, 360),
-                22,
-                0,
-                64,
-                gameRules.randomTickSpeed(),
-                WbTheme.WARN,
-                gameRules::setRandomTickSpeed,
-                value -> Component.translatable("worldbinder.config.random_tick_speed", value)
-        ), sliderY, 22);
+        addIfVisible(new WbIntegerSlider(font, x, sliderY, Math.min(w, 360), 22, 0, 64, gameRules.randomTickSpeed(),
+                WbTheme.WARN, gameRules::setRandomTickSpeed,
+                value -> Component.translatable("worldbinder.config.random_tick_speed", value)), sliderY, 22);
 
         int gridY = sliderY + 38;
         int cols = w < 420 ? 1 : 2;
@@ -523,7 +817,9 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         rebuildConfigWidgets();
     }
 
-    private <T extends net.minecraft.client.gui.components.AbstractWidget> T addContentWidget(T widget) {
+    // ------------------------------------------------------------------ helpers
+
+    private <T extends AbstractWidget> T addContentWidget(T widget) {
         if (widget instanceof WbEditBox styled) {
             widget.visible = isInContentArea(styled.chromeY(), styled.chromeHeight());
         } else {
@@ -533,13 +829,13 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return widget;
     }
 
-    private <T extends net.minecraft.client.gui.components.AbstractWidget> T addIfVisible(T widget, int y, int h) {
+    private <T extends AbstractWidget> T addIfVisible(T widget, int y, int h) {
         widget.visible = isInContentArea(y, h);
         addRenderableWidget(widget);
         return widget;
     }
 
-    private Button preset(int x, int y, int w, String labelKey, WorldBinderConfig.PerformancePreset preset, String tooltipKey) {
+    private Button preset(int x, int y, int w, String labelKey, WorldBinderConfig.PerformancePreset preset, String tooltipKey, WbIcon icon) {
         Button button = WbButton.create(x, y, w, 22, Component.translatable(labelKey), Component.translatable(tooltipKey),
                 b -> {
                     if (!applyFieldsToDraft()) {
@@ -548,7 +844,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                     draft.applyPreset(preset);
                     net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderConfigScreen(parent, Tab.PERFORMANCE, SafetyPage.CORE, 0, draft));
                 });
-        return WbButton.tab(button, WbTheme.ACCENT_RIGHT, draft.performancePreset == preset);
+        return WbButton.icon(WbButton.tab(button, WbTheme.ACCENT_RIGHT, draft.performancePreset == preset), icon);
     }
 
     private Button resourcePackFallbackButton(int x, int y, int w, WorldBinderConfig config) {
@@ -557,7 +853,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             config.resourcePackFallbackMode = nextFallbackMode(config.resourcePackFallbackMode);
             b.setMessage(fit(Component.translatable("worldbinder.config.resource_pack_fallback.value", fallbackLabel(config.resourcePackFallbackMode)), b.getWidth()));
         });
-        return WbButton.dropdown(button, WbTheme.WARN, false);
+        return WbButton.icon(WbButton.dropdown(button, WbTheme.WARN, false), WbIcon.PALETTE);
     }
 
     private static WorldBinderConfig.ResourcePackFallbackMode nextFallbackMode(WorldBinderConfig.ResourcePackFallbackMode mode) {
@@ -584,7 +880,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             setter.set(next);
             b.setMessage(fit(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), modeLabel(next)), b.getWidth()));
         });
-        return WbButton.dropdown(button, WbTheme.INFO, false);
+        return WbButton.icon(WbButton.dropdown(button, WbTheme.INFO, false), WbIcon.LAYERS);
     }
 
     private static WorldBinderConfig.MapLayerMode nextMode(WorldBinderConfig.MapLayerMode mode) {
@@ -603,7 +899,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             setter.set(next);
             b.setMessage(fit(Component.translatable("worldbinder.config.mode_value", Component.translatable(label), radarDetailLabel(next)), b.getWidth()));
         });
-        return WbButton.dropdown(button, WbTheme.INFO, false);
+        return WbButton.icon(WbButton.dropdown(button, WbTheme.INFO, false), WbIcon.TARGET);
     }
 
     private static String modeLabel(WorldBinderConfig.MapLayerMode mode) {
@@ -656,7 +952,8 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         }
     }
 
-    private void addButtonGrid(int x, int y, int w, int requestedCols, Button... buttons) {
+    /** Lays buttons out in a grid and returns the number of rows used. */
+    private int addButtonGrid(int x, int y, int w, int requestedCols, Button... buttons) {
         int cols = Math.min(requestedCols, w < 300 ? 1 : w < 430 ? 2 : 3);
         int gap = 8;
         int buttonW = Math.max(88, (w - gap * (cols - 1)) / cols);
@@ -668,6 +965,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             buttons[i].setWidth(buttonW);
             addContentWidget(buttons[i]);
         }
+        return (buttons.length + cols - 1) / cols;
     }
 
     private ToggleSpec toggleSpec(String labelKey, String tooltipKey, BoolGetter getter, BoolSetter setter) {
@@ -712,13 +1010,134 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return Component.literal(WbButton.fitLabel(label.getString(), width));
     }
 
+    // ------------------------------------------------------------------ actions
+
     private boolean saveConfig() {
         if (!applyFieldsToDraft()) {
+            WbSounds.error();
             return false;
         }
         WorldBinder.replaceConfig(draft);
         draft.save();
+        WbTheme.refresh();
         return true;
+    }
+
+    private void requestClose() {
+        applyFieldsToDraft();
+        long now = System.currentTimeMillis();
+        if (computeDirty() && now - discardArmedMillis >= CONFIRM_WINDOW_MILLIS) {
+            discardArmedMillis = now;
+            statusMessage = Component.translatable("worldbinder.config.discard_hint");
+            statusMessageMillis = now;
+            WbSounds.warning();
+            rebuildConfigWidgets();
+            return;
+        }
+        WbTheme.refresh();
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
+    }
+
+    private void resetTab() {
+        long now = System.currentTimeMillis();
+        if (now - resetArmedMillis >= CONFIRM_WINDOW_MILLIS) {
+            resetArmedMillis = now;
+            statusMessage = Component.translatable("worldbinder.config.reset_hint", Component.translatable(tabLabelKey(tab)));
+            statusMessageMillis = now;
+            WbSounds.warning();
+            rebuildConfigWidgets();
+            return;
+        }
+        resetArmedMillis = 0L;
+        WorldBinderConfig defaults = new WorldBinderConfig();
+        WorldBinderConfig c = draft;
+        switch (tab) {
+            case GENERAL -> {
+                c.defaultArchiveName = defaults.defaultArchiveName;
+                c.targetMinecraftVersion = defaults.targetMinecraftVersion;
+                c.roamingRadiusChunks = defaults.roamingRadiusChunks;
+                c.captureMinY = defaults.captureMinY;
+                c.captureMaxY = defaults.captureMaxY;
+                c.captureEntities = defaults.captureEntities;
+                c.captureBlockEntities = defaults.captureBlockEntities;
+                c.captureAir = defaults.captureAir;
+                c.includeServerResourcePack = defaults.includeServerResourcePack;
+                c.exportGameRules = defaults.exportGameRules;
+                c.appendTimestampToArchiveName = defaults.appendTimestampToArchiveName;
+            }
+            case PERFORMANCE -> {
+                c.applyPreset(WorldBinderConfig.PerformancePreset.BALANCED);
+                c.targetFps = defaults.targetFps;
+                c.maxUiWorkMs = defaults.maxUiWorkMs;
+                c.maxCaptureWorkMs = defaults.maxCaptureWorkMs;
+                c.maxArchiveWorkMs = defaults.maxArchiveWorkMs;
+            }
+            case HUD -> {
+                c.chunkRadarSize = defaults.chunkRadarSize;
+                c.chunkRadarCellSize = defaults.chunkRadarCellSize;
+                c.radarMaxRenderedChunks = defaults.radarMaxRenderedChunks;
+                c.radarUpdateRate = defaults.radarUpdateRate;
+                c.f10MapLayerMode = defaults.f10MapLayerMode;
+                c.radarLayerMode = defaults.radarLayerMode;
+                c.radarDetailMode = defaults.radarDetailMode;
+                c.showWorldGizmos = defaults.showWorldGizmos;
+                c.notificationDurationPercent = defaults.notificationDurationPercent;
+                c.messageMode = defaults.messageMode;
+                c.mapHillshade = defaults.mapHillshade;
+                c.mapShowGrid = defaults.mapShowGrid;
+                c.mapShowStatusOverlay = defaults.mapShowStatusOverlay;
+                c.mapShowPlayers = defaults.mapShowPlayers;
+                c.mapShowSidebar = defaults.mapShowSidebar;
+                c.mapSmoothCamera = defaults.mapSmoothCamera;
+            }
+            case SAFETY -> {
+                c.recoveryAutosaveSeconds = defaults.recoveryAutosaveSeconds;
+                c.adaptiveThrottle = defaults.adaptiveThrottle;
+                c.adaptivePerformance = defaults.adaptivePerformance;
+                c.serverSafetyMode = defaults.serverSafetyMode;
+                c.autoSaveOnDisconnect = defaults.autoSaveOnDisconnect;
+                c.crashRecovery = defaults.crashRecovery;
+                c.autoDeleteRecovery = defaults.autoDeleteRecovery;
+                c.exportMaps = defaults.exportMaps;
+                c.exportStats = defaults.exportStats;
+                c.exportAdvancements = defaults.exportAdvancements;
+                c.zipWorldExport = defaults.zipWorldExport;
+                c.queueDebugDiagnostics = defaults.queueDebugDiagnostics;
+                c.resourcePackFallbackMode = defaults.resourcePackFallbackMode;
+                c.showResourcePackFallbackWarning = defaults.showResourcePackFallbackWarning;
+                c.gameRulesOverride = defaults.gameRulesOverride;
+            }
+            case MOVEMENT -> {
+                c.movement = new MovementSettings();
+                c.movementMasterEnabled = defaults.movementMasterEnabled;
+                c.movementToggleFeedback = defaults.movementToggleFeedback;
+                c.movementDisableOnServers = defaults.movementDisableOnServers;
+                c.movementHudShowValues = defaults.movementHudShowValues;
+                c.movementHudStyle = defaults.movementHudStyle;
+                c.showMovementBadges = defaults.showMovementBadges;
+            }
+            case DISPLAY -> {
+                c.uiAccent = defaults.uiAccent;
+                c.uiCustomAccentColor = defaults.uiCustomAccentColor;
+                c.uiBackdropOpacityPercent = defaults.uiBackdropOpacityPercent;
+                c.uiAnimationSpeedPercent = defaults.uiAnimationSpeedPercent;
+                c.uiScreenTransitions = defaults.uiScreenTransitions;
+                c.uiShowIcons = defaults.uiShowIcons;
+                c.uiSounds = defaults.uiSounds;
+                c.uiSoundVolumePercent = defaults.uiSoundVolumePercent;
+                c.uiHoverSounds = defaults.uiHoverSounds;
+                c.notificationSounds = defaults.notificationSounds;
+                c.tooltipsEnabled = defaults.tooltipsEnabled;
+                c.tooltipDelayMs = defaults.tooltipDelayMs;
+                c.tooltipShowHints = defaults.tooltipShowHints;
+                c.highContrastUi = defaults.highContrastUi;
+                c.reducedUiMotion = defaults.reducedUiMotion;
+            }
+        }
+        statusMessage = Component.translatable("worldbinder.config.reset_done", Component.translatable(tabLabelKey(tab)));
+        statusMessageMillis = now;
+        pageChangedMillis = now;
+        net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderConfigScreen(parent, tab, safetyPage, 0, c));
     }
 
     private boolean applyFieldsToDraft() {
@@ -838,6 +1257,18 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             openSection(next, next == Tab.SAFETY ? safetyPage : SafetyPage.CORE);
             return true;
         }
+        if (event.key() == InputConstants.KEY_S && event.hasControlDown()) {
+            if (saveConfig()) {
+                WbSounds.success();
+                statusMessage = Component.translatable("worldbinder.config.saved_toast");
+                statusMessageMillis = System.currentTimeMillis();
+                dirty = false;
+            }
+            return true;
+        }
+        if (event.key() == InputConstants.KEY_TAB || event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN) {
+            WbTooltips.noteKeyboardNavigation();
+        }
         return super.keyPressed(event);
     }
 
@@ -896,9 +1327,9 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     protected int contentHeight(int w) {
         if (tab == Tab.GENERAL) return 308;
         if (tab == Tab.PERFORMANCE) return (w < 420 ? 96 + 5 * 52 : 78 + 3 * 52) + 38;
-        if (tab == Tab.HUD) return (w < 430 ? 500 : 452);
-        if (tab == Tab.MOVEMENT) return MovementSettingsLayout.height(movementGroup);
-        if (tab == Tab.DISPLAY) return 182;
+        if (tab == Tab.HUD) return (w < 430 ? 244 : 196) + hudMapSectionHeight(w) + 132;
+        if (tab == Tab.MOVEMENT) return movementGroupHeight(w);
+        if (tab == Tab.DISPLAY) return displayHeight(w);
         if (tab == Tab.SAFETY && safetyPage == SafetyPage.GAMERULES) {
             int cols = w < 420 ? 1 : 2;
             int rows = (GameRuleSettings.rules(draft.targetMinecraftVersion, gameRuleCategory).length + cols - 1) / cols;
@@ -912,7 +1343,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
 
     @Override
     public void onClose() {
-        net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
+        requestClose();
     }
 
     private record ToggleSpec(String labelKey, String tooltipKey, BoolGetter getter, BoolSetter setter) {}

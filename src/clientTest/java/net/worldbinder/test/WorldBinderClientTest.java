@@ -107,6 +107,10 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             var screen = net.worldbinder.compat.ClientCompat.screen(client);
             for (int i = 0; i < 24; i++) screen.mouseScrolled(390, 180, 0, -1);
+        });
+        context.waitTicks(20);
+        context.runOnClient(client -> {
+            var screen = net.worldbinder.compat.ClientCompat.screen(client);
             check(screen.children().stream().anyMatch(child -> child instanceof Button button && button.visible
                     && button.getMessage().getString().equals("Custom Settings")),
                     "Capture preset actions remain reachable after scrolling");
@@ -166,21 +170,14 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         context.clickScreenButton("Movement Tools");
         context.waitTicks(3);
         context.takeScreenshot("movement-settings-top");
-        MovementTool[][] movementGroups = {
-                {MovementTool.SPEED, MovementTool.STEP, MovementTool.HIGH_JUMP, MovementTool.AUTO_SPRINT,
-                        MovementTool.SAFE_WALK, MovementTool.AUTO_JUMP},
-                {MovementTool.FLY, MovementTool.SPIDER, MovementTool.GLIDE, MovementTool.FAST_LADDER,
-                        MovementTool.NO_FALL},
-                {MovementTool.JESUS, MovementTool.WATER_SPEED},
-                {MovementTool.AIR_CONTROL}
-        };
-        String[] movementTabs = {
-                "worldbinder.config.movement.group.ground", "worldbinder.config.movement.group.vertical",
-                "worldbinder.config.movement.group.water", "worldbinder.config.movement.group.control"
-        };
-        for (int group = 0; group < movementGroups.length; group++) {
-            context.clickScreenButton(net.minecraft.network.chat.Component.translatable(movementTabs[group]).getString());
-            MovementTool[] tools = movementGroups[group];
+        MovementTool.Category[] categories = MovementTool.Category.values();
+        int categorizedTools = 0;
+        for (MovementTool.Category category : categories) categorizedTools += category.tools().size();
+        check(categorizedTools == MovementTool.values().length && MovementTool.values().length == 24,
+                "Every movement tool belongs to exactly one settings category");
+        for (int group = 0; group < categories.length; group++) {
+            context.clickScreenButton(net.minecraft.network.chat.Component.translatable(categories[group].titleKey).getString());
+            MovementTool[] tools = categories[group].tools().toArray(MovementTool[]::new);
             context.runOnClient(client -> {
             for (MovementTool tool : tools) {
                 String name = net.minecraft.network.chat.Component.translatable(tool.key()).getString();
@@ -202,6 +199,14 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                 }
             } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
             });
+            if (group == 0) {
+                context.runOnClient(client -> {
+                    var screen = net.worldbinder.compat.ClientCompat.screen(client);
+                    for (int i = 0; i < 5; i++) screen.mouseScrolled(500, 300, 0, -1);
+                });
+                context.waitTicks(3);
+                context.takeScreenshot("movement-cards-1_6");
+            }
         }
         context.clickScreenButton("worldbinder.config.save");
         context.runOnClient(client -> {
@@ -254,20 +259,28 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         context.waitTicks(2);
         context.takeScreenshot("message-settings");
         context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
-        context.clickScreenButton("Display & Input");
+        context.clickScreenButton("Interface");
         context.waitTicks(2);
-        context.takeScreenshot("settings-display-1_5");
-        context.clickScreenButton("High contrast: OFF");
-        context.clickScreenButton("Reduce motion: OFF");
+        context.takeScreenshot("settings-interface-1_6");
+        context.runOnClient(client -> {
+            pressButton(client, "High contrast: OFF");
+            pressButton(client, "Reduce motion: OFF");
+            pressButton(client, "Violet");
+        });
         context.clickScreenButton("worldbinder.config.save");
         context.runOnClient(client -> {
             check(WorldBinderConfig.load().highContrastUi && WorldBinderConfig.load().reducedUiMotion,
                     "Display settings save from UI");
+            check(WorldBinderConfig.load().effectiveUiAccent() == net.worldbinder.ui.component.WbTheme.Accent.VIOLET,
+                    "Theme accent saves from UI");
+            net.worldbinder.ui.component.WbTheme.refresh();
+            check(net.worldbinder.ui.component.WbTheme.ACCENT == net.worldbinder.ui.component.WbTheme.Accent.VIOLET.primary,
+                    "Theme accent applies to the palette");
             check(WbMotion.approach(0, 1, 16_000_000L, 5) == 1, "Reduced motion snaps transitions");
         });
         context.setScreen(() -> WorldBinderConfigScreen.general(new TitleScreen()));
-        context.clickScreenButton("Display & Input");
-        context.takeScreenshot("settings-contrast-1_5");
+        context.clickScreenButton("Interface");
+        context.takeScreenshot("settings-contrast-1_6");
         context.runOnClient(client -> {
             WorldBinder.replaceConfig(new WorldBinderConfig());
             WorldBinder.saveConfig();
@@ -391,7 +404,7 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 check(net.worldbinder.compat.ClientCompat.screen(client).children().stream()
                         .anyMatch(child -> child instanceof Button button
-                                && button.getMessage().getString().contains("Speed")), "Shortcut opens Movement Tools");
+                                && button.getMessage().getString().startsWith("Movement tools: ")), "Shortcut opens Movement Tools");
                 net.worldbinder.compat.ClientCompat.setScreen(client, null);
             });
             context.runOnClient(client -> testMovement(client));
@@ -420,6 +433,56 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                 WorldBinder.config().movement.enabled(MovementTool.SAFE_WALK, false);
             });
             context.takeScreenshot("movement-world-smoke");
+            String mapPreview = "map_preview_" + java.util.UUID.randomUUID().toString().replace("-", "");
+            context.runOnClient(client -> {
+                WorldBinder.config().messageMode = WorldBinderConfig.MessageMode.NONE;
+                WorldBinderClient.capture().toggleRoamingCapture(mapPreview);
+            });
+            context.waitTicks(100);
+            context.setScreen(() -> new net.worldbinder.ui.WorldBinderMapScreen(null));
+            context.waitTicks(20);
+            context.takeScreenshot("map-live-1_6");
+            context.runOnClient(client -> {
+                check(!WorldBinderClient.capture().chunkSnapshotsView().isEmpty(), "Roaming capture feeds the live map");
+                check(net.worldbinder.render.MapRegionTextures.shared().regionCount() > 0, "Live map renders captured terrain textures");
+                net.worldbinder.compat.ClientCompat.setScreen(client, null);
+                WorldBinderClient.capture().cancelActiveCapture();
+            });
+            context.waitFor(client -> !WorldBinderClient.capture().isCapturing() && !WorldBinderClient.capture().isSaving());
+            context.runOnClient(client -> {
+                WorldBinder.config().mapExploreMode = true;
+                WorldBinder.config().radarShowOutsideCapture = true;
+                WorldBinder.config().mapShowPassive = true;
+            });
+            context.waitTicks(60);
+            context.takeScreenshot("radar-hud-1_6");
+            context.runOnClient(client -> check(net.worldbinder.render.MapExplorer.get().size() > 0, "Explore mode maps loaded chunks without capturing"));
+            context.setScreen(() -> new net.worldbinder.ui.WorldBinderMapScreen(null));
+            context.waitTicks(20);
+            context.takeScreenshot("map-explore-1_6");
+            context.runOnClient(client -> {
+                try {
+                    var result = net.worldbinder.render.MapExporter.export(WorldBinderClient.capture().chunkSnapshotsView(),
+                            net.worldbinder.render.MapExporter.Mode.FULL, true, null).get(60, java.util.concurrent.TimeUnit.SECONDS);
+                    check(java.nio.file.Files.size(result.path()) > 0 && result.chunks() > 0, "Live map PNG export");
+                    var tiles = net.worldbinder.render.MapExporter.export(WorldBinderClient.capture().chunkSnapshotsView(),
+                            net.worldbinder.render.MapExporter.Mode.TILES, true, key -> 0x40FF0000).get(60, java.util.concurrent.TimeUnit.SECONDS);
+                    check(tiles.files() > 0, "Live map tile export");
+                } catch (Exception e) {
+                    throw new AssertionError("Map export", e);
+                }
+                net.worldbinder.compat.ClientCompat.setScreen(client, null);
+                WorldBinder.config().mapExploreMode = false;
+                WorldBinder.config().radarShowOutsideCapture = false;
+                net.worldbinder.render.MapExplorer.get().clear();
+            });
+            context.setScreen(() -> new WorldBinderLegalStartScreen(null, name -> { }, null, "preview"));
+            context.waitTicks(10);
+            context.takeScreenshot("capture-setup-1_6");
+            context.setScreen(() -> new net.worldbinder.ui.WorldBinderWidgetEditorScreen(null, WorldBinder.config()));
+            context.waitTicks(10);
+            context.takeScreenshot("widget-editor-world-1_6");
+            context.setScreen(() -> null);
             CaptureRegressionTest.run(context);
         }
         context.runOnClient(client -> { WorldBinder.replaceConfig(new WorldBinderConfig()); WorldBinder.saveConfig(); });
@@ -678,6 +741,7 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         MovementController.travel(player, new Vec3(0, 0, 1));
         check(player.getDeltaMovement().horizontalDistanceSqr() > 0, "Air Control");
         settings.enabled(MovementTool.AIR_CONTROL, false);
+        testNewMovementTools(client, settings);
         testSurfaces(client, settings);
         player.input = originalInput;
         for (MovementTool tool : MovementTool.values()) settings.enabled(tool, false);
@@ -758,6 +822,89 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
             player.move(MoverType.SELF, new Vec3(1.5, 0, 0));
             check(player.getX() > 1.5, "Safe Walk off releases movement");
         } catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+    }
+
+    private static void testNewMovementTools(Minecraft client, MovementSettings settings) {
+        var player = client.player;
+        double originalSpeed = player.getAttributeValue(Attributes.MOVEMENT_SPEED);
+        double originalSneak = player.getAttributeValue(Attributes.SNEAKING_SPEED);
+        double originalGravity = player.getAttributeValue(Attributes.GRAVITY);
+        settings.enabled(MovementTool.SNEAK_SPEED, true);
+        settings.value(MovementTool.SNEAK_SPEED, 2);
+        settings.enabled(MovementTool.NO_SLOW, true);
+        settings.enabled(MovementTool.LOW_GRAVITY, true);
+        settings.value(MovementTool.LOW_GRAVITY, 0.5);
+        MovementAttributes.tick(player);
+        check(player.getAttributeValue(Attributes.SNEAKING_SPEED) > originalSneak * 1.5, "Sneak Speed");
+        check(player.getAttributeValue(Attributes.MOVEMENT_EFFICIENCY) >= 0.999, "No Slow");
+        check(Math.abs(player.getAttributeValue(Attributes.GRAVITY) - originalGravity * 0.5) < 0.0001, "Low Gravity");
+        settings.enabled(MovementTool.SNEAK_SPEED, false);
+        settings.enabled(MovementTool.NO_SLOW, false);
+        settings.enabled(MovementTool.LOW_GRAVITY, false);
+        MovementAttributes.tick(player);
+        check(player.getAttributeValue(Attributes.SNEAKING_SPEED) == originalSneak, "Sneak Speed restores");
+        check(player.getAttributeValue(Attributes.GRAVITY) == originalGravity, "Low Gravity restores");
+
+        settings.enabled(MovementTool.SPEED, true);
+        settings.value(MovementTool.SPEED, 3);
+        WorldBinder.config().movementMasterEnabled = false;
+        MovementAttributes.tick(player);
+        check(Math.abs(player.getAttributeValue(Attributes.MOVEMENT_SPEED) - originalSpeed) < 0.001, "Master switch pauses tools");
+        WorldBinder.config().movementMasterEnabled = true;
+        MovementAttributes.tick(player);
+        check(player.getAttributeValue(Attributes.MOVEMENT_SPEED) > originalSpeed * 2.5, "Master switch resumes tools");
+        settings.enabled(MovementTool.SPEED, false);
+        MovementAttributes.tick(player);
+
+        player.setPos(0.5, 140, 0.5);
+        player.setOnGround(false);
+        settings.enabled(MovementTool.JETPACK, true);
+        settings.value(MovementTool.JETPACK, 3);
+        client.options.keyJump.setDown(true);
+        player.setDeltaMovement(0, -0.3, 0);
+        AirMotion.jetpack(player, settings);
+        client.options.keyJump.setDown(false);
+        check(player.getDeltaMovement().y > -0.3, "Jetpack thrust");
+        settings.enabled(MovementTool.JETPACK, false);
+
+        settings.enabled(MovementTool.LONG_JUMP, true);
+        settings.value(MovementTool.LONG_JUMP, 3);
+        player.setSprinting(true);
+        player.setDeltaMovement(0.3, 0.42, 0);
+        AirMotion.afterGroundJump(player);
+        check(player.getDeltaMovement().x > 0.45 && player.getDeltaMovement().y == 0.42, "Long Jump extends sprint jumps");
+        player.setSprinting(false);
+        player.setDeltaMovement(0.3, 0.42, 0);
+        AirMotion.afterGroundJump(player);
+        check(Math.abs(player.getDeltaMovement().x - 0.3) < 1.0E-6, "Long Jump ignores walking jumps");
+        settings.enabled(MovementTool.LONG_JUMP, false);
+        player.setDeltaMovement(Vec3.ZERO);
+
+        MovementSettings profileSettings = new MovementSettings();
+        MovementProfile.BUILDER.applyTo(profileSettings);
+        check(profileSettings.enabled(MovementTool.FLY) && profileSettings.enabled(MovementTool.SAFE_WALK)
+                && !profileSettings.enabled(MovementTool.SPEED), "Movement profiles apply their tool set");
+        check(profileSettings.enabledCount() == MovementProfile.BUILDER.toolValues().size(), "Profiles disable other tools");
+
+        var snapshots = new java.util.HashMap<Long, net.worldbinder.scene.ChunkSnapshot>();
+        var snapshot = new net.worldbinder.scene.ChunkSnapshot(1000, 1000);
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) snapshot.sample(x, z, 60 + x, "minecraft:stone", 0xFF777777);
+        snapshots.put(net.minecraft.world.level.ChunkPos.pack(1000, 1000), snapshot);
+        var textures = net.worldbinder.render.MapRegionTextures.shared();
+        textures.sync(snapshots, 999, 999, 1001, 1001, true);
+        check(textures.pendingChunks() == 1, "Live map queues changed chunks only");
+        textures.paint(snapshots, 50_000_000L);
+        check(textures.pendingChunks() == 0 && textures.regionCount() >= 1, "Live map paints region textures");
+        textures.sync(snapshots, 999, 999, 1001, 1001, true);
+        check(textures.pendingChunks() == 0, "Unchanged chunks are not repainted");
+        textures.clear();
+    }
+
+    private static void pressButton(Minecraft client, String label) {
+        Button button = (Button) net.worldbinder.compat.ClientCompat.screen(client).children().stream()
+                .filter(child -> child instanceof Button candidate && candidate.getMessage().getString().equals(label))
+                .findFirst().orElseThrow(() -> new AssertionError("Missing button: " + label));
+        button.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0));
     }
 
     private static void check(boolean condition, String message) {

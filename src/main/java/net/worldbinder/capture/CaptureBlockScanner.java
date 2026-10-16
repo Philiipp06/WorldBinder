@@ -415,7 +415,7 @@ abstract class CaptureBlockScanner {
         }
         String stateString = BlockStateStrings.toCommandString(state);
         if (!state.isAir()) {
-            snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(stateString));
+            snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
         }
         appendBlockRecord(pos, new BlockRecord(
                 pos.getX() - activeOrigin.getX(),
@@ -480,8 +480,24 @@ abstract class CaptureBlockScanner {
         int chunkZ = pos.getZ() >> 4;
         long key = ChunkPos.pack(chunkX, chunkZ);
         ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(stateString));
+        snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
         activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
+    }
+
+    /** Vanilla map palette color for the sampled top block, falling back to the name heuristic. */
+    protected static int blockPreviewColor(BlockState state, BlockPos pos, String stateString) {
+        try {
+            Minecraft client = Minecraft.getInstance();
+            if (client != null && client.level != null && state != null) {
+                net.minecraft.world.level.material.MapColor mapColor = state.getMapColor(client.level, pos);
+                if (mapColor != null && mapColor != net.minecraft.world.level.material.MapColor.NONE && mapColor.col != 0) {
+                    return 0xFF000000 | mapColor.col;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Some modded states compute map colors from world data that is not loaded client-side.
+        }
+        return blockPreviewColor(stateString);
     }
 
     protected static int blockPreviewColor(String stateString) {
