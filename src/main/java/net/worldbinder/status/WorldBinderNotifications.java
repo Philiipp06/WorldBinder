@@ -56,6 +56,14 @@ public final class WorldBinderNotifications {
     private static synchronized void show(Type type, Component title, Component message, long durationMillis) {
         long effectiveDuration = WorldBinder.config().effectiveNotificationDurationMillis(durationMillis);
         PENDING.addLast(new PendingEntry(++nextId, type, title, message, effectiveDuration));
+        if (WorldBinder.config().notificationSounds) {
+            switch (type) {
+                case INFO -> net.worldbinder.ui.component.WbSounds.info();
+                case SUCCESS -> net.worldbinder.ui.component.WbSounds.success();
+                case WARN -> net.worldbinder.ui.component.WbSounds.warning();
+                case ERROR -> net.worldbinder.ui.component.WbSounds.error();
+            }
+        }
         while (PENDING.size() > MAX_PENDING) {
             PENDING.removeFirst();
         }

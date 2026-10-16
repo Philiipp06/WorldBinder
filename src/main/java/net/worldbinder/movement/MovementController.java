@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.worldbinder.WorldBinder;
+import net.worldbinder.config.WorldBinderConfig;
 
 public final class MovementController {
     private MovementController() {}
@@ -23,8 +24,19 @@ public final class MovementController {
                 (client.hasSingleplayerServer() && client.isLocalPlayer(entity.getUUID())));
     }
 
+    /** Master switch plus the optional "disable on servers" safety option. */
+    public static boolean masterActive() {
+        WorldBinderConfig config = WorldBinder.config();
+        if (!config.movementMasterEnabled) return false;
+        if (config.movementDisableOnServers) {
+            Minecraft client = Minecraft.getInstance();
+            return client.level == null || !net.worldbinder.compat.ClientCompat.multiplayer(client);
+        }
+        return true;
+    }
+
     public static boolean enabled(Entity entity, MovementTool tool) {
-        return ownedPlayer(entity) && settings() != null && settings().enabled(tool);
+        return ownedPlayer(entity) && settings() != null && settings().enabled(tool) && masterActive();
     }
 
     public static boolean flight(Entity entity) {
@@ -64,16 +76,22 @@ public final class MovementController {
             FlightMotion.travel(player, input, settings);
             return true;
         }
+        if (player.isFallFlying()) {
+            AirMotion.elytraBoost(player, settings);
+            return false;
+        }
         if (!walking(player)) return false;
         SurfaceMotion.beforeTravel(player, settings);
         if (!inputAllowed()) return false;
-        if (settings.enabled(MovementTool.AIR_CONTROL) && !player.onGround() && !player.isInWater()
+        if (enabled(player, MovementTool.AIR_CONTROL) && !player.onGround() && !player.isInWater()
                 && !player.isInLava() && !player.onClimbable()) {
             player.moveRelative((float)(0.02 * (settings.value(MovementTool.AIR_CONTROL) - 1)), input);
         }
-        if (settings.enabled(MovementTool.WATER_SPEED) && player.isInWater() && !WaterSurface.supported(player)) {
+        if (enabled(player, MovementTool.WATER_SPEED) && player.isInWater() && !WaterSurface.supported(player)) {
             player.moveRelative((float)(0.02 * (settings.value(MovementTool.WATER_SPEED) - 1)), input);
         }
+        AirMotion.jetpack(player, settings);
+        AirMotion.autoSurface(player);
         return false;
     }
 

@@ -20,6 +20,7 @@ import net.worldbinder.util.Lang;
 import net.worldbinder.version.TargetMinecraftVersion;
 import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
+import net.worldbinder.ui.component.WbIcon;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
@@ -30,6 +31,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public final class WorldBinderScreen extends WorldBinderScreenView {
+    private static final WbIcon[] ARCHIVE_ICONS = {
+            WbIcon.DOWNLOAD, WbIcon.FOLDER, WbIcon.PLAY, WbIcon.CHECK, WbIcon.EYE,
+            WbIcon.COPY, WbIcon.SHIELD, WbIcon.RECOVERY, WbIcon.TRASH
+    };
 
     public WorldBinderScreen(SelectionManager selections, SceneCaptureService capture, ScenePlacementService placement, SceneLibrary library) {
         this(selections, capture, placement, library, null);
@@ -43,6 +48,7 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
         legalNoticeFirst = false;
         section = Section.ABOUT;
         contentScroll = 0;
+        scrollTarget = -1;
         presetDropdownOpen = false;
         if (minecraft != null) rebuildWidgets();
     }
@@ -51,6 +57,7 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
         legalNoticeFirst = true;
         section = Section.ABOUT;
         contentScroll = 0;
+        scrollTarget = -1;
         presetDropdownOpen = false;
         if (minecraft != null) rebuildWidgets();
     }
@@ -145,12 +152,23 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
                     Component.translatable("worldbinder.about.legal_tooltip"), b -> {
                         legalNoticeFirst = true;
                         contentScroll = 0;
+                        scrollTarget = -1;
                         rebuildWidgets();
                     }))));
         }
 
-        addRenderableWidget(WbButton.quiet(WbButton.create(left + panelWidth - 116, top + panelHeight - 32, 96, 22,
-                Lang.string("worldbinder.gui.close"), Component.translatable("worldbinder.tooltip.close"), b -> onClose())));
+        Button close = WbButton.icon(WbButton.quiet(WbButton.create(left + panelWidth - 116, top + panelHeight - 32, 96, 22,
+                Lang.string("worldbinder.gui.close"), Component.translatable("worldbinder.tooltip.close"), b -> onClose())), WbIcon.CLOSE);
+        WbTooltips.hint(close, Component.literal("Esc"));
+        addRenderableWidget(close);
+        Button interfaceSettings = WbButton.iconOnly(WbButton.quiet(WbButton.create(left + panelWidth - 144, top + panelHeight - 32, 22, 22,
+                Lang.string("worldbinder.config.tab.display"), Component.translatable("worldbinder.tooltip.open_interface"),
+                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, WorldBinderConfigScreen.display(this)))), WbIcon.PALETTE);
+        addRenderableWidget(interfaceSettings);
+        Button movementSettings = WbButton.iconOnly(WbButton.quiet(WbButton.create(left + panelWidth - 172, top + panelHeight - 32, 22, 22,
+                Lang.string("worldbinder.config.tab.movement"), Component.translatable("worldbinder.tooltip.open_movement"),
+                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, WorldBinderConfigScreen.movement(this)))), WbIcon.MOVEMENT);
+        addRenderableWidget(movementSettings);
         } finally {
             width = realWidth;
             height = realHeight;
@@ -174,14 +192,21 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
                     ? compactSectionLabel(target)
                     : target.title();
             Button widget = WbButton.tab(WbButton.create(buttonX, y, buttonW, buttonH, label, target.subtitle(), button -> {
+                if (section != target) sectionChangedMillis = System.currentTimeMillis();
                 section = target;
                 legalNoticeFirst = false;
                 contentScroll = 0;
+                scrollTarget = -1;
                 presetDropdownOpen = false;
                 pendingDeletePath = null;
                 pendingDeleteMillis = 0L;
                 rebuildWidgets();
             }), sectionAccent(target), section == target);
+            WbButton.icon(widget, target.icon);
+            if (target == Section.RECOVERY && library.recoveryCount() > 0) {
+                WbButton.badge(widget, Integer.toString(library.recoveryCount()));
+            }
+            WbTooltips.hint(widget, Component.literal("Ctrl + Tab"));
             addRenderableWidget(widget);
             y += step;
         }
@@ -206,37 +231,38 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
         int rows = library.recoveryCount() > 0 && cols == 3 ? 2 : 2;
         int y = bottom - rows * rowH - (rows - 1) * 6 - 4;
 
-        addRenderableWidget(worldButton(x + 18, y, buttonW, rowH,
+        addRenderableWidget(WbButton.icon(WbButton.primary(worldButton(x + 18, y, buttonW, rowH,
                 capture.isRoamingCapture() ? Lang.string("worldbinder.gui.finish_export") : Lang.string("worldbinder.gui.start_capture"),
                 Component.translatable("worldbinder.tooltip.start_download"),
-                b -> startRoamingCaptureWithLegalReminder()));
-        addRenderableWidget(worldButton(x + 18 + (buttonW + gap), y, buttonW, rowH,
+                b -> startRoamingCaptureWithLegalReminder())), capture.isRoamingCapture() ? WbIcon.STOP : WbIcon.PLAY));
+        addRenderableWidget(WbButton.icon(worldButton(x + 18 + (buttonW + gap), y, buttonW, rowH,
                 capture.isCapturing() && capture.isPaused() ? Lang.string("worldbinder.gui.resume_capture") : Lang.string("worldbinder.gui.pause_capture"),
                 Component.translatable("worldbinder.tooltip.pause_capture"),
-                b -> { capture.togglePause(); rebuildWidgets(); }));
+                b -> { capture.togglePause(); rebuildWidgets(); }), capture.isCapturing() && capture.isPaused() ? WbIcon.PLAY : WbIcon.PAUSE));
 
         if (cols == 3) {
-            addRenderableWidget(worldButton(x + 18 + (buttonW + gap) * 2, y, buttonW, rowH,
+            addRenderableWidget(WbButton.icon(worldButton(x + 18 + (buttonW + gap) * 2, y, buttonW, rowH,
                     Lang.string("worldbinder.gui.open_f10_map"), Component.translatable("worldbinder.tooltip.open_map"),
-                    b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))));
+                    b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))), WbIcon.MAP));
             y += rowH + 6;
-            addRenderableWidget(worldButton(x + 18, y, buttonW, rowH,
+            addRenderableWidget(WbButton.icon(worldButton(x + 18, y, buttonW, rowH,
                     Lang.string("worldbinder.gui.place_latest"), Component.translatable("worldbinder.tooltip.place_latest"),
-                    b -> placement.placeLatestAtPlayer()));
-            addRenderableWidget(button(x + 18 + (buttonW + gap), y, buttonW, rowH,
+                    b -> placement.placeLatestAtPlayer()), WbIcon.DOWNLOAD));
+            addRenderableWidget(WbButton.icon(button(x + 18 + (buttonW + gap), y, buttonW, rowH,
                     Lang.string("worldbinder.gui.open_archives"), Component.translatable("worldbinder.archives.tooltip"),
-                    b -> { section = Section.ARCHIVES; rebuildWidgets(); }));
-            addRenderableWidget(button(x + 18 + (buttonW + gap) * 2, y, buttonW, rowH,
+                    b -> { section = Section.ARCHIVES; sectionChangedMillis = System.currentTimeMillis(); rebuildWidgets(); }), WbIcon.ARCHIVE));
+            addRenderableWidget(WbButton.icon(button(x + 18 + (buttonW + gap) * 2, y, buttonW, rowH,
                     library.recoveryCount() > 0 ? Lang.string("worldbinder.section.recovery") : Lang.string("worldbinder.section.tools"),
                     library.recoveryCount() > 0 ? Component.translatable("worldbinder.recovery.sessions.tooltip") : Component.translatable("worldbinder.section.tools.tooltip"),
-                    b -> { section = library.recoveryCount() > 0 ? Section.RECOVERY : Section.TOOLS; rebuildWidgets(); }));
+                    b -> { section = library.recoveryCount() > 0 ? Section.RECOVERY : Section.TOOLS; sectionChangedMillis = System.currentTimeMillis(); rebuildWidgets(); }),
+                    library.recoveryCount() > 0 ? WbIcon.RECOVERY : WbIcon.TOOLS));
         } else {
-            addRenderableWidget(worldButton(x + 18, y + rowH + 6, buttonW, rowH,
+            addRenderableWidget(WbButton.icon(worldButton(x + 18, y + rowH + 6, buttonW, rowH,
                     Lang.string("worldbinder.gui.f10_map"), Component.translatable("worldbinder.tooltip.open_map"),
-                    b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))));
-            addRenderableWidget(button(x + 18 + (buttonW + gap), y + rowH + 6, buttonW, rowH,
+                    b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))), WbIcon.MAP));
+            addRenderableWidget(WbButton.icon(button(x + 18 + (buttonW + gap), y + rowH + 6, buttonW, rowH,
                     Lang.string("worldbinder.section.archives.short"), Component.translatable("worldbinder.archives.tooltip"),
-                    b -> { section = Section.ARCHIVES; rebuildWidgets(); }));
+                    b -> { section = Section.ARCHIVES; sectionChangedMillis = System.currentTimeMillis(); rebuildWidgets(); }), WbIcon.ARCHIVE));
         }
     }
 private void captureWidgets(int x, int top, int width) {
@@ -252,6 +278,8 @@ private void captureWidgets(int x, int top, int width) {
                 capture.isPaused() ? Lang.string("worldbinder.gui.resume") : Lang.string("worldbinder.gui.pause"),
                 Component.translatable("worldbinder.tooltip.pause_capture"),
                 b -> { capture.togglePause(); rebuildWidgets(); });
+        WbButton.icon(WbButton.primary(start), capture.isRoamingCapture() ? WbIcon.STOP : WbIcon.PLAY);
+        WbButton.icon(pause, capture.isPaused() ? WbIcon.PLAY : WbIcon.PAUSE);
         clipContentWidget(start);
         clipContentWidget(pause);
         addRenderableWidget(start);
@@ -283,6 +311,9 @@ private void captureWidgets(int x, int top, int width) {
                 Lang.string("worldbinder.capture.preset_dropdown_value", capturePresetLabel()), Component.translatable("worldbinder.tooltip.presets_card"), b -> {
                     presetDropdownOpen = !presetDropdownOpen;
                     rebuildWidgets();
+                    if (presetDropdownOpen) {
+                        revealPresetDropdown();
+                    }
                 }), WbTheme.WARN, presetDropdownOpen);
         clipContentWidget(presetToggle);
         addRenderableWidget(presetToggle);
@@ -312,6 +343,10 @@ private void captureWidgets(int x, int top, int width) {
         Button settings = button(actionCols == 1 ? x + 18 : x + 38 + capW * 2, actionCols == 1 ? actionRowY + 56 : actionRowY, capW, 22,
                 Lang.string("worldbinder.gui.custom_settings"), Component.translatable("worldbinder.tooltip.custom_settings"),
                 b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, WorldBinderConfigScreen.performance(this)));
+        WbButton.icon(pos, WbIcon.TARGET);
+        WbButton.icon(scene, WbIcon.CAPTURE);
+        WbButton.icon(settings, WbIcon.SETTINGS);
+        WbButton.icon(presetToggle, WbIcon.PERFORMANCE);
         clipContentWidget(pos);
         clipContentWidget(scene);
         clipContentWidget(settings);
@@ -324,10 +359,10 @@ private void mapWidgets(int x, int top, int width) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
         int y = bottom - 54;
         int buttonW = Math.max(104, Math.min(150, (width - 44) / 2));
-        addRenderableWidget(worldButton(x + 18, y, buttonW, 25, Lang.string("worldbinder.gui.open_f10_map"), Component.translatable("worldbinder.tooltip.open_map"),
-                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this))));
-        addRenderableWidget(worldButton(x + 30 + buttonW, y, buttonW, 25, Lang.string("worldbinder.gui.profiler"), Component.translatable("worldbinder.tooltip.profiler"),
-                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderProfilerScreen(this))));
+        addRenderableWidget(WbButton.icon(WbButton.primary(worldButton(x + 18, y, buttonW, 25, Lang.string("worldbinder.gui.open_f10_map"), Component.translatable("worldbinder.tooltip.open_map"),
+                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderMapScreen(this)))), WbIcon.MAP));
+        addRenderableWidget(WbButton.icon(worldButton(x + 30 + buttonW, y, buttonW, 25, Lang.string("worldbinder.gui.profiler"), Component.translatable("worldbinder.tooltip.profiler"),
+                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderProfilerScreen(this))), WbIcon.PERFORMANCE));
     }
 private void archiveWidgets(int x, int top, boolean recoveryOnly) {
         normalizeArchiveSelection(recoveryOnly);
@@ -382,6 +417,8 @@ private void archiveWidgets(int x, int top, boolean recoveryOnly) {
                     ? Component.translatable("worldbinder.tooltip.world_required")
                     : tooltips[i];
             Button created = addRenderableWidget(button(x + 18 + col * (buttonW + gap), y + row * (rowH + 6), buttonW, rowH, Lang.string(labelKeys[i]), tooltip, actions[i]));
+            WbButton.icon(created, ARCHIVE_ICONS[i]);
+            if (i == 8) WbButton.danger(created);
             buttons[i] = created;
         }
         placeSelectedButton = buttons[0];
@@ -405,8 +442,8 @@ private void archiveWidgets(int x, int top, boolean recoveryOnly) {
 private void settingsWidgets(int x, int top) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
         int w = Math.min(170, Math.max(110, contentWidth(panelWidth()) - 36));
-        addRenderableWidget(button(x + 18, bottom - 28, w, 23, Lang.string("worldbinder.gui.open_full_settings"), Component.translatable("worldbinder.tooltip.settings"),
-                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderConfigScreen(this))));
+        addRenderableWidget(WbButton.icon(WbButton.primary(button(x + 18, bottom - 28, w, 23, Lang.string("worldbinder.gui.open_full_settings"), Component.translatable("worldbinder.tooltip.settings"),
+                b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderConfigScreen(this)))), WbIcon.SETTINGS));
     }
 private void toolsWidgets(int x, int top, int width) {
         int bottom = WbLayout.contentBottom(top, panelHeight());
@@ -844,11 +881,16 @@ private void toolsWidgets(int x, int top, int width) {
             Section[] sections = Section.values();
             int direction = event.hasShiftDown() ? -1 : 1;
             section = sections[Math.floorMod(section.ordinal() + direction, sections.length)];
+            sectionChangedMillis = System.currentTimeMillis();
             legalNoticeFirst = false;
             contentScroll = 0;
+            scrollTarget = -1;
             presetDropdownOpen = false;
             rebuildWidgets();
             return true;
+        }
+        if (event.key() == InputConstants.KEY_TAB || event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN) {
+            WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);
     }
@@ -880,14 +922,68 @@ private void toolsWidgets(int x, int top, int width) {
         }
         int maxScroll = maxContentScroll();
         if (maxScroll > 0) {
-            int next = Math.max(0, Math.min(maxScroll, contentScroll + (verticalAmount < 0 ? 24 : -24)));
-            if (next != contentScroll) {
-                contentScroll = next;
-                rebuildWidgets();
+            int base = scrollTarget >= 0 ? scrollTarget : contentScroll;
+            int next = Math.max(0, Math.min(maxScroll, base + (verticalAmount < 0 ? 32 : -32)));
+            if (next != base) {
+                scrollTo(next);
                 return true;
             }
         }
         return super.mouseScrolled(virtualMouseX, virtualMouseY, horizontalAmount, verticalAmount);
+        } finally {
+            width = realWidth;
+            height = realHeight;
+        }
+    }
+
+    /** Starts a smooth scroll; reduced motion jumps directly. */
+    private void scrollTo(int target) {
+        scrollTarget = target;
+        if (net.worldbinder.ui.component.WbMotion.reduced()) {
+            contentScroll = target;
+            scrollTarget = -1;
+            rebuildWidgets();
+        }
+    }
+
+    /** Advances the smooth content scroll; called with real (unscaled) screen dimensions. */
+    private void stepSmoothScroll() {
+        if (scrollTarget < 0) {
+            return;
+        }
+        long now = System.nanoTime();
+        float seconds = lastScrollNanos == 0L ? 0.016F : Math.min(0.05F, (now - lastScrollNanos) / 1_000_000_000.0F);
+        lastScrollNanos = now;
+        float blend = 1.0F - (float) Math.exp(-16.0F * net.worldbinder.ui.component.WbMotion.speedFactor() * seconds);
+        int diff = scrollTarget - contentScroll;
+        int step = Math.round(diff * blend);
+        if (step == 0) step = Integer.signum(diff);
+        contentScroll += step;
+        if (contentScroll == scrollTarget) {
+            scrollTarget = -1;
+            lastScrollNanos = 0L;
+        }
+        rebuildWidgets();
+    }
+
+    /** Scrolls so that the open preset dropdown in the Capture section is completely visible. */
+    private void revealPresetDropdown() {
+        int realWidth = width;
+        int realHeight = height;
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
+        try {
+            int panelTop = WbLayout.top(height, panelHeight());
+            boolean narrow = contentWidth(panelWidth()) < 620;
+            int presetY = panelTop + captureCardOffset() + (narrow ? 244 : 228);
+            int dropdownBottom = presetY + 86 + 29 + 4 * 20 + 10;
+            int needed = dropdownBottom - contentViewportBottom();
+            int max = maxContentScroll();
+            int target = Math.max(0, Math.min(max, Math.max(scrollTarget >= 0 ? scrollTarget : contentScroll, needed)));
+            if (target != contentScroll) {
+                scrollTo(target);
+            }
         } finally {
             width = realWidth;
             height = realHeight;
@@ -949,8 +1045,10 @@ private void toolsWidgets(int x, int top, int width) {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        stepSmoothScroll();
         int realWidth = width;
         int realHeight = height;
+        boolean transition = net.worldbinder.ui.component.WbTransition.begin(context, this, realWidth, realHeight);
         WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
         int virtualMouseX = uiScale.toVirtualX(mouseX);
         int virtualMouseY = uiScale.toVirtualY(mouseY);
@@ -962,7 +1060,7 @@ private void toolsWidgets(int x, int top, int width) {
         width = uiScale.virtualWidth();
         height = uiScale.virtualHeight();
         try {
-        context.fill(0, 0, width, height, WbTheme.BACKDROP);
+        WbChrome.drawBackdrop(context, width, height);
         int panelWidth = panelWidth();
         int panelHeight = panelHeight();
         int left = WbLayout.left(width, panelWidth);
@@ -981,6 +1079,8 @@ private void toolsWidgets(int x, int top, int width) {
                     contentScroll, maxScroll, contentViewportBottom() - contentViewportTop());
         }
         super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
+        net.worldbinder.ui.component.WbTransition.contentFade(context, contentX(left) - 8, contentViewportTop() - 40,
+                contentWidth(panelWidth) + 16, contentViewportBottom() - contentViewportTop() + 40, sectionChangedMillis);
         } finally {
             width = realWidth;
             height = realHeight;
@@ -991,6 +1091,8 @@ private void toolsWidgets(int x, int top, int width) {
         } else {
             WbTooltips.showHovered(this, context, font, virtualMouseX, virtualMouseY, mouseX, mouseY);
         }
+        net.worldbinder.ui.component.WbTransition.end(context, transition);
+        net.worldbinder.ui.component.WbTransition.veil(context, this, realWidth, realHeight);
     }
 
     private List<Path> archiveRows() {

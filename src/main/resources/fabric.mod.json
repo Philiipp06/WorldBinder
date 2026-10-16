@@ -3,7 +3,7 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder 1.5.0 is a client-side Fabric tool for permitted world capture, visual HUD customization, chunk mapping, archive recovery, validation and target-version world export.",
+  "description": "WorldBinder 1.6.0 is a client-side Fabric tool for permitted world capture, a texture-based live map, 24 movement tools, a themeable animated interface, archive recovery, validation and target-version world export.",
   "authors": [
     "Philiipp06"
   ],

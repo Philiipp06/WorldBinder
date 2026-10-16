@@ -2,6 +2,7 @@ package net.worldbinder.config;
 
 import net.worldbinder.WorldBinder;
 import net.worldbinder.io.WorldBinderPaths;
+import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.version.TargetMinecraftVersion;
 
 import java.io.IOException;
@@ -17,13 +18,70 @@ public final class WorldBinderConfig {
         public boolean toast() { return this == TOAST || this == CHAT_AND_TOAST; }
     }
 
+    public enum MovementHudStyle {
+        DETAILED,
+        COMPACT,
+        ICONS
+    }
+
     public MessageMode messageMode = MessageMode.TOAST;
     public boolean highContrastUi = false;
     public boolean reducedUiMotion = false;
     public net.worldbinder.movement.MovementSettings movement = new net.worldbinder.movement.MovementSettings();
 
+    // Interface (1.6.0)
+    public WbTheme.Accent uiAccent = WbTheme.Accent.AQUA;
+    public int uiCustomAccentColor = 0xFF62C3EA;
+    public int uiBackdropOpacityPercent = 82;
+    public int uiAnimationSpeedPercent = 100;
+    public boolean uiScreenTransitions = true;
+    public boolean uiShowIcons = true;
+    public boolean uiSounds = true;
+    public int uiSoundVolumePercent = 100;
+    public boolean uiHoverSounds = false;
+    public boolean tooltipsEnabled = true;
+    public int tooltipDelayMs = 300;
+    public boolean tooltipShowHints = true;
+    public boolean notificationSounds = true;
+
+    // Movement (1.6.0)
+    public boolean movementMasterEnabled = true;
+    public boolean movementToggleFeedback = true;
+    public boolean movementDisableOnServers = false;
+    public boolean movementHudShowValues = true;
+    public MovementHudStyle movementHudStyle = MovementHudStyle.DETAILED;
+
+    // Live map (1.6.0)
+    public boolean mapHillshade = true;
+    public boolean mapShowGrid = true;
+    public boolean mapShowStatusOverlay = true;
+    public boolean mapShowPlayers = true;
+    public boolean mapShowSidebar = true;
+    public boolean mapSmoothCamera = true;
+    public double mapZoom = 2.0D;
+    public boolean mapExploreMode = false;
+    public boolean mapShowHostile = true;
+    public boolean mapShowPassive = true;
+    public boolean mapShowItems = false;
+    public boolean mapShowOtherEntities = false;
+    public boolean mapLimitPanning = true;
+
+    // Chunk radar (1.6.0)
+    public boolean radarRotate = false;
+    public boolean radarShowOutsideCapture = false;
+    public boolean radarShowEntities = true;
+    public boolean radarShowCoordinates = true;
+
     public MessageMode effectiveMessageMode() {
         return messageMode == null ? MessageMode.TOAST : messageMode;
+    }
+
+    public WbTheme.Accent effectiveUiAccent() {
+        return uiAccent == null ? WbTheme.Accent.AQUA : uiAccent;
+    }
+
+    public MovementHudStyle effectiveMovementHudStyle() {
+        return movementHudStyle == null ? MovementHudStyle.DETAILED : movementHudStyle;
     }
     private static final int MAX_ROAMING_RADIUS_CHUNKS = 12;
     private static final int DEFAULT_NOTIFICATION_SCALE_PERCENT = 100;
@@ -544,6 +602,17 @@ public final class WorldBinderConfig {
         if (gameRulesOverride == null) {
             gameRulesOverride = "";
         }
+        uiAccent = effectiveUiAccent();
+        uiCustomAccentColor = 0xFF000000 | (uiCustomAccentColor & 0xFFFFFF);
+        uiBackdropOpacityPercent = Math.max(20, Math.min(100, uiBackdropOpacityPercent == 0 ? 82 : uiBackdropOpacityPercent));
+        uiAnimationSpeedPercent = Math.max(50, Math.min(200, uiAnimationSpeedPercent == 0 ? 100 : uiAnimationSpeedPercent));
+        uiSoundVolumePercent = Math.max(0, Math.min(200, uiSoundVolumePercent));
+        tooltipDelayMs = Math.max(0, Math.min(1500, tooltipDelayMs));
+        movementHudStyle = effectiveMovementHudStyle();
+        if (!Double.isFinite(mapZoom)) {
+            mapZoom = 2.0D;
+        }
+        mapZoom = Math.max(0.25D, Math.min(16.0D, mapZoom));
         return this;
     }
 }

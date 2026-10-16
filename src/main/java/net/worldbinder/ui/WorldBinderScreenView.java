@@ -16,6 +16,7 @@ import net.worldbinder.status.OperationStatus;
 import net.worldbinder.status.WorldBinderActivityLog;
 import net.worldbinder.ui.component.WbCard;
 import net.worldbinder.ui.component.WbChrome;
+import net.worldbinder.ui.component.WbIcon;
 import net.worldbinder.ui.component.WbLayout;
 import net.worldbinder.ui.component.WbProgressBar;
 import net.worldbinder.ui.component.WbSectionHeader;
@@ -34,23 +35,25 @@ import java.util.Set;
 
 abstract class WorldBinderScreenView extends Screen {
     protected enum Section {
-        OVERVIEW("worldbinder.section.overview", "worldbinder.section.overview.short", "worldbinder.section.overview.tooltip"),
-        CAPTURE("worldbinder.section.capture", "worldbinder.section.capture.short", "worldbinder.section.capture.tooltip"),
-        MAP("worldbinder.section.map", "worldbinder.section.map.short", "worldbinder.section.map.tooltip"),
-        ARCHIVES("worldbinder.section.archives", "worldbinder.section.archives.short", "worldbinder.section.archives.tooltip"),
-        RECOVERY("worldbinder.section.recovery", "worldbinder.section.recovery.short", "worldbinder.section.recovery.tooltip"),
-        SETTINGS("worldbinder.section.settings", "worldbinder.section.settings.short", "worldbinder.section.settings.tooltip"),
-        TOOLS("worldbinder.section.tools", "worldbinder.section.tools.short", "worldbinder.section.tools.tooltip"),
-        ABOUT("worldbinder.section.about", "worldbinder.section.about.short", "worldbinder.section.about.tooltip");
+        OVERVIEW("worldbinder.section.overview", "worldbinder.section.overview.short", "worldbinder.section.overview.tooltip", WbIcon.HOME),
+        CAPTURE("worldbinder.section.capture", "worldbinder.section.capture.short", "worldbinder.section.capture.tooltip", WbIcon.CAPTURE),
+        MAP("worldbinder.section.map", "worldbinder.section.map.short", "worldbinder.section.map.tooltip", WbIcon.MAP),
+        ARCHIVES("worldbinder.section.archives", "worldbinder.section.archives.short", "worldbinder.section.archives.tooltip", WbIcon.ARCHIVE),
+        RECOVERY("worldbinder.section.recovery", "worldbinder.section.recovery.short", "worldbinder.section.recovery.tooltip", WbIcon.RECOVERY),
+        SETTINGS("worldbinder.section.settings", "worldbinder.section.settings.short", "worldbinder.section.settings.tooltip", WbIcon.SETTINGS),
+        TOOLS("worldbinder.section.tools", "worldbinder.section.tools.short", "worldbinder.section.tools.tooltip", WbIcon.TOOLS),
+        ABOUT("worldbinder.section.about", "worldbinder.section.about.short", "worldbinder.section.about.tooltip", WbIcon.INFO);
 
         final String titleKey;
         final String shortTitleKey;
         final String subtitleKey;
+        final WbIcon icon;
 
-        Section(String titleKey, String shortTitleKey, String subtitleKey) {
+        Section(String titleKey, String shortTitleKey, String subtitleKey, WbIcon icon) {
             this.titleKey = titleKey;
             this.shortTitleKey = shortTitleKey;
             this.subtitleKey = subtitleKey;
+            this.icon = icon;
         }
 
         String title() {
@@ -92,6 +95,9 @@ abstract class WorldBinderScreenView extends Screen {
     protected int contentScroll;
     protected boolean presetDropdownOpen;
     protected List<String> cachedActivityEntries = List.of();
+    protected long sectionChangedMillis;
+    protected int scrollTarget = -1;
+    protected long lastScrollNanos;
 
     protected WorldBinderScreenView(SelectionManager selections, SceneCaptureService capture,
                                     ScenePlacementService placement, SceneLibrary library, Screen parent) {
@@ -273,8 +279,15 @@ protected void drawCapture(GuiGraphicsExtractor context, int x, int top, int wid
         int archiveW = Math.max(120, width - 36);
         int targetW = captureTargetDropdownWidth(width);
         drawCard(context, x, card1Y, width, card1H, Lang.text("worldbinder.section.capture"), Lang.text("worldbinder.capture.card.tooltip"), mouseX, mouseY);
-        WbChrome.drawInset(context, x + 18, archiveFieldY - 2, archiveW, 26, WbTheme.INFO, false);
+        boolean nameFocused = archiveName != null && archiveName.isFocused();
+        boolean nameHovered = WbChrome.contains(x + 18, archiveFieldY - 2, archiveW, 22, mouseX, mouseY);
+        WbChrome.drawField(context, x + 18, archiveFieldY - 2, archiveW, 22, WbTheme.ACCENT_RIGHT, nameFocused, nameHovered);
         WbText.drawClipped(context, font, Lang.string("worldbinder.gui.archive_name"), x + 20, archiveFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
+        WbIcon.FOLDER.draw(context, x + 20, archiveFieldY + 24, 1, WbTheme.TEXT_DIM);
+        WbText.drawClipped(context, font, Lang.string("worldbinder.capture.name_preview",
+                        net.worldbinder.util.FileNames.cleanBaseName(currentArchiveName())
+                                + (WorldBinder.config().appendTimestampToArchiveName ? "_" + Lang.string("worldbinder.capture.name_timestamp") : "")),
+                x + 32, archiveFieldY + 24, width - 52, WbTheme.TEXT_DIM);
         WbText.drawClipped(context, font, Lang.string("worldbinder.gui.target_output_version"), x + 20, targetFieldY - 16, width - 40, WbTheme.TEXT_MUTED);
         WbText.drawClipped(context, font, targetSummaryLine(), x + 20, actionY + 30, width - 40, WbTheme.INFO);
 
@@ -487,8 +500,8 @@ protected void drawArchiveList(GuiGraphicsExtractor context, int x, int top, int
         int cw = contentWidth(width);
         int top = y + 16;
         int bottom = y + height - 42;
-        context.fill(cx - 8, top, cx + cw + 8, bottom, 0x252E423A);
-        context.fill(cx - 8, top, cx - 6, bottom, sectionAccent(section));
+        WbChrome.rounded(context, cx - 8, top, cw + 16, bottom - top, 0x1E000000);
+        context.fillGradient(cx - 8, top, cx + cw + 8, top + 40, WbTheme.withAlpha(sectionAccent(section), 0x14), 0x00000000);
     }
 
 protected void drawSidebar(GuiGraphicsExtractor context, int left, int top) {
@@ -520,7 +533,7 @@ protected void drawSidebar(GuiGraphicsExtractor context, int left, int top) {
 
 protected void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, int width) {
         WbSectionHeader.draw(context, font, x, y, width, section.title(),
-                WbText.ellipsize(font, section.subtitle().getString(), Math.max(40, width - 8)), sectionAccent(section));
+                WbText.ellipsize(font, section.subtitle().getString(), Math.max(40, width - 38)), sectionAccent(section), section.icon);
     }
 
     protected void drawCard(GuiGraphicsExtractor context, int x, int y, int width, int height, Component title, Component tooltip, int mouseX, int mouseY) {
@@ -548,7 +561,16 @@ protected void drawSectionHeader(GuiGraphicsExtractor context, int x, int y, int
     }
 
     protected void drawChip(GuiGraphicsExtractor context, int x, int y, int width, String label, String value, int accent) {
-        WbStatusChip.draw(context, font, x, y, width, label, value, accent);
+        WbStatusChip.draw(context, font, x, y, width, label, value, accent, chipIcon(label));
+    }
+
+    private WbIcon chipIcon(String label) {
+        if (label.equals(Lang.string("worldbinder.common.saved"))) return WbIcon.CHECK;
+        if (label.equals(Lang.string("worldbinder.common.queued"))) return WbIcon.CHUNK;
+        if (label.equals(Lang.string("worldbinder.common.entities"))) return WbIcon.ENTITY;
+        if (label.equals(Lang.string("worldbinder.common.eta"))) return WbIcon.RECOVERY;
+        if (label.equals(Lang.string("worldbinder.common.throttle"))) return WbIcon.PERFORMANCE;
+        return WbIcon.ARCHIVE;
     }
 
     protected void drawActivity(GuiGraphicsExtractor context, int x, int y) {

@@ -1,78 +1,186 @@
 package net.worldbinder.ui;
 
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.worldbinder.WorldBinder;
-import net.worldbinder.config.WorldBinderConfig;
 import net.worldbinder.capture.SceneCaptureService;
 import net.worldbinder.client.WorldBinderClient;
-import net.worldbinder.scene.ChunkSnapshot;
+import net.worldbinder.config.WorldBinderConfig;
+import net.worldbinder.io.WorldBinderPaths;
+import net.worldbinder.render.MapData;
+import net.worldbinder.render.MapExplorer;
+import net.worldbinder.render.MapExporter;
+import net.worldbinder.render.MapMarkers;
+import net.worldbinder.render.MapRegionTextures;
+import net.worldbinder.render.MapStatusOverlay;
 import net.worldbinder.scene.ChunkCaptureStatus;
-import net.worldbinder.render.ChunkMapTileCache;
+import net.worldbinder.scene.ChunkSnapshot;
 import net.worldbinder.ui.component.WbButton;
 import net.worldbinder.ui.component.WbChrome;
+import net.worldbinder.ui.component.WbEditBox;
+import net.worldbinder.ui.component.WbIcon;
 import net.worldbinder.ui.component.WbLayout;
+import net.worldbinder.ui.component.WbMotion;
+import net.worldbinder.ui.component.WbSounds;
 import net.worldbinder.ui.component.WbText;
 import net.worldbinder.ui.component.WbTheme;
 import net.worldbinder.ui.component.WbTooltips;
+import net.worldbinder.ui.component.WbTransition;
 import net.worldbinder.util.Chat;
 import net.worldbinder.util.Lang;
-import com.mojang.blaze3d.platform.InputConstants;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.LongFunction;
 
+/**
+ * WorldBinder live map (F10). Terrain is rendered from cached region textures with optional relief shading,
+ * the capture status is a second texture layer, and all panels only refresh when the map data changes.
+ * Explore mode adds loaded chunks without capturing, entities can be shown as markers, and the map can be
+ * exported as a PNG or as region tiles.
+ */
 public final class WorldBinderMapScreen extends Screen {
+    private static final double MIN_ZOOM = 0.5D;
+    private static final double MAX_ZOOM = 16.0D;
+    private static final int MARGIN = 12;
+    private static final int TOOLBAR_Y = 10;
+    private static final int TOOLBAR_H = 22;
+    private static final int SIDEBAR_W = 212;
+    private static final int DROPDOWN_ROW = 22;
+    private static final MapStatusOverlay STATUS_OVERLAY = new MapStatusOverlay();
+
+    private enum Dropdown { NONE, LAYERS, FILTERS, EXPORT }
+
+    private enum StatusFilter {
+        MISSING("worldbinder.map.filter.missing", WbIcon.SEARCH),
+        DONE("worldbinder.map.filter.done", WbIcon.CHECK),
+        PROGRESS("worldbinder.map.filter.progress", WbIcon.RECOVERY),
+        FAILED("worldbinder.map.filter.failed", WbIcon.CLOSE);
+
+        final String key;
+        final WbIcon icon;
+
+        StatusFilter(String key, WbIcon icon) {
+            this.key = key;
+            this.icon = icon;
+        }
+    }
+
+    private enum ContentFilter {
+        ENTITIES("worldbinder.map.filter.entities", WbIcon.ENTITY),
+        BLOCK_ENTITIES("worldbinder.map.filter.block_entities", WbIcon.CHEST),
+        LOW_QUALITY("worldbinder.map.filter.low_quality", WbIcon.WARNING),
+        RECENT("worldbinder.map.filter.recent", WbIcon.STAR),
+        EXPLORED_ONLY("worldbinder.map.filter.explored_only", WbIcon.GLOBE);
+
+        final String key;
+        final WbIcon icon;
+
+        ContentFilter(String key, WbIcon icon) {
+            this.key = key;
+            this.icon = icon;
+        }
+    }
+
+    private static final EnumSet<StatusFilter> STATUS_FILTERS = EnumSet.noneOf(StatusFilter.class);
+    private static final EnumSet<ContentFilter> CONTENT_FILTERS = EnumSet.noneOf(ContentFilter.class);
+    private static boolean filterInvert;
+    private static boolean filterHide;
+    private static boolean exportWithStatus;
+
     private final Screen parent;
-    private int zoom = 2;
-    private int panChunkX = 0;
-    private int panChunkZ = 0;
+    private double camX;
+    private double camZ;
+    private double targetCamX;
+    private double targetCamZ;
+    private double zoom;
+    private double targetZoom;
     private boolean followPlayer = true;
-    private double panOffsetX;
-    private double panOffsetY;
+    private boolean cameraInitialized;
+    private boolean dragging;
+    private double dragDistance;
     private long selectedChunk = Long.MIN_VALUE;
-    private boolean filterMissing;
-    private boolean filterIncomplete;
-    private boolean filterEntities;
-    private boolean filterBlockEntities;
-    private boolean filtersOpen;
-    private int toolbarBottomY;
-    private Button missingFilterButton;
-    private Button incompleteFilterButton;
-    private Button entitiesFilterButton;
-    private Button blockEntitiesFilterButton;
-    private EditBox goX;
-    private EditBox goZ;
-    private final ChunkMapTileCache tileCache = new ChunkMapTileCache();
-    private long nextMapDataRefreshMillis;
-    private long nextPanelRefreshMillis;
-    private long cachedMapRevision = Long.MIN_VALUE;
-    private long cachedPanelRevision = Long.MIN_VALUE;
+    private Dropdown dropdown = Dropdown.NONE;
+    private int dropdownX;
+    private EditBox goField;
+    private long lastFrameNanos;
+    private long footerMessageMillis;
+    private Component footerMessage;
+    private int footerAccent = WbTheme.OK;
+    private boolean exporting;
+
+    private long nextDataRefreshMillis;
+    private long cachedRevision = Long.MIN_VALUE;
+    private long cachedExplorerRevision = Long.MIN_VALUE;
     private Set<Long> cachedDone = Set.of();
     private Set<Long> cachedPartial = Set.of();
     private Set<Long> cachedQueued = Set.of();
     private Set<Long> cachedFailed = Set.of();
     private Map<Long, ChunkSnapshot> cachedSnapshots = Map.of();
-    private int cachedSavedCount;
-    private int cachedScanningCount;
-    private int cachedQueuedCount;
-    private int cachedErrorCount;
-    private long cachedInspectorKey = Long.MIN_VALUE;
-    private ChunkSnapshot cachedInspectorSnapshot;
-    private String cachedInspectorStatus = "";
-    private double cachedInspectorQuality;
-    private String cachedQueueDiagnostics = "";
+    private LongFunction<ChunkSnapshot> lookup = key -> null;
+    private int[] cachedBounds;
+    private int statDone;
+    private int statPartial;
+    private int statQueued;
+    private int statFailed;
+    private int statKnown;
+    private int statWithEntities;
+    private int statWithBlockEntities;
+    private long lastSyncSignature = Long.MIN_VALUE;
+    private final Map<MapMarkers.Kind, Integer> nearbyEntities = new EnumMap<>(MapMarkers.Kind.class);
+
+    private int hoverBlockX;
+    private int hoverBlockZ;
+    private boolean hoverValid;
+    private Entity hoveredEntity;
 
     public WorldBinderMapScreen(Screen parent) {
         super(Component.translatable("worldbinder.map.title"));
         this.parent = parent;
+        double stored = WorldBinder.config().mapZoom;
+        this.zoom = this.targetZoom = clampZoom(Double.isFinite(stored) ? stored : 2.0D);
+    }
+
+    // ------------------------------------------------------------------ layout
+
+    private boolean sidebarVisible() {
+        return WorldBinder.config().mapShowSidebar && width >= 640;
+    }
+
+    private int mapX() {
+        return MARGIN;
+    }
+
+    private int mapY() {
+        return TOOLBAR_Y + TOOLBAR_H + 10;
+    }
+
+    private int mapW() {
+        return Math.max(120, width - MARGIN * 2 - (sidebarVisible() ? SIDEBAR_W + 10 : 0));
+    }
+
+    private int mapH() {
+        return Math.max(90, height - mapY() - 30);
+    }
+
+    private int sidebarX() {
+        return width - MARGIN - SIDEBAR_W;
     }
 
     @Override
@@ -90,173 +198,1209 @@ public final class WorldBinderMapScreen extends Screen {
         }
     }
 
-    private void initScaled() {
-        missingFilterButton = null;
-        incompleteFilterButton = null;
-        entitiesFilterButton = null;
-        blockEntitiesFilterButton = null;
-
-        int margin = mapOuterMargin();
-        int gap = 6;
-        int top = controlsTop();
-        int rowH = 22;
-        int buttonW = width < 520 ? 64 : width < 760 ? 72 : 82;
-        int x = margin;
-        int y = top;
-        int rightLimit = width - margin;
-
-        Button follow = button(x, y, buttonW, Lang.string("worldbinder.map.follow"), Component.translatable("worldbinder.map.tooltip.follow"), b -> {
-            followPlayer = true;
-            panOffsetX = panOffsetY = 0;
-        });
-        addRenderableWidget(follow);
-        x += buttonW + gap;
-        Button player = button(x, y, buttonW, Lang.string("worldbinder.map.player"), Component.translatable("worldbinder.map.tooltip.player"), b -> {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null) {
-                panChunkX = mc.player.blockPosition().getX() >> 4;
-                panChunkZ = mc.player.blockPosition().getZ() >> 4;
-                followPlayer = true;
-                panOffsetX = panOffsetY = 0;
-            }
-        });
-        addRenderableWidget(player);
-        x += buttonW + gap;
-        if (x + buttonW > rightLimit) {
-            x = margin;
-            y += rowH + 6;
-        }
-        addRenderableWidget(button(x, y, buttonW, Lang.string("worldbinder.map.origin"), Component.translatable("worldbinder.map.tooltip.origin"), b -> jumpToOrigin()));
-        x += buttonW + gap;
-
-        int viewW = Math.min(Math.max(buttonW + 20, 104), Math.max(72, rightLimit - x));
-        if (x + viewW > rightLimit) {
-            x = margin;
-            y += rowH + 6;
-            viewW = Math.min(Math.max(buttonW + 20, 104), rightLimit - x);
-        }
-        addRenderableWidget(button(x, y, viewW, Lang.string("worldbinder.map.view_value", modeLabel(WorldBinder.config().f10MapLayerMode)), Component.translatable("worldbinder.map.tooltip.view"), b -> {
-            WorldBinder.config().f10MapLayerMode = nextMode(WorldBinder.config().f10MapLayerMode);
-            WorldBinder.config().save();
-            b.setMessage(Component.literal(Lang.string("worldbinder.map.view_value", modeLabel(WorldBinder.config().f10MapLayerMode))));
-        }));
-        x += viewW + gap;
-
-        int filterW = Math.min(Math.max(buttonW + 26, 100), Math.max(72, rightLimit - x));
-        if (x + filterW > rightLimit) {
-            x = margin;
-            y += rowH + 6;
-            filterW = Math.min(Math.max(buttonW + 26, 100), rightLimit - x);
-        }
-        addRenderableWidget(button(x, y, filterW, Lang.string(filtersOpen ? "worldbinder.map.filters_toggle_open" : "worldbinder.map.filters_toggle_closed"), Component.translatable("worldbinder.map.tooltip.filters"), b -> {
-            filtersOpen = !filtersOpen;
-            rebuildWidgets();
-        }));
-        toolbarBottomY = y + rowH;
-
-        int goY = y;
-        int goW = 68;
-        int goTotalW = goW * 2 + 72 + gap * 2;
-        int goXStart = rightLimit - goTotalW;
-        if (width >= 650 && goXStart > x + filterW + 12) {
-            goX = new EditBox(font, goXStart, goY, goW, 20, Lang.text("worldbinder.map.chunk_x"));
-            goX.setHint(Lang.text("worldbinder.map.chunk_x"));
-            goZ = new EditBox(font, goXStart + goW + gap, goY, goW, 20, Lang.text("worldbinder.map.chunk_z"));
-            goZ.setHint(Lang.text("worldbinder.map.chunk_z"));
-            addRenderableWidget(goX);
-            addRenderableWidget(goZ);
-            addRenderableWidget(button(goXStart + goW * 2 + gap * 2, goY, 72, Lang.string("worldbinder.map.go"), Component.translatable("worldbinder.map.tooltip.go"), b -> jumpToFields()));
-        }
-
-        if (filtersOpen) {
-            int filterY = filterControlsY();
-            int fw = Math.max(82, Math.min(118, (width - margin * 2 - gap * 3) / 4));
-            int fx = margin;
-            missingFilterButton = filterButton(fx, filterY, fw, Lang.string("worldbinder.map.missing"), Component.translatable("worldbinder.map.tooltip.missing"), b -> { filterMissing = !filterMissing; updateFilterButtons(); });
-            addRenderableWidget(missingFilterButton);
-            fx += fw + gap;
-            incompleteFilterButton = filterButton(fx, filterY, fw, Lang.string("worldbinder.map.incomplete"), Component.translatable("worldbinder.map.tooltip.incomplete"), b -> { filterIncomplete = !filterIncomplete; updateFilterButtons(); });
-            addRenderableWidget(incompleteFilterButton);
-            fx += fw + gap;
-            if (fx + fw <= rightLimit) {
-                entitiesFilterButton = filterButton(fx, filterY, fw, Lang.string("worldbinder.map.entities"), Component.translatable("worldbinder.map.tooltip.entities"), b -> { filterEntities = !filterEntities; updateFilterButtons(); });
-                addRenderableWidget(entitiesFilterButton);
-                fx += fw + gap;
-            }
-            if (fx + fw <= rightLimit) {
-                blockEntitiesFilterButton = filterButton(fx, filterY, fw, Lang.string("worldbinder.map.blockentities"), Component.translatable("worldbinder.map.tooltip.blockentities"), b -> { filterBlockEntities = !filterBlockEntities; updateFilterButtons(); });
-                addRenderableWidget(blockEntitiesFilterButton);
-            }
-        }
-
-        int footerY = Math.max(controlsTop() + 28, height - 30);
-        int footerW = Math.max(78, Math.min(130, (width - margin * 2 - gap * 2) / 3));
-        addRenderableWidget(button(margin, footerY, footerW, Lang.string("worldbinder.map.queue_rescan"), Component.translatable("worldbinder.map.tooltip.rescan"), b -> queueSelectedRescan()));
-        addRenderableWidget(button(margin + footerW + gap, footerY, footerW, Lang.string("worldbinder.map.clear_filters"), Component.translatable("worldbinder.map.tooltip.clear_filters"), b -> clearFilters()));
-        addRenderableWidget(button(width - margin - Math.min(86, footerW), footerY, Math.min(86, footerW), Lang.string("worldbinder.gui.back"), Component.translatable("worldbinder.tooltip.config.back"), b -> onClose()));
-        updateFilterButtons();
+    private Button toolbarButton(int x, String key, String tooltipKey, WbIcon icon, boolean labeled, int labeledWidth, Button.OnPress action) {
+        Button button = WbButton.create(x, TOOLBAR_Y, labeled ? labeledWidth : 24, TOOLBAR_H, Lang.text(key), Lang.text(tooltipKey), action);
+        return labeled ? WbButton.icon(button, icon) : WbButton.iconOnly(button, icon);
     }
 
-    @Override
-    protected void rebuildWidgets() {
+    private void initScaled() {
+        String pendingGo = goField == null ? "" : goField.getValue();
+        WorldBinderConfig config = WorldBinder.config();
+        boolean wideLabels = width >= 880;
+        boolean labels = width >= 700;
+        int x = MARGIN;
+
+        Button follow = toolbarButton(x, "worldbinder.map.follow", "worldbinder.map.tooltip.follow", WbIcon.FOLLOW, wideLabels, 72, b -> {
+            followPlayer = !followPlayer;
+            rebuild();
+        });
+        WbButton.tab(follow, WbTheme.ACCENT, followPlayer);
+        WbTooltips.hint(follow, Component.literal("F"));
+        addRenderableWidget(follow);
+        x += follow.getWidth() + 4;
+
+        Button center = toolbarButton(x, "worldbinder.map.player", "worldbinder.map.tooltip.player", WbIcon.TARGET, wideLabels, 72, b -> centerOnPlayer(true));
+        WbTooltips.hint(center, Component.literal("Space"));
+        addRenderableWidget(center);
+        x += center.getWidth() + 4;
+
+        Button origin = toolbarButton(x, "worldbinder.map.origin", "worldbinder.map.tooltip.origin", WbIcon.HOME, wideLabels, 66, b -> jumpToOrigin());
+        addRenderableWidget(origin);
+        x += origin.getWidth() + 10;
+
+        Button zoomOut = WbButton.iconOnly(WbButton.create(x, TOOLBAR_Y, 22, TOOLBAR_H, Lang.text("worldbinder.map.zoom_out"),
+                Lang.text("worldbinder.map.tooltip.zoom_out"), b -> zoomBy(-1, mapX() + mapW() / 2.0, mapY() + mapH() / 2.0)), WbIcon.MINUS);
+        WbTooltips.hint(zoomOut, Component.literal("-"));
+        addRenderableWidget(zoomOut);
+        zoomLabelX = x + 22;
+        x += 22 + 44;
+        Button zoomIn = WbButton.iconOnly(WbButton.create(x, TOOLBAR_Y, 22, TOOLBAR_H, Lang.text("worldbinder.map.zoom_in"),
+                Lang.text("worldbinder.map.tooltip.zoom_in"), b -> zoomBy(1, mapX() + mapW() / 2.0, mapY() + mapH() / 2.0)), WbIcon.PLUS);
+        WbTooltips.hint(zoomIn, Component.literal("+"));
+        addRenderableWidget(zoomIn);
+        x += 22 + 10;
+
+        Button layers = toolbarButton(x, "worldbinder.map.layers", "worldbinder.map.tooltip.layers", WbIcon.LAYERS, labels, 84, b -> toggleDropdown(Dropdown.LAYERS));
+        WbButton.dropdown(layers, WbTheme.INFO, dropdown == Dropdown.LAYERS);
+        addRenderableWidget(layers);
+        int layersX = x;
+        x += layers.getWidth() + 4;
+
+        Button filters = toolbarButton(x, "worldbinder.map.filters", "worldbinder.map.tooltip.filters", WbIcon.FILTER, labels, 84, b -> toggleDropdown(Dropdown.FILTERS));
+        WbButton.dropdown(filters, activeFilterCount() > 0 ? WbTheme.OK : WbTheme.INFO, dropdown == Dropdown.FILTERS);
+        if (activeFilterCount() > 0 && labels) {
+            WbButton.badge(filters, Integer.toString(activeFilterCount()));
+        }
+        addRenderableWidget(filters);
+        int filtersX = x;
+        x += filters.getWidth() + 4;
+
+        Button explore = toolbarButton(x, "worldbinder.map.explore", "worldbinder.map.tooltip.explore", WbIcon.GLOBE, labels, 84, b -> {
+            WorldBinder.config().mapExploreMode = !WorldBinder.config().mapExploreMode;
+            WorldBinder.config().save();
+            footer(Component.translatable(WorldBinder.config().mapExploreMode ? "worldbinder.map.explore_on" : "worldbinder.map.explore_off"), WbTheme.INFO);
+            rebuild();
+        });
+        WbButton.tab(explore, WbTheme.OK, config.mapExploreMode);
+        WbTooltips.hint(explore, Component.literal("E"));
+        addRenderableWidget(explore);
+        x += explore.getWidth() + 4;
+
+        Button export = toolbarButton(x, "worldbinder.map.export", "worldbinder.map.tooltip.export", WbIcon.DOWNLOAD, labels, 84, b -> toggleDropdown(Dropdown.EXPORT));
+        WbButton.dropdown(export, WbTheme.ACCENT_RIGHT, dropdown == Dropdown.EXPORT);
+        export.active = !exporting;
+        addRenderableWidget(export);
+        int exportX = x;
+        x += export.getWidth() + 10;
+
+        int right = width - MARGIN;
+        Button close = WbButton.icon(WbButton.quiet(WbButton.create(right - 68, TOOLBAR_Y, 68, TOOLBAR_H, Lang.text("worldbinder.gui.back"),
+                Lang.text("worldbinder.tooltip.config.back"), b -> onClose())), WbIcon.BACK);
+        WbTooltips.hint(close, Component.literal("Esc"));
+        addRenderableWidget(close);
+        right -= 72;
+        if (width >= 640) {
+            Button sidebar = WbButton.iconOnly(WbButton.create(right - 22, TOOLBAR_Y, 22, TOOLBAR_H, Lang.text("worldbinder.map.sidebar"),
+                    Lang.text("worldbinder.map.tooltip.sidebar"), b -> {
+                        WorldBinder.config().mapShowSidebar = !WorldBinder.config().mapShowSidebar;
+                        rebuild();
+                    }), WbIcon.EYE);
+            WbButton.tab(sidebar, WbTheme.ACCENT, config.mapShowSidebar);
+            WbTooltips.hint(sidebar, Component.literal("H"));
+            addRenderableWidget(sidebar);
+            right -= 26;
+        }
+        int goW = 30;
+        int fieldW = Math.min(110, right - goW - 4 - x);
+        if (fieldW >= 64) {
+            goField = new WbEditBox(font, right - goW - 4 - fieldW, TOOLBAR_Y, fieldW, TOOLBAR_H);
+            goField.setBordered(false);
+            goField.setMaxLength(32);
+            goField.setHint(Lang.text("worldbinder.map.go_hint"));
+            goField.setValue(pendingGo);
+            goField.setTextColor(WbTheme.TEXT_SOFT);
+            WbTooltips.register(goField, Lang.text("worldbinder.map.tooltip.go_field"));
+            addRenderableWidget(goField);
+            addRenderableWidget(WbButton.iconOnly(WbButton.primary(WbButton.create(right - goW, TOOLBAR_Y, goW, TOOLBAR_H, Lang.text("worldbinder.map.go"),
+                    Lang.text("worldbinder.map.tooltip.go"), b -> jumpToField())), WbIcon.CHEVRON_RIGHT));
+        } else {
+            goField = null;
+        }
+
+        if (dropdown == Dropdown.LAYERS) {
+            addLayerDropdown(layersX);
+        } else if (dropdown == Dropdown.FILTERS) {
+            addFilterDropdown(filtersX);
+        } else if (dropdown == Dropdown.EXPORT) {
+            addExportDropdown(exportX);
+        }
+
+        if (sidebarVisible()) {
+            addSidebarActions();
+        }
+    }
+
+    private int zoomLabelX;
+
+    private int[] dropdownBounds() {
+        int y = TOOLBAR_Y + TOOLBAR_H + 4;
+        return switch (dropdown) {
+            case LAYERS, FILTERS -> new int[] {dropdownX, y, 380, 10 + 14 + 6 * DROPDOWN_ROW + 2};
+            case EXPORT -> new int[] {dropdownX, y, 230, 10 + 4 * DROPDOWN_ROW};
+            case NONE -> new int[] {0, 0, 0, 0};
+        };
+    }
+
+    private void addLayerDropdown(int x) {
+        dropdownX = Math.max(MARGIN, Math.min(x, width - MARGIN - 380));
+        WorldBinderConfig config = WorldBinder.config();
+        int top = TOOLBAR_Y + TOOLBAR_H + 4 + 5 + 14;
+        int colW = 180;
+        int left = dropdownX + 6;
+        int rightCol = dropdownX + 6 + colW + 8;
+        WorldBinderConfig.MapLayerMode[] modes = WorldBinderConfig.MapLayerMode.values();
+        WbIcon[] modeIcons = {WbIcon.LAYERS, WbIcon.GRID, WbIcon.MAP};
+        for (int i = 0; i < modes.length; i++) {
+            WorldBinderConfig.MapLayerMode mode = modes[i];
+            Button button = WbButton.create(left, top + i * DROPDOWN_ROW, colW, 20, Component.literal(modeLabel(mode)),
+                    Lang.text("worldbinder.map.tooltip.view"), b -> {
+                        WorldBinder.config().f10MapLayerMode = mode;
+                        rebuild();
+                    });
+            addRenderableWidget(WbButton.icon(WbButton.tab(button, WbTheme.INFO, effectiveMode() == mode), modeIcons[i]));
+        }
+        int row = modes.length;
+        addRenderableWidget(toggleRow(left, top + row++ * DROPDOWN_ROW, colW, "worldbinder.config.map.hillshade", "worldbinder.tooltip.config.map.hillshade",
+                config.mapHillshade, v -> config.mapHillshade = v));
+        addRenderableWidget(toggleRow(left, top + row++ * DROPDOWN_ROW, colW, "worldbinder.config.map.grid", "worldbinder.tooltip.config.map.grid",
+                config.mapShowGrid, v -> config.mapShowGrid = v));
+        addRenderableWidget(toggleRow(left, top + row * DROPDOWN_ROW, colW, "worldbinder.config.map.status", "worldbinder.tooltip.config.map.status",
+                config.mapShowStatusOverlay, v -> config.mapShowStatusOverlay = v));
+
+        int r = 0;
+        addRenderableWidget(markerRow(rightCol, top + r++ * DROPDOWN_ROW, colW, MapMarkers.Kind.PLAYER, "worldbinder.config.map.players", config.mapShowPlayers, v -> config.mapShowPlayers = v));
+        addRenderableWidget(markerRow(rightCol, top + r++ * DROPDOWN_ROW, colW, MapMarkers.Kind.HOSTILE, "worldbinder.map.layer.hostile", config.mapShowHostile, v -> config.mapShowHostile = v));
+        addRenderableWidget(markerRow(rightCol, top + r++ * DROPDOWN_ROW, colW, MapMarkers.Kind.PASSIVE, "worldbinder.map.layer.passive", config.mapShowPassive, v -> config.mapShowPassive = v));
+        addRenderableWidget(markerRow(rightCol, top + r++ * DROPDOWN_ROW, colW, MapMarkers.Kind.ITEM, "worldbinder.map.layer.items", config.mapShowItems, v -> config.mapShowItems = v));
+        addRenderableWidget(markerRow(rightCol, top + r++ * DROPDOWN_ROW, colW, MapMarkers.Kind.OTHER, "worldbinder.map.layer.other", config.mapShowOtherEntities, v -> config.mapShowOtherEntities = v));
+        addRenderableWidget(toggleRow(rightCol, top + r * DROPDOWN_ROW, colW, "worldbinder.map.layer.limit", "worldbinder.map.tooltip.limit",
+                config.mapLimitPanning, v -> config.mapLimitPanning = v));
+    }
+
+    private void addFilterDropdown(int x) {
+        dropdownX = Math.max(MARGIN, Math.min(x, width - MARGIN - 380));
+        int top = TOOLBAR_Y + TOOLBAR_H + 4 + 5 + 14;
+        int colW = 180;
+        int left = dropdownX + 6;
+        int rightCol = dropdownX + 6 + colW + 8;
+        int row = 0;
+        for (StatusFilter filter : StatusFilter.values()) {
+            Button button = filterRow(left, top + row++ * DROPDOWN_ROW, colW, filter.key, filter.key + ".tooltip", filter.icon,
+                    STATUS_FILTERS.contains(filter), v -> {
+                        if (v) STATUS_FILTERS.add(filter); else STATUS_FILTERS.remove(filter);
+                    });
+            String count = statusCount(filter);
+            if (count != null) WbButton.badge(button, count);
+            addRenderableWidget(button);
+        }
+        row = 0;
+        for (ContentFilter filter : ContentFilter.values()) {
+            Button button = filterRow(rightCol, top + row++ * DROPDOWN_ROW, colW, filter.key, filter.key + ".tooltip", filter.icon,
+                    CONTENT_FILTERS.contains(filter), v -> {
+                        if (v) CONTENT_FILTERS.add(filter); else CONTENT_FILTERS.remove(filter);
+                    });
+            String count = contentCount(filter);
+            if (count != null) WbButton.badge(button, count);
+            addRenderableWidget(button);
+        }
+        int actionY = top + 5 * DROPDOWN_ROW + 2;
+        int third = (380 - 12 - 8) / 3;
+        addRenderableWidget(toggleRow(left, actionY, third, "worldbinder.map.filter.invert", "worldbinder.map.filter.invert.tooltip", filterInvert, v -> filterInvert = v));
+        addRenderableWidget(toggleRow(left + third + 4, actionY, third, "worldbinder.map.filter.hide", "worldbinder.map.filter.hide.tooltip", filterHide, v -> filterHide = v));
+        addRenderableWidget(WbButton.icon(WbButton.quiet(WbButton.create(left + (third + 4) * 2, actionY, third, 20, Lang.text("worldbinder.map.clear_filters"),
+                Lang.text("worldbinder.map.tooltip.clear_filters"), b -> clearFilters())), WbIcon.RESET));
+    }
+
+    private void addExportDropdown(int x) {
+        dropdownX = Math.max(MARGIN, Math.min(x, width - MARGIN - 230));
+        int top = TOOLBAR_Y + TOOLBAR_H + 4 + 5;
+        int w = 218;
+        int left = dropdownX + 6;
+        addRenderableWidget(WbButton.icon(WbButton.create(left, top, w, 20, Lang.text("worldbinder.map.export.full"),
+                Lang.text("worldbinder.map.export.full.tooltip"), b -> startExport(MapExporter.Mode.FULL)), WbIcon.MAP));
+        addRenderableWidget(WbButton.icon(WbButton.create(left, top + DROPDOWN_ROW, w, 20, Lang.text("worldbinder.map.export.tiles"),
+                Lang.text("worldbinder.map.export.tiles.tooltip"), b -> startExport(MapExporter.Mode.TILES)), WbIcon.GRID));
+        addRenderableWidget(toggleRow(left, top + DROPDOWN_ROW * 2, w, "worldbinder.map.export.status", "worldbinder.map.export.status.tooltip",
+                exportWithStatus, v -> exportWithStatus = v));
+        addRenderableWidget(WbButton.icon(WbButton.quiet(WbButton.create(left, top + DROPDOWN_ROW * 3, w, 20, Lang.text("worldbinder.map.export.folder"),
+                Lang.text("worldbinder.map.export.folder.tooltip"), b -> {
+                    java.nio.file.Path folder = WorldBinderPaths.RECOVERY_ROOT.resolve("map_exports");
+                    try {
+                        java.nio.file.Files.createDirectories(folder);
+                    } catch (java.io.IOException ignored) {
+                        // PathOpener reports missing folders itself.
+                    }
+                    net.worldbinder.util.PathOpener.open(folder);
+                })), WbIcon.FOLDER));
+    }
+
+    private Button toggleRow(int x, int y, int w, String key, String tooltipKey, boolean value, java.util.function.Consumer<Boolean> setter) {
+        Button button = WbButton.create(x, y, w, 20, Lang.text(key), Lang.text(tooltipKey), b -> {
+            boolean next = !WbButton.isSelected(b);
+            setter.accept(next);
+            WbButton.selected(b, next);
+            lastSyncSignature = Long.MIN_VALUE;
+        });
+        return WbButton.toggle(button, WbTheme.ACCENT, value);
+    }
+
+    private Button markerRow(int x, int y, int w, MapMarkers.Kind kind, String key, boolean value, java.util.function.Consumer<Boolean> setter) {
+        Button button = toggleRow(x, y, w, key, "worldbinder.map.tooltip.marker", value, setter);
+        WbButton.style(button, WbButton.Style.TOGGLE, kind.color, value);
+        Integer count = nearbyEntities.get(kind);
+        if (count != null && count > 0) {
+            WbButton.badge(button, Integer.toString(count));
+        }
+        return button;
+    }
+
+    private Button filterRow(int x, int y, int w, String key, String tooltipKey, WbIcon icon, boolean value, java.util.function.Consumer<Boolean> setter) {
+        Button button = WbButton.create(x, y, w, 20, Lang.text(key), Lang.text(tooltipKey), b -> {
+            boolean next = !WbButton.isSelected(b);
+            setter.accept(next);
+            WbButton.selected(b, next);
+        });
+        return WbButton.icon(WbButton.tab(button, WbTheme.OK, value), icon);
+    }
+
+    private int selectedCardY() {
+        return mapY() + 230;
+    }
+
+    private void addSidebarActions() {
+        if (selectedChunk == Long.MIN_VALUE) {
+            return;
+        }
+        int x = sidebarX() + 10;
+        int w = SIDEBAR_W - 20;
+        int y = selectedCardY() + 150;
+        if (y + 22 > mapY() + mapH()) {
+            return;
+        }
+        int bw = (w - 8) / 3;
+        addRenderableWidget(WbButton.icon(WbButton.create(x, y, bw, 20, Lang.text("worldbinder.map.action.rescan"),
+                Lang.text("worldbinder.map.tooltip.rescan"), b -> queueSelectedRescan()), WbIcon.RECOVERY));
+        addRenderableWidget(WbButton.icon(WbButton.create(x + bw + 4, y, bw, 20, Lang.text("worldbinder.map.action.copy"),
+                Lang.text("worldbinder.map.tooltip.copy"), b -> copySelectedChunkCenter()), WbIcon.COPY));
+        addRenderableWidget(WbButton.icon(WbButton.create(x + (bw + 4) * 2, y, bw, 20, Lang.text("worldbinder.map.action.center"),
+                Lang.text("worldbinder.map.tooltip.center"), b -> centerOnChunk(selectedChunk)), WbIcon.TARGET));
+    }
+
+    private void rebuild() {
         clearWidgets();
         init();
     }
 
-    private Button button(int x, int y, int w, String label, Component tooltip, Button.OnPress action) {
-        return WbButton.create(x, y, w, 20, label, tooltip, action);
+    private void toggleDropdown(Dropdown target) {
+        dropdown = dropdown == target ? Dropdown.NONE : target;
+        rebuild();
     }
 
-    private Button filterButton(int x, int y, int w, String label, Component tooltip, Button.OnPress action) {
-        return WbButton.create(x, y, w, 20, filterButtonLabel(label, false), tooltip, action);
+    // ------------------------------------------------------------------ camera
+
+    private static double clampZoom(double value) {
+        return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
     }
 
-    private void updateFilterButtons() {
-        if (missingFilterButton != null) missingFilterButton.setMessage(Component.literal(filterButtonLabel(Lang.string("worldbinder.map.missing"), filterMissing)));
-        if (incompleteFilterButton != null) incompleteFilterButton.setMessage(Component.literal(filterButtonLabel(Lang.string("worldbinder.map.incomplete"), filterIncomplete)));
-        if (entitiesFilterButton != null) entitiesFilterButton.setMessage(Component.literal(filterButtonLabel(Lang.string("worldbinder.map.entities"), filterEntities)));
-        if (blockEntitiesFilterButton != null) blockEntitiesFilterButton.setMessage(Component.literal(filterButtonLabel(Lang.string("worldbinder.map.blockentities"), filterBlockEntities)));
+    private void zoomBy(int direction, double anchorX, double anchorY) {
+        double next = clampZoom(targetZoom * (direction > 0 ? 1.35D : 1.0D / 1.35D));
+        if (next == targetZoom) {
+            return;
+        }
+        double centerX = mapX() + mapW() / 2.0;
+        double centerY = mapY() + mapH() / 2.0;
+        double anchorBlockX = targetCamX + (anchorX - centerX) / targetZoom;
+        double anchorBlockZ = targetCamZ + (anchorY - centerY) / targetZoom;
+        targetZoom = next;
+        if (!followPlayer) {
+            targetCamX = anchorBlockX - (anchorX - centerX) / next;
+            targetCamZ = anchorBlockZ - (anchorY - centerY) / next;
+        }
+        WbSounds.sliderTick();
     }
 
-    private String filterButtonLabel(String label, boolean active) {
-        return (active ? "§a" + Lang.string("worldbinder.common.on") + " " : "§7" + Lang.string("worldbinder.common.off") + " ") + label;
+    private void updateCamera() {
+        long now = System.nanoTime();
+        long elapsed = lastFrameNanos == 0L ? 0L : now - lastFrameNanos;
+        lastFrameNanos = now;
+        Minecraft mc = Minecraft.getInstance();
+        if (!cameraInitialized) {
+            cameraInitialized = true;
+            if (mc.player != null) {
+                camX = targetCamX = mc.player.getX();
+                camZ = targetCamZ = mc.player.getZ();
+            } else if (cachedBounds != null) {
+                camX = targetCamX = (cachedBounds[0] + cachedBounds[2] + 1) * 8.0;
+                camZ = targetCamZ = (cachedBounds[1] + cachedBounds[3] + 1) * 8.0;
+            }
+        }
+        if (followPlayer && mc.player != null) {
+            targetCamX = mc.player.getX();
+            targetCamZ = mc.player.getZ();
+        } else {
+            clampTarget();
+        }
+        boolean smooth = WorldBinder.config().mapSmoothCamera && !WbMotion.reduced();
+        if (!smooth || dragging) {
+            camX = targetCamX;
+            camZ = targetCamZ;
+            zoom = targetZoom;
+            if (!smooth) return;
+        }
+        float seconds = Math.min(0.05F, elapsed / 1_000_000_000.0F);
+        double blend = 1.0D - Math.exp(-14.0D * seconds);
+        camX += (targetCamX - camX) * blend;
+        camZ += (targetCamZ - camZ) * blend;
+        double zoomBlend = 1.0D - Math.exp(-16.0D * seconds);
+        zoom = Math.exp(Math.log(zoom) + (Math.log(targetZoom) - Math.log(zoom)) * zoomBlend);
+        if (Math.abs(zoom - targetZoom) < 0.0005D) zoom = targetZoom;
     }
+
+    /** Keeps the camera center inside the known map area (plus a margin) so you cannot pan into the void. */
+    private void clampTarget() {
+        if (!WorldBinder.config().mapLimitPanning) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        double minX;
+        double minZ;
+        double maxX;
+        double maxZ;
+        if (cachedBounds != null) {
+            minX = cachedBounds[0] * 16.0;
+            minZ = cachedBounds[1] * 16.0;
+            maxX = (cachedBounds[2] + 1) * 16.0;
+            maxZ = (cachedBounds[3] + 1) * 16.0;
+        } else if (mc.player != null) {
+            minX = maxX = mc.player.getX();
+            minZ = maxZ = mc.player.getZ();
+        } else {
+            return;
+        }
+        if (mc.player != null) {
+            minX = Math.min(minX, mc.player.getX());
+            maxX = Math.max(maxX, mc.player.getX());
+            minZ = Math.min(minZ, mc.player.getZ());
+            maxZ = Math.max(maxZ, mc.player.getZ());
+        }
+        double margin = 48.0 + Math.min(mapW(), mapH()) / 4.0 / Math.max(MIN_ZOOM, targetZoom);
+        targetCamX = Math.max(minX - margin, Math.min(maxX + margin, targetCamX));
+        targetCamZ = Math.max(minZ - margin, Math.min(maxZ + margin, targetCamZ));
+    }
+
+    private void centerOnPlayer(boolean enableFollow) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        targetCamX = mc.player.getX();
+        targetCamZ = mc.player.getZ();
+        if (enableFollow && !followPlayer) {
+            followPlayer = true;
+            rebuild();
+        }
+    }
+
+    private void centerOnChunk(long key) {
+        if (key == Long.MIN_VALUE) {
+            return;
+        }
+        setFollow(false);
+        targetCamX = chunkX(key) * 16 + 8;
+        targetCamZ = chunkZ(key) * 16 + 8;
+    }
+
+    private void setFollow(boolean value) {
+        if (followPlayer != value) {
+            followPlayer = value;
+            rebuild();
+        }
+    }
+
+    private double blockAtScreenX(double screenX) {
+        return camX + (screenX - (mapX() + mapW() / 2.0)) / zoom;
+    }
+
+    private double blockAtScreenY(double screenY) {
+        return camZ + (screenY - (mapY() + mapH() / 2.0)) / zoom;
+    }
+
+    private double screenXOfBlock(double blockX) {
+        return mapX() + mapW() / 2.0 + (blockX - camX) * zoom;
+    }
+
+    private double screenYOfBlock(double blockZ) {
+        return mapY() + mapH() / 2.0 + (blockZ - camZ) * zoom;
+    }
+
+    private boolean insideMap(double x, double y) {
+        return x >= mapX() && y >= mapY() && x < mapX() + mapW() && y < mapY() + mapH();
+    }
+
+    // ------------------------------------------------------------------ data
+
+    private void refreshData(SceneCaptureService capture) {
+        long now = System.currentTimeMillis();
+        long revision = capture.mapDataRevision();
+        long explorerRevision = MapExplorer.get().revision();
+        if (revision == cachedRevision && explorerRevision == cachedExplorerRevision && now < nextDataRefreshMillis) {
+            return;
+        }
+        nextDataRefreshMillis = now + 250L;
+        boolean dataChanged = revision != cachedRevision || explorerRevision != cachedExplorerRevision;
+        cachedRevision = revision;
+        cachedExplorerRevision = explorerRevision;
+        cachedDone = capture.downloadedChunksView();
+        cachedPartial = capture.partialChunksView();
+        cachedQueued = capture.queuedChunksView();
+        cachedFailed = capture.failedChunksView();
+        cachedSnapshots = capture.chunkSnapshotsView();
+        lookup = MapData.lookup(cachedSnapshots);
+        statDone = cachedDone.size();
+        statPartial = cachedPartial.size();
+        statQueued = cachedQueued.size();
+        statFailed = cachedFailed.size();
+        statKnown = Math.max(cachedSnapshots.size(), statDone + statPartial);
+        if (dataChanged) {
+            cachedBounds = MapData.bounds(cachedSnapshots);
+            int withEntities = 0;
+            int withBlockEntities = 0;
+            for (ChunkSnapshot snapshot : cachedSnapshots.values()) {
+                if (snapshot.entityCount > 0) withEntities++;
+                if (snapshot.blockEntityCount > 0) withBlockEntities++;
+            }
+            statWithEntities = withEntities;
+            statWithBlockEntities = withBlockEntities;
+        }
+        lastSyncSignature = Long.MIN_VALUE;
+    }
+
+    private ChunkCaptureStatus statusOf(long key) {
+        ChunkSnapshot snapshot = cachedSnapshots.get(key);
+        if (cachedFailed.contains(key) || (snapshot != null && snapshot.exportError)) return ChunkCaptureStatus.FAILED;
+        if (cachedPartial.contains(key)) {
+            return snapshot != null && snapshot.effectiveStatus() == ChunkCaptureStatus.PARTIAL ? ChunkCaptureStatus.PARTIAL : ChunkCaptureStatus.SCANNING;
+        }
+        if (cachedQueued.contains(key)) return ChunkCaptureStatus.QUEUED;
+        if (cachedDone.contains(key)) return ChunkCaptureStatus.DONE;
+        return snapshot == null ? ChunkCaptureStatus.UNKNOWN : snapshot.effectiveStatus();
+    }
+
+    private boolean explored(long key) {
+        return !cachedSnapshots.containsKey(key) && MapExplorer.get().snapshot(key) != null;
+    }
+
+    private boolean passesFilter(long key, ChunkCaptureStatus status) {
+        ChunkSnapshot snapshot = cachedSnapshots.get(key);
+        boolean ok = true;
+        if (!STATUS_FILTERS.isEmpty()) {
+            boolean any = false;
+            for (StatusFilter filter : STATUS_FILTERS) {
+                any |= switch (filter) {
+                    case MISSING -> status == ChunkCaptureStatus.UNKNOWN;
+                    case DONE -> status == ChunkCaptureStatus.DONE;
+                    case PROGRESS -> status == ChunkCaptureStatus.QUEUED || status == ChunkCaptureStatus.SCANNING
+                            || status == ChunkCaptureStatus.PARTIAL || status == ChunkCaptureStatus.RECOVERY;
+                    case FAILED -> status == ChunkCaptureStatus.FAILED;
+                };
+            }
+            ok = any;
+        }
+        for (ContentFilter filter : CONTENT_FILTERS) {
+            ok &= switch (filter) {
+                case ENTITIES -> snapshot != null && snapshot.entityCount > 0;
+                case BLOCK_ENTITIES -> snapshot != null && snapshot.blockEntityCount > 0;
+                case LOW_QUALITY -> snapshot != null && snapshot.qualityScore(WorldBinder.config().effectiveCaptureHeight()) < 0.55D;
+                case RECENT -> snapshot != null && System.currentTimeMillis() - snapshot.lastScannedAtMillis < 120_000L;
+                case EXPLORED_ONLY -> explored(key);
+            };
+        }
+        return filterInvert != ok;
+    }
+
+    private int activeFilterCount() {
+        return STATUS_FILTERS.size() + CONTENT_FILTERS.size();
+    }
+
+    private String statusCount(StatusFilter filter) {
+        return switch (filter) {
+            case MISSING -> null;
+            case DONE -> Integer.toString(statDone);
+            case PROGRESS -> Integer.toString(statPartial + statQueued);
+            case FAILED -> Integer.toString(statFailed);
+        };
+    }
+
+    private String contentCount(ContentFilter filter) {
+        return switch (filter) {
+            case ENTITIES -> Integer.toString(statWithEntities);
+            case BLOCK_ENTITIES -> Integer.toString(statWithBlockEntities);
+            case EXPLORED_ONLY -> MapExplorer.get().size() > 0 ? Integer.toString(MapExplorer.get().size()) : null;
+            default -> null;
+        };
+    }
+
+    private WorldBinderConfig.MapLayerMode effectiveMode() {
+        WorldBinderConfig.MapLayerMode mode = WorldBinder.config().f10MapLayerMode;
+        return mode == null ? WorldBinderConfig.MapLayerMode.BOTH : mode;
+    }
+
+    private int statusOverlayColor(long key) {
+        ChunkCaptureStatus status = statusOf(key);
+        boolean chunksOnly = effectiveMode() == WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
+        if (activeFilterCount() > 0 || filterInvert) {
+            boolean pass = passesFilter(key, status);
+            if (!pass) {
+                return filterHide ? 0xFF0B1016 : 0xC0070A0E;
+            }
+            if (lookup.apply(key) == null) {
+                return 0x50FFFFFF;
+            }
+        }
+        if (effectiveMode() == WorldBinderConfig.MapLayerMode.MAP_ONLY || !WorldBinder.config().mapShowStatusOverlay && !chunksOnly) {
+            return 0;
+        }
+        return statusTint(status, chunksOnly);
+    }
+
+    private static int statusTint(ChunkCaptureStatus status, boolean strong) {
+        int alpha = strong ? 0xD0 : 0x58;
+        return switch (status) {
+            case DONE -> strong ? WbTheme.withAlpha(0xFF3F8F67, alpha) : 0;
+            case PARTIAL, RECOVERY -> WbTheme.withAlpha(WbTheme.WARN, alpha);
+            case QUEUED -> WbTheme.withAlpha(WbTheme.ACCENT_RIGHT, alpha);
+            case SCANNING -> WbTheme.withAlpha(WbTheme.INFO, strong ? alpha : 0x70);
+            case FAILED -> WbTheme.withAlpha(WbTheme.ERROR, strong ? alpha : 0x88);
+            case UNKNOWN -> 0;
+        };
+    }
+
+    // ------------------------------------------------------------------ rendering
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        int realWidth = width;
+        int realHeight = height;
+        boolean transition = WbTransition.begin(context, this, realWidth, realHeight);
+        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+        int vmx = uiScale.toVirtualX(mouseX);
+        int vmy = uiScale.toVirtualY(mouseY);
+        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
+        context.pose().pushMatrix();
+        context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
+        context.pose().scale(uiScale.scale(), uiScale.scale());
+        width = uiScale.virtualWidth();
+        height = uiScale.virtualHeight();
+        List<String> hoverLines = null;
+        String hoverTitle = null;
+        int hoverAccent = WbTheme.ACCENT;
+        try {
+            WbChrome.drawBackdrop(context, width, height);
+            SceneCaptureService capture = WorldBinderClient.capture();
+            refreshData(capture);
+            updateCamera();
+
+            drawToolbarChrome(context);
+            drawMap(context, capture, vmx, vmy);
+            if (sidebarVisible()) {
+                drawSidebar(context, capture);
+            }
+            drawFooter(context);
+
+            if (dropdown != Dropdown.NONE) {
+                context.nextStratum();
+                drawDropdownChrome(context);
+            }
+            super.extractRenderState(context, vmx, vmy, delta);
+
+            if (!dragging && dropdown == Dropdown.NONE && insideMap(vmx, vmy)) {
+                if (hoveredEntity != null) {
+                    MapMarkers.Kind kind = MapMarkers.kind(hoveredEntity);
+                    hoverTitle = hoveredEntity.getName().getString();
+                    hoverLines = entityDetails(hoveredEntity, kind);
+                    hoverAccent = kind.color;
+                } else if (hoverValid) {
+                    long key = ChunkPos.pack(Math.floorDiv(hoverBlockX, 16), Math.floorDiv(hoverBlockZ, 16));
+                    ChunkCaptureStatus status = statusOf(key);
+                    hoverTitle = Lang.string("worldbinder.map.tooltip.chunk_line", chunkX(key), chunkZ(key));
+                    hoverLines = hoverDetails(key, status);
+                    hoverAccent = statusColor(status);
+                }
+            }
+        } finally {
+            width = realWidth;
+            height = realHeight;
+            context.pose().popMatrix();
+        }
+        if (hoverLines != null) {
+            WbTooltips.drawCard(context, font, hoverTitle, hoverLines, hoverAccent, mouseX, mouseY, realWidth, realHeight);
+        } else {
+            WbTooltips.showHovered(this, context, font, vmx, vmy, mouseX, mouseY);
+        }
+        WbTransition.end(context, transition);
+        WbTransition.veil(context, this, realWidth, realHeight);
+    }
+
+    private void drawDropdownChrome(GuiGraphicsExtractor context) {
+        int[] b = dropdownBounds();
+        int accent = dropdown == Dropdown.EXPORT ? WbTheme.ACCENT_RIGHT : dropdown == Dropdown.FILTERS ? WbTheme.OK : WbTheme.INFO;
+        WbChrome.softShadow(context, b[0], b[1], b[2], b[3], 0xB0);
+        WbChrome.rounded(context, b[0], b[1], b[2], b[3], WbMotion.mix(WbTheme.panelBorder(), accent, 0.4F));
+        WbChrome.roundedGradient(context, b[0] + 1, b[1] + 1, b[2] - 2, b[3] - 2, WbTheme.PANEL_TOP, WbTheme.PANEL_INNER);
+        context.fill(b[0] + 2, b[1] + 1, b[0] + b[2] - 2, b[1] + 2, accent);
+        if (dropdown == Dropdown.LAYERS || dropdown == Dropdown.FILTERS) {
+            String left = Lang.string(dropdown == Dropdown.LAYERS ? "worldbinder.map.layer.header_map" : "worldbinder.map.filter.header_status");
+            String right = Lang.string(dropdown == Dropdown.LAYERS ? "worldbinder.map.layer.header_markers" : "worldbinder.map.filter.header_content");
+            context.text(font, Component.literal(left).withStyle(ChatFormatting.BOLD), b[0] + 10, b[1] + 7, WbTheme.TEXT_MUTED, false);
+            context.text(font, Component.literal(right).withStyle(ChatFormatting.BOLD), b[0] + 10 + 188, b[1] + 7, WbTheme.TEXT_MUTED, false);
+            context.fill(b[0] + 190, b[1] + 8, b[0] + 191, b[1] + b[3] - (dropdown == Dropdown.FILTERS ? 30 : 6), WbTheme.divider());
+            if (dropdown == Dropdown.FILTERS) {
+                context.fill(b[0] + 8, b[1] + b[3] - 28, b[0] + b[2] - 8, b[1] + b[3] - 27, WbTheme.divider());
+            }
+        }
+    }
+
+    private void drawToolbarChrome(GuiGraphicsExtractor context) {
+        String zoomText = zoomLabel();
+        WbChrome.rounded(context, zoomLabelX + 2, TOOLBAR_Y + 3, 40, TOOLBAR_H - 6, 0x40000000);
+        context.text(font, zoomText, zoomLabelX + 22 - font.width(zoomText) / 2, TOOLBAR_Y + 7, WbTheme.TEXT_SOFT, false);
+        if (goField != null) {
+            WbEditBox field = (WbEditBox) goField;
+            WbChrome.drawField(context, field.chromeX(), field.chromeY(), field.chromeWidth(), field.chromeHeight(), WbTheme.ACCENT,
+                    goField.isFocused(), false);
+        }
+    }
+
+    private String zoomLabel() {
+        return zoom >= 1.0D ? String.format(Locale.ROOT, "%.1fx", zoom) : String.format(Locale.ROOT, "1:%d", Math.round(1.0D / zoom));
+    }
+
+    private void drawMap(GuiGraphicsExtractor context, SceneCaptureService capture, int mouseX, int mouseY) {
+        WorldBinderConfig config = WorldBinder.config();
+        int mx = mapX();
+        int my = mapY();
+        int mw = mapW();
+        int mh = mapH();
+        WbChrome.softShadow(context, mx, my, mw, mh, 0x80);
+        WbChrome.rounded(context, mx - 1, my - 1, mw + 2, mh + 2, WbMotion.mix(WbTheme.panelBorder(), WbTheme.ACCENT, 0.25F));
+        context.fill(mx, my, mx + mw, my + mh, 0xFF0B1016);
+
+        double originX = mx + mw / 2.0 - camX * zoom;
+        double originY = my + mh / 2.0 - camZ * zoom;
+        int minChunkX = (int) Math.floor(blockAtScreenX(mx) / 16.0) - 1;
+        int maxChunkX = (int) Math.floor(blockAtScreenX(mx + mw) / 16.0) + 1;
+        int minChunkZ = (int) Math.floor(blockAtScreenY(my) / 16.0) - 1;
+        int maxChunkZ = (int) Math.floor(blockAtScreenY(my + mh) / 16.0) + 1;
+        int minRegionX = Math.floorDiv(minChunkX, MapRegionTextures.REGION_CHUNKS);
+        int maxRegionX = Math.floorDiv(maxChunkX, MapRegionTextures.REGION_CHUNKS);
+        int minRegionZ = Math.floorDiv(minChunkZ, MapRegionTextures.REGION_CHUNKS);
+        int maxRegionZ = Math.floorDiv(maxChunkZ, MapRegionTextures.REGION_CHUNKS);
+
+        MapRegionTextures textures = MapRegionTextures.shared();
+        boolean terrain = effectiveMode() != WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
+        long syncSignature = cachedRevision * 31L + cachedExplorerRevision * 17L + minChunkX * 7919L + minChunkZ * 104729L
+                + maxChunkX * 31L + maxChunkZ + (config.mapHillshade ? 1 : 0);
+        if (terrain && syncSignature != lastSyncSignature) {
+            lastSyncSignature = syncSignature;
+            textures.sync(lookup, minChunkX, minChunkZ, maxChunkX, maxChunkZ, config.mapHillshade);
+        }
+        if (terrain) {
+            textures.paint(lookup, config.effectiveMaxUiWorkMs() * 1_000_000L);
+        }
+        long filterSignature = STATUS_FILTERS.hashCode() * 31L + CONTENT_FILTERS.hashCode() * 17L + (filterInvert ? 3 : 0) + (filterHide ? 5 : 0);
+        long statusSignature = cachedRevision * 131L + filterSignature * 7L + effectiveMode().ordinal() * 16L
+                + (config.mapShowStatusOverlay ? 64 : 0) + WbTheme.ACCENT
+                + (CONTENT_FILTERS.contains(ContentFilter.EXPLORED_ONLY) || !STATUS_FILTERS.isEmpty() ? cachedExplorerRevision * 1009L : 0L)
+                + (CONTENT_FILTERS.contains(ContentFilter.RECENT) ? System.currentTimeMillis() / 5000L : 0L);
+        STATUS_OVERLAY.update(minRegionX, minRegionZ, maxRegionX, maxRegionZ, statusSignature, this::statusOverlayColor);
+
+        context.enableScissor(mx, my, mx + mw, my + mh);
+        try {
+            drawBackgroundGrid(context, originX, originY, minRegionX, minRegionZ, maxRegionX, maxRegionZ);
+            if (terrain) {
+                textures.drawTerrain(context, originX, originY, zoom, minRegionX, minRegionZ, maxRegionX, maxRegionZ);
+            }
+            STATUS_OVERLAY.draw(context, originX, originY, zoom, minRegionX, minRegionZ, maxRegionX, maxRegionZ);
+            if (config.mapShowGrid) {
+                drawGrid(context, minChunkX, minChunkZ, maxChunkX, maxChunkZ, minRegionX, minRegionZ, maxRegionX, maxRegionZ);
+            }
+            drawCaptureRadius(context, capture);
+
+            hoverValid = insideMap(mouseX, mouseY);
+            if (hoverValid) {
+                hoverBlockX = (int) Math.floor(blockAtScreenX(mouseX));
+                hoverBlockZ = (int) Math.floor(blockAtScreenY(mouseY));
+                if (!dragging) {
+                    drawChunkOutline(context, Math.floorDiv(hoverBlockX, 16), Math.floorDiv(hoverBlockZ, 16), 0x90FFFFFF, 1);
+                }
+            }
+            if (selectedChunk != Long.MIN_VALUE) {
+                float pulse = WbMotion.pulse(1400L);
+                drawChunkOutline(context, chunkX(selectedChunk), chunkZ(selectedChunk), WbMotion.mix(WbTheme.ACCENT, 0xFFFFFFFF, pulse), 2);
+            }
+            drawEntities(context, mouseX, mouseY);
+            drawLocalPlayer(context);
+            drawCompass(context, mx + mw - 26, my + 8);
+            drawScaleBar(context, mx + 10, my + mh - 20);
+            int pending = textures.pendingChunks();
+            int pillY = my + 8;
+            if (pending > 0 && terrain) {
+                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.rendering", pending), WbTheme.INFO, WbIcon.PERFORMANCE);
+                pillY += 18;
+            }
+            if (activeFilterCount() > 0) {
+                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.filters_active", activeFilterCount()), WbTheme.OK, WbIcon.FILTER);
+                pillY += 18;
+            }
+            if (config.mapExploreMode) {
+                float pulse = WbMotion.pulse(2000L);
+                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.exploring", MapExplorer.get().size()),
+                        WbMotion.mix(WbTheme.OK, 0xFFFFFFFF, pulse * 0.2F), WbIcon.GLOBE);
+            }
+            if (cachedSnapshots.isEmpty() && cachedDone.isEmpty() && cachedQueued.isEmpty() && MapExplorer.get().size() == 0) {
+                drawEmptyState(context, mx, my, mw, mh);
+            }
+        } finally {
+            context.disableScissor();
+        }
+        WbChrome.roundedOutline(context, mx - 1, my - 1, mw + 2, mh + 2, WbTheme.withAlpha(WbTheme.ACCENT, 0x40));
+    }
+
+    private void drawBackgroundGrid(GuiGraphicsExtractor context, double originX, double originY,
+                                    int minRegionX, int minRegionZ, int maxRegionX, int maxRegionZ) {
+        double regionSize = MapRegionTextures.REGION_BLOCKS * zoom;
+        for (int rz = minRegionZ; rz <= maxRegionZ; rz++) {
+            for (int rx = minRegionX; rx <= maxRegionX; rx++) {
+                if (((rx + rz) & 1) == 0) {
+                    continue;
+                }
+                int x1 = (int) Math.floor(originX + rx * regionSize);
+                int y1 = (int) Math.floor(originY + rz * regionSize);
+                context.fill(x1, y1, (int) Math.floor(originX + (rx + 1) * regionSize), (int) Math.floor(originY + (rz + 1) * regionSize), 0x0CFFFFFF);
+            }
+        }
+    }
+
+    private void drawGrid(GuiGraphicsExtractor context, int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+                          int minRegionX, int minRegionZ, int maxRegionX, int maxRegionZ) {
+        int top = mapY();
+        int bottom = mapY() + mapH();
+        int left = mapX();
+        int right = mapX() + mapW();
+        double chunkPixels = zoom * 16.0D;
+        if (chunkPixels >= 6.0D) {
+            int alpha = (int) Math.min(0x22, (chunkPixels - 6.0D) * 3.0D + 6.0D);
+            int color = alpha << 24 | 0xFFFFFF;
+            for (int cx = minChunkX; cx <= maxChunkX + 1; cx++) {
+                int x = (int) Math.round(screenXOfBlock(cx * 16.0));
+                context.fill(x, top, x + 1, bottom, color);
+            }
+            for (int cz = minChunkZ; cz <= maxChunkZ + 1; cz++) {
+                int y = (int) Math.round(screenYOfBlock(cz * 16.0));
+                context.fill(left, y, right, y + 1, color);
+            }
+        }
+        int regionColor = 0x38FFFFFF;
+        for (int rx = minRegionX; rx <= maxRegionX + 1; rx++) {
+            int x = (int) Math.round(screenXOfBlock(rx * (double) MapRegionTextures.REGION_BLOCKS));
+            context.fill(x, top, x + 1, bottom, regionColor);
+        }
+        for (int rz = minRegionZ; rz <= maxRegionZ + 1; rz++) {
+            int y = (int) Math.round(screenYOfBlock(rz * (double) MapRegionTextures.REGION_BLOCKS));
+            context.fill(left, y, right, y + 1, regionColor);
+        }
+    }
+
+    private void drawChunkOutline(GuiGraphicsExtractor context, int cx, int cz, int color, int thickness) {
+        int x1 = (int) Math.round(screenXOfBlock(cx * 16.0));
+        int y1 = (int) Math.round(screenYOfBlock(cz * 16.0));
+        int x2 = (int) Math.round(screenXOfBlock(cx * 16.0 + 16.0));
+        int y2 = (int) Math.round(screenYOfBlock(cz * 16.0 + 16.0));
+        if (x2 - x1 < 3) {
+            x2 = x1 + 3;
+            y2 = y1 + 3;
+        }
+        context.fill(x1, y1, x2, y1 + thickness, color);
+        context.fill(x1, y2 - thickness, x2, y2, color);
+        context.fill(x1, y1, x1 + thickness, y2, color);
+        context.fill(x2 - thickness, y1, x2, y2, color);
+    }
+
+    private void drawCaptureRadius(GuiGraphicsExtractor context, SceneCaptureService capture) {
+        Minecraft mc = Minecraft.getInstance();
+        if (capture == null || !capture.isRoamingCapture() || mc.player == null) {
+            return;
+        }
+        int radius = WorldBinder.config().effectiveRoamingRadiusChunks();
+        int pcx = mc.player.blockPosition().getX() >> 4;
+        int pcz = mc.player.blockPosition().getZ() >> 4;
+        int x1 = (int) Math.round(screenXOfBlock((pcx - radius) * 16.0));
+        int y1 = (int) Math.round(screenYOfBlock((pcz - radius) * 16.0));
+        int x2 = (int) Math.round(screenXOfBlock((pcx + radius + 1) * 16.0));
+        int y2 = (int) Math.round(screenYOfBlock((pcz + radius + 1) * 16.0));
+        float pulse = WbMotion.pulse(2200L);
+        int color = WbTheme.withAlpha(WbTheme.OK, 0x60 + Math.round(0x50 * pulse));
+        int dash = 6;
+        for (int x = x1; x < x2; x += dash * 2) {
+            context.fill(x, y1, Math.min(x + dash, x2), y1 + 1, color);
+            context.fill(x, y2 - 1, Math.min(x + dash, x2), y2, color);
+        }
+        for (int y = y1; y < y2; y += dash * 2) {
+            context.fill(x1, y, x1 + 1, Math.min(y + dash, y2), color);
+            context.fill(x2 - 1, y, x2, Math.min(y + dash, y2), color);
+        }
+    }
+
+    private void drawEntities(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
+        hoveredEntity = null;
+        nearbyEntities.clear();
+        if (mc.level == null) {
+            return;
+        }
+        WorldBinderConfig config = WorldBinder.config();
+        float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        double bestDistance = 25.0D;
+        int radius = zoom >= 4.0D ? 3 : 2;
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity == mc.player) {
+                continue;
+            }
+            MapMarkers.Kind kind = MapMarkers.kind(entity);
+            nearbyEntities.merge(kind, 1, Integer::sum);
+            if (!MapMarkers.visible(kind, config)) {
+                continue;
+            }
+            double ex = entity.xo + (entity.getX() - entity.xo) * partial;
+            double ez = entity.zo + (entity.getZ() - entity.zo) * partial;
+            int sx = (int) Math.round(screenXOfBlock(ex));
+            int sy = (int) Math.round(screenYOfBlock(ez));
+            if (!insideMap(sx, sy)) {
+                continue;
+            }
+            if (entity instanceof Player other) {
+                MapMarkers.drawPlayerArrow(context, sx, sy, other.getViewYRot(partial), 0.7F, MapMarkers.Kind.PLAYER.color, false);
+                if (zoom >= 1.0D) {
+                    String name = other.getName().getString();
+                    int w = font.width(name) + 8;
+                    WbChrome.rounded(context, sx - w / 2, sy - 20, w, 11, 0xC0000000);
+                    context.text(font, name, sx - font.width(name) / 2, sy - 18, WbTheme.TEXT, false);
+                }
+            } else {
+                MapMarkers.drawEntity(context, sx, sy, kind, radius);
+            }
+            double dx = sx - mouseX;
+            double dy = sy - mouseY;
+            double distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                hoveredEntity = entity;
+            }
+        }
+        if (hoveredEntity != null) {
+            int sx = (int) Math.round(screenXOfBlock(hoveredEntity.getX()));
+            int sy = (int) Math.round(screenYOfBlock(hoveredEntity.getZ()));
+            WbChrome.circleOutline(context, sx, sy, radius + 4, 0xE0FFFFFF);
+        }
+    }
+
+    private void drawLocalPlayer(GuiGraphicsExtractor context) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        double px = mc.player.xo + (mc.player.getX() - mc.player.xo) * partial;
+        double pz = mc.player.zo + (mc.player.getZ() - mc.player.zo) * partial;
+        float sx = (float) screenXOfBlock(px);
+        float sy = (float) screenYOfBlock(pz);
+        MapMarkers.drawPlayerArrow(context, sx, sy, mc.player.getViewYRot(partial), 1.0F, WbTheme.ACCENT, true);
+    }
+
+    private void drawCompass(GuiGraphicsExtractor context, int x, int y) {
+        WbChrome.rounded(context, x, y, 18, 24, 0xB0101720);
+        WbChrome.roundedOutline(context, x, y, 18, 24, WbTheme.withAlpha(WbTheme.ACCENT, 0x80));
+        WbIcon.COMPASS.draw(context, x + 6, y + 3, 1, WbTheme.ERROR);
+        context.text(font, "N", x + 9 - font.width("N") / 2, y + 13, WbTheme.TEXT, false);
+    }
+
+    private void drawScaleBar(GuiGraphicsExtractor context, int x, int y) {
+        double[] steps = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048};
+        double blocks = steps[0];
+        for (double step : steps) {
+            blocks = step;
+            if (step * zoom >= 48.0D) {
+                break;
+            }
+        }
+        int pixels = (int) Math.round(blocks * zoom);
+        String label = Lang.string("worldbinder.map.scale_blocks", (int) blocks);
+        int w = Math.max(pixels, font.width(label)) + 12;
+        WbChrome.rounded(context, x - 4, y - 12, w, 20, 0xA0080C12);
+        context.fill(x, y + 2, x + pixels, y + 4, WbTheme.TEXT);
+        context.fill(x, y - 1, x + 1, y + 4, WbTheme.TEXT);
+        context.fill(x + pixels - 1, y - 1, x + pixels, y + 4, WbTheme.TEXT);
+        context.text(font, label, x, y - 10, WbTheme.TEXT_SOFT, false);
+    }
+
+    private void drawEmptyState(GuiGraphicsExtractor context, int mx, int my, int mw, int mh) {
+        int w = Math.min(340, mw - 40);
+        int h = 86;
+        int x = mx + (mw - w) / 2;
+        int y = my + (mh - h) / 2;
+        WbChrome.drawCardSurface(context, x, y, w, h, WbTheme.ACCENT, false, false);
+        WbIcon.MAP.draw(context, x + 14, y + 12, 2, WbTheme.ACCENT);
+        context.text(font, Component.literal(Lang.string("worldbinder.map.empty_title")).withStyle(ChatFormatting.BOLD), x + 36, y + 14, WbTheme.TEXT, true);
+        WbText.drawWrapped(context, font, Lang.string("worldbinder.map.empty_hint_explore"), x + 14, y + 34, w - 28, WbTheme.TEXT_SOFT, 4);
+    }
+
+    // ------------------------------------------------------------------ sidebar
+
+    private void drawSidebar(GuiGraphicsExtractor context, SceneCaptureService capture) {
+        int x = sidebarX();
+        int y = mapY();
+        int w = SIDEBAR_W;
+        int bottom = mapY() + mapH();
+
+        int cardH = 138;
+        WbChrome.drawCardSurface(context, x, y, w, cardH, WbTheme.ACCENT, false, false);
+        cardTitle(context, x, y, WbIcon.MAP, Lang.string("worldbinder.map.coverage"));
+        int total = Math.max(1, statDone + statPartial + statQueued + statFailed);
+        int rowY = y + 26;
+        statRow(context, x + 10, rowY, w - 20, Lang.string("worldbinder.map.saved"), statDone, total, WbTheme.OK); rowY += 20;
+        statRow(context, x + 10, rowY, w - 20, Lang.string("worldbinder.map.partial"), statPartial, total, WbTheme.WARN); rowY += 20;
+        statRow(context, x + 10, rowY, w - 20, Lang.string("worldbinder.map.queued"), statQueued, total, WbTheme.ACCENT_RIGHT); rowY += 20;
+        statRow(context, x + 10, rowY, w - 20, Lang.string("worldbinder.map.errors"), statFailed, total, WbTheme.ERROR);
+        double areaKm2 = statDone * 256.0D / 1_000_000.0D;
+        WbText.drawClipped(context, font, Lang.string("worldbinder.map.area", String.format(Locale.ROOT, "%.2f", areaKm2), statKnown),
+                x + 10, y + cardH - 26, w - 20, WbTheme.TEXT_DIM);
+        String explored = Lang.string("worldbinder.map.explored_count", MapExplorer.get().size());
+        WbIcon.GLOBE.draw(context, x + 10, y + cardH - 13, 1, WorldBinder.config().mapExploreMode ? WbTheme.OK : WbTheme.TEXT_DIM);
+        WbText.drawClipped(context, font, explored, x + 21, y + cardH - 13, w - 31, WbTheme.TEXT_DIM);
+
+        int cursorY = y + cardH + 8;
+        int cursorH = 76;
+        WbChrome.drawCardSurface(context, x, cursorY, w, cursorH, WbTheme.INFO, false, false);
+        cardTitle(context, x, cursorY, WbIcon.TARGET, Lang.string("worldbinder.map.cursor"));
+        if (hoverValid) {
+            long key = ChunkPos.pack(Math.floorDiv(hoverBlockX, 16), Math.floorDiv(hoverBlockZ, 16));
+            String height = heightAt(lookup.apply(key), hoverBlockX, hoverBlockZ);
+            infoRow(context, x + 10, cursorY + 26, w - 20, Lang.string("worldbinder.map.position"), hoverBlockX + " / " + height + " / " + hoverBlockZ);
+            infoRow(context, x + 10, cursorY + 40, w - 20, Lang.string("worldbinder.map.chunk"), chunkX(key) + ", " + chunkZ(key)
+                    + "  (r " + Math.floorDiv(chunkX(key), 32) + ", " + Math.floorDiv(chunkZ(key), 32) + ")");
+            statusRow(context, x + 10, cursorY + 56, statusOf(key), explored(key));
+        } else {
+            entityCounts(context, x + 10, cursorY + 28, w - 20);
+        }
+
+        int selY = selectedCardY();
+        int selH = Math.min(176, bottom - selY);
+        if (selH < 60) {
+            return;
+        }
+        WbChrome.drawCardSurface(context, x, selY, w, selH, selectedChunk == Long.MIN_VALUE ? WbTheme.PANEL_BORDER : WbTheme.ACCENT, false, selectedChunk != Long.MIN_VALUE);
+        cardTitle(context, x, selY, WbIcon.CHUNK, Lang.string("worldbinder.map.inspector"));
+        if (selectedChunk == Long.MIN_VALUE) {
+            WbText.drawWrapped(context, font, Lang.string("worldbinder.map.inspector.empty"), x + 10, selY + 28, w - 20, WbTheme.TEXT_DIM, 4);
+            return;
+        }
+        ChunkSnapshot snapshot = cachedSnapshots.get(selectedChunk);
+        ChunkCaptureStatus status = statusOf(selectedChunk);
+        int cx = chunkX(selectedChunk);
+        int cz = chunkZ(selectedChunk);
+        int line = selY + 26;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.chunk"), cx + ", " + cz); line += 13;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.blocks_range"), (cx << 4) + ".." + ((cx << 4) + 15) + " / " + (cz << 4) + ".." + ((cz << 4) + 15)); line += 13;
+        statusRow(context, x + 10, line, status, explored(selectedChunk)); line += 15;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.blocks"), snapshot == null ? "0" : snapshot.savedBlocks + " / " + snapshot.scannedBlocks); line += 13;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.entities"), snapshot == null ? "0" : Integer.toString(snapshot.entityCount)); line += 13;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.blockentities"), snapshot == null ? "0" : Integer.toString(snapshot.blockEntityCount)); line += 13;
+        infoRow(context, x + 10, line, w - 20, Lang.string("worldbinder.map.last_scanned"), snapshot == null ? Lang.string("worldbinder.common.never") : snapshot.lastScannedText()); line += 15;
+        double quality = snapshot == null ? 0.0D : snapshot.qualityScore(WorldBinder.config().effectiveCaptureHeight());
+        context.text(font, Lang.string("worldbinder.map.quality", (int) Math.round(quality * 100.0D)), x + 10, line, WbTheme.TEXT_MUTED, false);
+        WbChrome.drawProgressTrack(context, x + 10, line + 11, w - 20, 6, (int) Math.round((w - 22) * quality),
+                quality > 0.9D ? WbTheme.OK : quality > 0.55D ? WbTheme.WARN : WbTheme.ERROR);
+        if (WorldBinder.config().queueDebugDiagnostics) {
+            WbText.drawClipped(context, font, capture.queueDiagnosticsLine(), x + 10, selY + selH + 4, w - 20, WbTheme.TEXT_DIM);
+        }
+    }
+
+    private void entityCounts(GuiGraphicsExtractor context, int x, int y, int w) {
+        WbText.drawClipped(context, font, Lang.string("worldbinder.map.nearby_entities"), x, y, w, WbTheme.TEXT_DIM);
+        int cx = x;
+        int cy = y + 16;
+        for (MapMarkers.Kind kind : new MapMarkers.Kind[] {MapMarkers.Kind.HOSTILE, MapMarkers.Kind.PASSIVE, MapMarkers.Kind.ITEM, MapMarkers.Kind.PLAYER}) {
+            int count = nearbyEntities.getOrDefault(kind, 0);
+            MapMarkers.drawEntity(context, cx + 3, cy + 4, kind, 3);
+            String text = Integer.toString(count);
+            context.text(font, text, cx + 10, cy, WbTheme.TEXT_SOFT, false);
+            cx += 14 + font.width(text) + 10;
+            if (cx > x + w - 30) {
+                cx = x;
+                cy += 14;
+            }
+        }
+        WbText.drawClipped(context, font, Lang.string("worldbinder.map.cursor_hint_short"), x, y + 34, w, WbTheme.TEXT_DIM);
+    }
+
+    private void cardTitle(GuiGraphicsExtractor context, int x, int y, WbIcon icon, String title) {
+        icon.draw(context, x + 10, y + 9, 1, WbTheme.ACCENT);
+        context.text(font, Component.literal(title).withStyle(ChatFormatting.BOLD), x + 22, y + 8, WbTheme.TEXT, true);
+        WbChrome.drawDivider(context, x + 8, y + 20, SIDEBAR_W - 16);
+    }
+
+    private void statRow(GuiGraphicsExtractor context, int x, int y, int w, String label, int value, int total, int color) {
+        WbChrome.rounded(context, x, y + 1, 7, 7, color);
+        context.text(font, label, x + 11, y, WbTheme.TEXT_SOFT, false);
+        String text = Integer.toString(value);
+        context.text(font, text, x + w - font.width(text), y, WbTheme.TEXT, false);
+        WbChrome.drawProgressTrack(context, x + 11, y + 10, w - 11, 4, (int) Math.round((w - 13) * Math.min(1.0D, value / (double) total)), color);
+    }
+
+    private void infoRow(GuiGraphicsExtractor context, int x, int y, int w, String label, String value) {
+        int labelW = Math.min(64, font.width(label) + 6);
+        WbText.drawClipped(context, font, label, x, y, labelW, WbTheme.TEXT_DIM);
+        WbText.drawClipped(context, font, value, x + labelW, y, w - labelW, WbTheme.TEXT_SOFT);
+    }
+
+    private void statusRow(GuiGraphicsExtractor context, int x, int y, ChunkCaptureStatus status, boolean explored) {
+        int width = WbChrome.drawPill(context, font, x, y - 3, statusLabel(status), statusColor(status), statusIcon(status));
+        if (explored) {
+            WbChrome.drawPill(context, font, x + width + 4, y - 3, Lang.string("worldbinder.map.status.explored"), WbTheme.OK, WbIcon.GLOBE);
+        }
+    }
+
+    private static String heightAt(ChunkSnapshot snapshot, int blockX, int blockZ) {
+        if (snapshot == null || snapshot.heights == null || snapshot.heights.length != 256) {
+            return "?";
+        }
+        int height = snapshot.heights[(blockZ & 15) * 16 + (blockX & 15)];
+        return height == Integer.MIN_VALUE ? "?" : Integer.toString(height);
+    }
+
+    private void drawFooter(GuiGraphicsExtractor context) {
+        int y = height - 22;
+        int x = MARGIN;
+        if (exporting) {
+            WbChrome.drawPill(context, font, x, y - 2, Lang.string("worldbinder.map.exporting"), WbTheme.ACCENT_RIGHT, WbIcon.DOWNLOAD);
+        } else if (footerMessage != null && System.currentTimeMillis() - footerMessageMillis < 3200L) {
+            WbChrome.drawPill(context, font, x, y - 2, WbText.ellipsize(font, footerMessage.getString(), width - 360), footerAccent, WbIcon.CHECK);
+        } else if (hoverValid) {
+            String coords = Lang.string("worldbinder.map.footer_coords", hoverBlockX, hoverBlockZ,
+                    Math.floorDiv(hoverBlockX, 16), Math.floorDiv(hoverBlockZ, 16));
+            WbIcon.TARGET.draw(context, x, y + 1, 1, WbTheme.ACCENT);
+            context.text(font, coords, x + 12, y, WbTheme.TEXT_SOFT, false);
+        } else {
+            Minecraft mc = Minecraft.getInstance();
+            String line = mc.player == null ? Lang.string("worldbinder.map.footer_no_player")
+                    : Lang.string("worldbinder.map.footer_player", mc.player.blockPosition().getX(), mc.player.blockPosition().getY(), mc.player.blockPosition().getZ());
+            WbIcon.PLAYER.draw(context, x, y + 1, 1, WbTheme.ACCENT);
+            context.text(font, line, x + 12, y, WbTheme.TEXT_MUTED, false);
+        }
+        if (width >= 700) {
+            int hx = width - MARGIN;
+            hx = hint(context, hx, y, Lang.string("worldbinder.map.hint_rescan"), Lang.string("worldbinder.map.key_right_click"));
+            hx = hint(context, hx - 10, y, Lang.string("worldbinder.map.hint_zoom"), Lang.string("worldbinder.map.key_scroll"));
+            hint(context, hx - 10, y, Lang.string("worldbinder.map.hint_pan"), Lang.string("worldbinder.map.key_drag"));
+        }
+    }
+
+    private int hint(GuiGraphicsExtractor context, int right, int y, String text, String key) {
+        int textW = font.width(text);
+        int keyW = Math.max(14, font.width(key) + 8);
+        int x = right - textW - keyW - 4;
+        WbChrome.drawKeycap(context, font, x, y - 2, key);
+        context.text(font, text, x + keyW + 4, y, WbTheme.TEXT_DIM, false);
+        return x;
+    }
+
+    private List<String> hoverDetails(long key, ChunkCaptureStatus status) {
+        ChunkSnapshot snapshot = cachedSnapshots.get(key);
+        List<String> details = new ArrayList<>();
+        details.add(Lang.string("worldbinder.map.tooltip.status_line", statusLabel(status))
+                + (explored(key) ? "  ·  " + Lang.string("worldbinder.map.status.explored") : ""));
+        details.add(Lang.string("worldbinder.map.tooltip.block_line", hoverBlockX, heightAt(lookup.apply(key), hoverBlockX, hoverBlockZ), hoverBlockZ));
+        if (snapshot == null) {
+            details.add(Lang.string("worldbinder.map.tooltip.not_recorded"));
+        } else {
+            details.add(Lang.string("worldbinder.map.tooltip.blocks_line", snapshot.savedBlocks + " / " + snapshot.scannedBlocks));
+            details.add(Lang.string("worldbinder.map.tooltip.entities_line", snapshot.entityCount)
+                    + "  ·  " + Lang.string("worldbinder.map.tooltip.blockentities_line", snapshot.blockEntityCount));
+        }
+        details.add("");
+        details.add(Lang.string("worldbinder.map.tooltip.click_hint"));
+        return details;
+    }
+
+    private List<String> entityDetails(Entity entity, MapMarkers.Kind kind) {
+        Minecraft mc = Minecraft.getInstance();
+        List<String> details = new ArrayList<>();
+        details.add(Lang.string("worldbinder.map.entity.kind", Lang.string("worldbinder.map.entity.kind." + kind.name().toLowerCase(Locale.ROOT)),
+                entity.getType().getDescription().getString()));
+        details.add(Lang.string("worldbinder.map.tooltip.block_line", (int) Math.floor(entity.getX()), (int) Math.floor(entity.getY()), (int) Math.floor(entity.getZ())));
+        if (mc.player != null) {
+            details.add(Lang.string("worldbinder.map.entity.distance", Math.round(mc.player.distanceTo(entity))));
+        }
+        return details;
+    }
+
+    private static int statusColor(ChunkCaptureStatus status) {
+        return switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
+            case DONE -> WbTheme.OK;
+            case PARTIAL, RECOVERY -> WbTheme.WARN;
+            case QUEUED -> WbTheme.ACCENT_RIGHT;
+            case SCANNING -> WbTheme.INFO;
+            case FAILED -> WbTheme.ERROR;
+            case UNKNOWN -> WbTheme.TEXT_DIM;
+        };
+    }
+
+    private static WbIcon statusIcon(ChunkCaptureStatus status) {
+        return switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
+            case DONE -> WbIcon.CHECK;
+            case PARTIAL, RECOVERY -> WbIcon.WARNING;
+            case QUEUED -> WbIcon.CHUNK;
+            case SCANNING -> WbIcon.SEARCH;
+            case FAILED -> WbIcon.CLOSE;
+            case UNKNOWN -> WbIcon.INFO;
+        };
+    }
+
+    private static String statusLabel(ChunkCaptureStatus status) {
+        return switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
+            case UNKNOWN -> Lang.string("worldbinder.map.status.unknown");
+            case QUEUED -> Lang.string("worldbinder.map.status.queued");
+            case SCANNING -> Lang.string("worldbinder.map.status.scanning");
+            case DONE -> Lang.string("worldbinder.map.status.done");
+            case PARTIAL -> Lang.string("worldbinder.map.status.partial");
+            case FAILED -> Lang.string("worldbinder.map.status.error");
+            case RECOVERY -> Lang.string("worldbinder.map.status.recovery");
+        };
+    }
+
+    private static String modeLabel(WorldBinderConfig.MapLayerMode mode) {
+        return switch (mode == null ? WorldBinderConfig.MapLayerMode.BOTH : mode) {
+            case BOTH -> Lang.string("worldbinder.config.map_mode.both");
+            case CHUNKS_ONLY -> Lang.string("worldbinder.config.map_mode.chunks");
+            case MAP_ONLY -> Lang.string("worldbinder.config.map_mode.map");
+        };
+    }
+
+    private static int chunkX(long key) {
+        return key == Long.MIN_VALUE ? 0 : (int) key;
+    }
+
+    private static int chunkZ(long key) {
+        return key == Long.MIN_VALUE ? 0 : (int) (key >> 32);
+    }
+
+    // ------------------------------------------------------------------ input
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        zoom = Math.max(1, Math.min(12, zoom + (verticalAmount > 0 ? 1 : -1)));
-        panOffsetX = panOffsetY = 0;
-        return true;
-    }
-
-    @Override
-    public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
         WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
-        MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        double vx = uiScale.toVirtualX(mouseX);
+        double vy = uiScale.toVirtualY(mouseY);
         int realWidth = width;
         int realHeight = height;
         width = uiScale.virtualWidth();
         height = uiScale.virtualHeight();
         try {
-        if (virtualEvent.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT) {
-            if (chunkAt(virtualEvent.x(), virtualEvent.y()) == Long.MIN_VALUE) {
-                return super.mouseDragged(virtualEvent, uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
+            if (insideMap(vx, vy) && dropdown == Dropdown.NONE && verticalAmount != 0) {
+                zoomBy(verticalAmount > 0 ? 1 : -1, vx, vy);
+                return true;
             }
-            offsetX = uiScale.toVirtualDelta(offsetX);
-            offsetY = uiScale.toVirtualDelta(offsetY);
-            followPlayer = false;
-            int chunkPixels = Math.max(16, 16 * zoom);
-            panOffsetX += offsetX;
-            panOffsetY += offsetY;
-            int chunksX = (int) (panOffsetX / chunkPixels);
-            int chunksZ = (int) (panOffsetY / chunkPixels);
-            panChunkX -= chunksX;
-            panChunkZ -= chunksZ;
-            panOffsetX -= chunksX * chunkPixels;
-            panOffsetY -= chunksZ * chunkPixels;
-            return true;
-        }
-        return super.mouseDragged(virtualEvent, uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
+            return super.mouseScrolled(vx, vy, horizontalAmount, verticalAmount);
         } finally {
             width = realWidth;
             height = realHeight;
@@ -272,677 +1416,262 @@ public final class WorldBinderMapScreen extends Screen {
         width = uiScale.virtualWidth();
         height = uiScale.virtualHeight();
         try {
-        long hovered = chunkAt(virtualEvent.x(), virtualEvent.y());
-        if (hovered != Long.MIN_VALUE) {
-            selectedChunk = hovered;
-            if (virtualEvent.button() == com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_RIGHT) {
-                WorldBinderClient.capture().queueChunkForRescan(chunkXFromKey(hovered), chunkZFromKey(hovered));
+            double vx = virtualEvent.x();
+            double vy = virtualEvent.y();
+            if (dropdown != Dropdown.NONE) {
+                int[] b = dropdownBounds();
+                boolean insidePanel = vx >= b[0] && vx <= b[0] + b[2] && vy >= b[1] && vy <= b[1] + b[3];
+                if (!insidePanel && vy > TOOLBAR_Y + TOOLBAR_H) {
+                    dropdown = Dropdown.NONE;
+                    rebuild();
+                    WbSounds.dropdown(false);
+                    return true;
+                }
+            }
+            if (super.mouseClicked(virtualEvent, doubleClick)) {
                 return true;
             }
-        }
-        return super.mouseClicked(virtualEvent, doubleClick);
+            if (insideMap(vx, vy)) {
+                long key = ChunkPos.pack(Math.floorDiv((int) Math.floor(blockAtScreenX(vx)), 16),
+                        Math.floorDiv((int) Math.floor(blockAtScreenY(vy)), 16));
+                if (virtualEvent.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+                    selectedChunk = key;
+                    WorldBinderClient.capture().queueChunkForRescan(chunkX(key), chunkZ(key));
+                    footer(Component.translatable("worldbinder.map.rescan_queued", chunkX(key), chunkZ(key)), WbTheme.OK);
+                    WbSounds.mapPing();
+                    rebuild();
+                    return true;
+                }
+                if (virtualEvent.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+                    dragging = true;
+                    dragDistance = 0;
+                    if (doubleClick) {
+                        centerOnChunk(key);
+                    }
+                    return true;
+                }
+            }
+            return false;
         } finally {
             width = realWidth;
             height = realHeight;
         }
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
+        WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
+        if (dragging) {
+            double dx = uiScale.toVirtualDelta(offsetX);
+            double dy = uiScale.toVirtualDelta(offsetY);
+            dragDistance += Math.abs(dx) + Math.abs(dy);
+            if (dragDistance > 2.0D) {
+                if (followPlayer) {
+                    followPlayer = false;
+                    rebuild();
+                }
+                targetCamX -= dx / zoom;
+                targetCamZ -= dy / zoom;
+            }
+            return true;
+        }
+        return super.mouseDragged(WbLayout.virtualMouseEvent(event, width, height), uiScale.toVirtualDelta(offsetX), uiScale.toVirtualDelta(offsetY));
     }
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        return super.mouseReleased(WbLayout.virtualMouseEvent(event, width, height));
+        MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        if (dragging) {
+            dragging = false;
+            if (dragDistance <= 2.0D) {
+                int realWidth = width;
+                int realHeight = height;
+                WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
+                width = uiScale.virtualWidth();
+                height = uiScale.virtualHeight();
+                try {
+                    long key = ChunkPos.pack(Math.floorDiv((int) Math.floor(blockAtScreenX(virtualEvent.x())), 16),
+                            Math.floorDiv((int) Math.floor(blockAtScreenY(virtualEvent.y())), 16));
+                    selectedChunk = selectedChunk == key ? Long.MIN_VALUE : key;
+                    WbSounds.click();
+                    rebuild();
+                } finally {
+                    width = realWidth;
+                    height = realHeight;
+                }
+            }
+            return true;
+        }
+        return super.mouseReleased(virtualEvent);
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (getFocused() == goX || getFocused() == goZ) {
+        if (goField != null && getFocused() == goField) {
+            if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
+                jumpToField();
+                return true;
+            }
             return super.keyPressed(event);
         }
-        boolean copyPressed = event.isCopy();
-        if (copyPressed && selectedChunk != Long.MIN_VALUE) {
+        if (event.isCopy() && selectedChunk != Long.MIN_VALUE) {
             copySelectedChunkCenter();
             return true;
+        }
+        int key = event.key();
+        double step = 48.0D / zoom;
+        if (key == InputConstants.KEY_W || key == InputConstants.KEY_UP) { pan(0, -step); return true; }
+        if (key == InputConstants.KEY_S || key == InputConstants.KEY_DOWN) { pan(0, step); return true; }
+        if (key == InputConstants.KEY_A || key == InputConstants.KEY_LEFT) { pan(-step, 0); return true; }
+        if (key == InputConstants.KEY_D || key == InputConstants.KEY_RIGHT) { pan(step, 0); return true; }
+        WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
+        double cx = MARGIN + (uiScale.virtualWidth() - MARGIN * 2) / 2.0;
+        double cy = uiScale.virtualHeight() / 2.0;
+        if (key == InputConstants.KEY_EQUALS || key == InputConstants.KEY_ADD) { zoomBy(1, cx, cy); return true; }
+        if (key == InputConstants.KEY_MINUS || key == 333 /* GLFW_KEY_KP_SUBTRACT */) { zoomBy(-1, cx, cy); return true; }
+        if (key == InputConstants.KEY_SPACE) { centerOnPlayer(true); return true; }
+        if (key == InputConstants.KEY_F) { followPlayer = !followPlayer; rebuild(); return true; }
+        if (key == InputConstants.KEY_G) { WorldBinder.config().mapShowGrid = !WorldBinder.config().mapShowGrid; WbSounds.toggle(WorldBinder.config().mapShowGrid); return true; }
+        if (key == InputConstants.KEY_H) { WorldBinder.config().mapShowSidebar = !WorldBinder.config().mapShowSidebar; rebuild(); return true; }
+        if (key == InputConstants.KEY_E) {
+            WorldBinder.config().mapExploreMode = !WorldBinder.config().mapExploreMode;
+            WbSounds.toggle(WorldBinder.config().mapExploreMode);
+            rebuild();
+            return true;
+        }
+        if (key == InputConstants.KEY_TAB) {
+            WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);
     }
 
+    private void pan(double dx, double dz) {
+        if (followPlayer) {
+            followPlayer = false;
+            rebuild();
+        }
+        targetCamX += dx;
+        targetCamZ += dz;
+    }
+
     @Override
     public void onClose() {
+        WorldBinder.config().mapZoom = targetZoom;
+        WorldBinder.config().save();
         net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
 
-    @Override
-    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        int realWidth = width;
-        int realHeight = height;
-        WbLayout.UiScale uiScale = WbLayout.uiScale(realWidth, realHeight);
-        int virtualMouseX = uiScale.toVirtualX(mouseX);
-        int virtualMouseY = uiScale.toVirtualY(mouseY);
-        context.fill(0, 0, realWidth, realHeight, WbTheme.BACKDROP);
-        context.pose().pushMatrix();
-        context.pose().translate(uiScale.offsetX(), uiScale.offsetY());
-        context.pose().scale(uiScale.scale(), uiScale.scale());
-        width = uiScale.virtualWidth();
-        height = uiScale.virtualHeight();
+    // ------------------------------------------------------------------ actions
+
+    private void footer(Component message, int accent) {
+        footerMessage = message;
+        footerAccent = accent;
+        footerMessageMillis = System.currentTimeMillis();
+    }
+
+    private void startExport(MapExporter.Mode mode) {
+        if (exporting) {
+            return;
+        }
+        if (cachedSnapshots.isEmpty() && MapExplorer.get().size() == 0) {
+            footer(Component.translatable("worldbinder.map.export.empty"), WbTheme.WARN);
+            WbSounds.warning();
+            return;
+        }
+        exporting = true;
+        dropdown = Dropdown.NONE;
+        rebuild();
+        java.util.function.LongToIntFunction status = exportWithStatus ? key -> statusTint(statusOf(key), false) : null;
+        MapExporter.export(cachedSnapshots, mode, WorldBinder.config().mapHillshade, status).whenComplete((result, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    exporting = false;
+                    if (error == null) {
+                        footer(Component.translatable("worldbinder.map.export.done", result.files(), result.chunks()), WbTheme.OK);
+                        Chat.info(Lang.string("worldbinder.map.export.done_chat", result.path().toAbsolutePath()));
+                        WbSounds.success();
+                        net.worldbinder.util.PathOpener.open(result.path());
+                    } else {
+                        footer(Component.translatable("worldbinder.map.export.failed"), WbTheme.ERROR);
+                        Chat.error(Lang.string("worldbinder.map.export.failed"));
+                        WorldBinder.LOGGER.warn("Live map export failed", error);
+                        WbSounds.error();
+                    }
+                    if (minecraft != null && net.worldbinder.compat.ClientCompat.screen(minecraft) == this) {
+                        rebuild();
+                    }
+                }));
+    }
+
+    private void jumpToField() {
+        if (goField == null) {
+            return;
+        }
+        String[] parts = goField.getValue().trim().replace(',', ' ').split("\\s+");
         try {
-        WbChrome.drawBackdrop(context, width, height);
-        SceneCaptureService capture = WorldBinderClient.capture();
-        boolean reducedUiDetail = shouldReduceUiDetail(capture);
-        refreshMapDataIfNeeded(capture, reducedUiDetail);
-        Set<Long> done = cachedDone;
-        Set<Long> partial = cachedPartial;
-        Set<Long> queued = cachedQueued;
-        Set<Long> failed = cachedFailed;
-        Map<Long, ChunkSnapshot> snapshots = cachedSnapshots;
-        Minecraft mc = Minecraft.getInstance();
-        int playerChunkX = mc.player == null ? 0 : mc.player.blockPosition().getX() >> 4;
-        int playerChunkZ = mc.player == null ? 0 : mc.player.blockPosition().getZ() >> 4;
-        if (followPlayer) {
-            panChunkX = playerChunkX;
-            panChunkZ = playerChunkZ;
-            panOffsetX = panOffsetY = 0;
-        }
-
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Lang.text("worldbinder.map.title"), width / 2, 14, WbTheme.TEXT);
-        net.worldbinder.util.GuiText.drawCenteredTextWithShadow(context, font, Component.literal(Lang.string("worldbinder.map.help_prefix") + modeLabel(WorldBinder.config().f10MapLayerMode) + (reducedUiDetail ? " / " + Lang.string("worldbinder.map.ui_reduced") : "")), width / 2, 29, reducedUiDetail ? WbTheme.WARN : WbTheme.TEXT_MUTED);
-        drawMapStatusChips(context);
-
-        int leftPanelW = leftPanelWidth();
-        int rightPanelW = rightPanelWidth();
-        int mapX = mapX(leftPanelW);
-        int mapY = mapY();
-        int mapW = mapWidth(leftPanelW, rightPanelW, mapX);
-        int mapH = mapHeight(mapY);
-        WbChrome.drawInset(context, mapX - 8, mapY - 8, mapW + 16, mapH + 16, WbTheme.ACCENT, true);
-
-        int chunkPixels = Math.max(16, 16 * zoom);
-        int chunksX = visibleChunkCount(mapW, chunkPixels);
-        int chunksZ = visibleChunkCount(mapH, chunkPixels);
-        int radiusX = chunksX / 2;
-        int radiusZ = chunksZ / 2;
-        Long hoveredKey = null;
-        int hoveredX = 0;
-        int hoveredZ = 0;
-
-        context.enableScissor(mapX, mapY, mapX + mapW, mapY + mapH);
-        for (int dz = -radiusZ - 1; dz <= radiusZ + 1; dz++) {
-            for (int dx = -radiusX - 1; dx <= radiusX + 1; dx++) {
-                int cx = panChunkX + dx;
-                int cz = panChunkZ + dz;
-                long key = ChunkPos.pack(cx, cz);
-                ChunkSnapshot snapshot = snapshots.get(key);
-                ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, cx == playerChunkX && cz == playerChunkZ);
-                if (!passesFilter(key, snapshot, done, partial, queued, failed)) continue;
-                int chunkX = mapX + (dx + radiusX) * chunkPixels + (int) Math.round(panOffsetX);
-                int chunkY = mapY + (dz + radiusZ) * chunkPixels + (int) Math.round(panOffsetY);
-                drawChunk(context, snapshot, chunkX, chunkY, zoom, fallbackChunkColor(status), WorldBinder.config().f10MapLayerMode, reducedUiDetail);
-                boolean playerChunk = cx == playerChunkX && cz == playerChunkZ;
-                boolean importantBorder = playerChunk || key == selectedChunk || status == ChunkCaptureStatus.DONE || status == ChunkCaptureStatus.PARTIAL || status == ChunkCaptureStatus.FAILED || zoom >= 3;
-                if (importantBorder && (WorldBinder.config().f10MapLayerMode != WorldBinderConfig.MapLayerMode.MAP_ONLY || playerChunk || key == selectedChunk)) {
-                    drawChunkBorder(context, chunkX, chunkY, chunkPixels, status, playerChunk, key == selectedChunk);
-                }
-                if (cx == playerChunkX && cz == playerChunkZ) {
-                    drawPlayerCross(context, chunkX, chunkY, chunkPixels);
-                }
-                if (virtualMouseX >= chunkX && virtualMouseX < chunkX + chunkPixels && virtualMouseY >= chunkY && virtualMouseY < chunkY + chunkPixels) {
-                    hoveredKey = key;
-                    hoveredX = cx;
-                    hoveredZ = cz;
-                }
+            double x;
+            double z;
+            if (parts.length >= 3) {
+                x = Double.parseDouble(parts[0]);
+                z = Double.parseDouble(parts[2]);
+            } else if (parts.length == 2) {
+                x = Double.parseDouble(parts[0]);
+                z = Double.parseDouble(parts[1]);
+            } else {
+                WbSounds.error();
+                return;
             }
-        }
-        context.disableScissor();
-
-        if (done.isEmpty() && partial.isEmpty() && queued.isEmpty() && failed.isEmpty() && snapshots.isEmpty()) {
-            String title = Lang.string("worldbinder.map.empty_title");
-            context.fill(mapX + 8, mapY + mapH / 2 - 28, mapX + mapW - 8,
-                    mapY + mapH / 2 + 36, 0xE615202C);
-            WbText.drawClipped(context, font, title, mapX + 18, mapY + mapH / 2 - 20,
-                    mapW - 36, WbTheme.TEXT);
-            WbText.drawWrapped(context, font, Lang.string("worldbinder.map.empty_hint"),
-                    mapX + 18, mapY + mapH / 2, mapW - 36, WbTheme.TEXT_SOFT, 3);
-        }
-
-        refreshPanelsIfNeeded(capture, hoveredKey != null ? hoveredKey : selectedChunk, snapshots, done, partial, queued, failed);
-        if (leftPanelW > 0) {
-            drawLegend(context, 16, mapY + 6);
-            drawCoveragePanel(context, 16, mapY + 118);
-            drawFilterPanel(context, 16, Math.min(height - 150, mapY + 260));
-        }
-        if (rightPanelW > 0) {
-            long inspectorKey = hoveredKey != null ? hoveredKey : selectedChunk;
-            drawInspectorPanel(context, width - rightPanelW - 18, 106, inspectorKey, hoveredKey != null ? hoveredX : chunkXFromKey(inspectorKey), hoveredKey != null ? hoveredZ : chunkZFromKey(inspectorKey));
-        }
-        if (hoveredKey != null) {
-            drawChunkTooltip(context, virtualMouseX, virtualMouseY, hoveredKey, hoveredX, hoveredZ, snapshots, done, partial, queued, failed);
-        }
-        WbText.drawClipped(context, font, Lang.string("worldbinder.map.center_line", panChunkX, panChunkZ, playerChunkX, playerChunkZ, zoom, followPlayer ? Lang.string("worldbinder.map.following") : Lang.string("worldbinder.map.free_pan")), mapX, mapY + mapH + 11, mapW, WbTheme.TEXT_SOFT);
-        super.extractRenderState(context, virtualMouseX, virtualMouseY, delta);
-        } finally {
-            width = realWidth;
-            height = realHeight;
-            context.pose().popMatrix();
-        }
-        WbTooltips.showHovered(this, context, font, virtualMouseX, virtualMouseY, mouseX, mouseY);
-    }
-
-
-    private void drawChunkTooltip(GuiGraphicsExtractor context, int mouseX, int mouseY, long key, int cx, int cz, Map<Long, ChunkSnapshot> snapshots, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed) {
-        ChunkSnapshot snapshot = snapshots.get(key);
-        int exactChunkX = chunkXFromKey(key);
-        int exactChunkZ = chunkZFromKey(key);
-        ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, false);
-        int centerX = chunkMiddleBlock(exactChunkX);
-        int centerZ = chunkMiddleBlock(exactChunkZ);
-        java.util.List<String> details = new java.util.ArrayList<>();
-        details.add(Lang.string("worldbinder.map.tooltip.chunk_line", exactChunkX, exactChunkZ));
-        details.add(Lang.string("worldbinder.map.tooltip.status_line", statusLabel(status)));
-        details.add(Lang.string("worldbinder.map.tooltip.center_line", centerX, centerZ));
-        if (snapshot == null) {
-            details.add(Lang.string("worldbinder.map.tooltip.not_recorded"));
-        } else {
-            details.add(Lang.string("worldbinder.map.tooltip.blocks_line", snapshot.savedBlocks + " / " + snapshot.scannedBlocks));
-            details.add(Lang.string("worldbinder.map.tooltip.samples_line", snapshot.sampleCount(), 256));
-            details.add(Lang.string("worldbinder.map.tooltip.entities_line", snapshot.entityCount));
-            details.add(Lang.string("worldbinder.map.tooltip.blockentities_line", snapshot.blockEntityCount));
-        }
-        details.add(Lang.string("worldbinder.map.tooltip.copy_center"));
-        String[] lines = details.toArray(String[]::new);
-        int w = 0;
-        for (String line : lines) {
-            w = Math.max(w, font.width(line));
-        }
-        w += 20;
-        int h = 18 + lines.length * 12;
-        int x = Math.min(width - w - 8, mouseX + 14);
-        int y = Math.min(height - h - 8, mouseY + 14);
-        int accent = status == ChunkCaptureStatus.DONE ? WbTheme.OK : status == ChunkCaptureStatus.FAILED ? WbTheme.ERROR : WbTheme.ACCENT;
-        WbChrome.drawInset(context, x, y, w, h, accent, true);
-        for (int i = 0; i < lines.length; i++) {
-            net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(lines[i]), x + 10, y + 10 + i * 12, i == 1 ? WbTheme.TEXT_SOFT : WbTheme.TEXT_MUTED);
-        }
-    }
-
-    private static int chunkXFromKey(long key) {
-        return key == Long.MIN_VALUE ? 0 : (int) key;
-    }
-
-    private static int chunkZFromKey(long key) {
-        return key == Long.MIN_VALUE ? 0 : (int) (key >> 32);
-    }
-
-    private static int chunkMinBlock(int chunk) {
-        return chunk << 4;
-    }
-
-    private static int chunkMiddleBlock(int chunk) {
-        return (chunk << 4) + 8;
-    }
-
-    private static int chunkMaxBlock(int chunk) {
-        return (chunk << 4) + 15;
-    }
-
-    private long chunkAt(double mouseX, double mouseY) {
-        int leftPanelW = leftPanelWidth();
-        int rightPanelW = rightPanelWidth();
-        int mapX = mapX(leftPanelW);
-        int mapY = mapY();
-        int mapW = mapWidth(leftPanelW, rightPanelW, mapX);
-        int mapH = mapHeight(mapY);
-        int chunkPixels = Math.max(16, 16 * zoom);
-        int chunksX = visibleChunkCount(mapW, chunkPixels);
-        int chunksZ = visibleChunkCount(mapH, chunkPixels);
-        int radiusX = chunksX / 2;
-        int radiusZ = chunksZ / 2;
-        if (mouseX < mapX || mouseY < mapY || mouseX >= mapX + mapW || mouseY >= mapY + mapH) return Long.MIN_VALUE;
-        int gridX = (int) Math.floor((mouseX - mapX - panOffsetX) / chunkPixels) - radiusX;
-        int gridZ = (int) Math.floor((mouseY - mapY - panOffsetY) / chunkPixels) - radiusZ;
-        return ChunkPos.pack(panChunkX + gridX, panChunkZ + gridZ);
-    }
-
-
-
-    private int mapOuterMargin() {
-        return width < 520 ? 12 : 18;
-    }
-
-    private int controlsTop() {
-        return height < 390 ? 42 : 52;
-    }
-
-    private int statusY() {
-        return toolbarBottomY + 8;
-    }
-
-    private int statusChipRows() {
-        int available = Math.max(1, width - mapOuterMargin() * 2);
-        int fullWidth = 0;
-        String[] labels = {
-                Lang.string("worldbinder.map.saved"),
-                Lang.string("worldbinder.map.partial"),
-                Lang.string("worldbinder.map.queued"),
-                Lang.string("worldbinder.map.errors")
-        };
-        int[] values = {cachedSavedCount, cachedScanningCount, cachedQueuedCount, cachedErrorCount};
-        for (int i = 0; i < labels.length; i++) {
-            fullWidth += chipWidth(labels[i], values[i]) + (i == 0 ? 0 : 6);
-        }
-        if (hasActiveFilters()) {
-            fullWidth += chipWidth(filterStatusLine(), -1) + 6;
-        }
-        return fullWidth > available ? 2 : 1;
-    }
-
-    private int filterControlsY() {
-        return statusY() + statusChipRows() * 20 + 6;
-    }
-
-    private int leftPanelWidth() {
-        return width >= 1040 && height >= 520 ? Math.min(160, Math.max(126, width / 9)) : 0;
-    }
-
-    private int rightPanelWidth() {
-        return width >= 1220 && height >= 520 ? 184 : 0;
-    }
-
-    private int mapX(int leftPanelW) {
-        return leftPanelW > 0 ? leftPanelW + mapOuterMargin() : mapOuterMargin();
-    }
-
-    private int mapY() {
-        return filterControlsY() + (filtersOpen ? 28 : 0) + 8;
-    }
-
-    private int mapWidth(int leftPanelW, int rightPanelW, int mapX) {
-        int reservedRight = rightPanelW > 0 ? rightPanelW + mapOuterMargin() * 2 : mapOuterMargin();
-        return Math.max(80, width - mapX - reservedRight);
-    }
-
-    private int mapHeight(int mapY) {
-        return Math.max(70, height - mapY - 62);
-    }
-
-    private static int visibleChunkCount(int pixels, int chunkPixels) {
-        int count = Math.max(3, pixels / Math.max(1, chunkPixels));
-        if (count % 2 == 0) {
-            count--;
-        }
-        return Math.max(3, count);
-    }
-    private boolean shouldReduceUiDetail(SceneCaptureService capture) {
-        if (!WorldBinder.config().effectiveAdaptiveThrottleEnabled()) {
-            return false;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        int fps = mc == null ? WorldBinder.config().targetFps : Math.max(1, mc.getFps());
-        return capture.renderingQualityReduced() || fps < Math.max(1, WorldBinder.config().targetFps) * 0.75D || cachedSnapshots.size() > 50_000;
-    }
-
-    private void refreshMapDataIfNeeded(SceneCaptureService capture, boolean reducedUiDetail) {
-        long now = System.currentTimeMillis();
-        long revision = capture.mapDataRevision();
-        if (now < nextMapDataRefreshMillis && revision == cachedMapRevision) {
-            return;
-        }
-        long interval = Math.max(50L, WorldBinder.config().effectiveMaxUiWorkMs() * (reducedUiDetail ? 40L : 20L));
-        nextMapDataRefreshMillis = now + Math.min(reducedUiDetail ? 250L : 125L, interval); // Heavy map data is capped; rendering still follows the screen FPS.
-        cachedMapRevision = revision;
-        cachedDone = capture.downloadedChunksView();
-        cachedPartial = capture.partialChunksView();
-        cachedQueued = capture.queuedChunksView();
-        cachedFailed = capture.failedChunksView();
-        cachedSnapshots = capture.chunkSnapshotsView();
-    }
-
-    private void refreshPanelsIfNeeded(SceneCaptureService capture, long inspectorKey, Map<Long, ChunkSnapshot> snapshots, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed) {
-        long now = System.currentTimeMillis();
-        long revision = capture.mapDataRevision();
-        if (now < nextPanelRefreshMillis && inspectorKey == cachedInspectorKey && revision == cachedPanelRevision) {
-            return;
-        }
-        nextPanelRefreshMillis = now + 350L;
-        cachedPanelRevision = revision;
-        cachedSavedCount = done.size();
-        cachedScanningCount = partial.size();
-        cachedQueuedCount = queued.size();
-        cachedErrorCount = failed.size();
-        cachedQueueDiagnostics = capture.queueDiagnosticsLine();
-        cachedInspectorKey = inspectorKey;
-        cachedInspectorSnapshot = inspectorKey == Long.MIN_VALUE ? null : snapshots.get(inspectorKey);
-        cachedInspectorStatus = inspectorKey == Long.MIN_VALUE ? Lang.string("worldbinder.map.status.unknown") : statusLabel(statusOf(inspectorKey, cachedInspectorSnapshot, done, partial, queued, failed, false));
-        cachedInspectorQuality = cachedInspectorSnapshot == null ? 0.0D : cachedInspectorSnapshot.qualityScore(expectedHeight());
-    }
-
-    private boolean passesFilter(long key, ChunkSnapshot snapshot, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed) {
-        ChunkCaptureStatus status = statusOf(key, snapshot, done, partial, queued, failed, false);
-        if (filterMissing && status != ChunkCaptureStatus.UNKNOWN) return false;
-        if (filterIncomplete && !isIncomplete(status)) return false;
-        if (filterEntities && (snapshot == null || snapshot.entityCount <= 0)) return false;
-        return !filterBlockEntities || (snapshot != null && snapshot.blockEntityCount > 0);
-    }
-
-    private ChunkCaptureStatus statusOf(long key, ChunkSnapshot snapshot, Set<Long> done, Set<Long> partial, Set<Long> queued, Set<Long> failed, boolean player) {
-        if (failed.contains(key) || (snapshot != null && snapshot.exportError)) return ChunkCaptureStatus.FAILED;
-        if (partial.contains(key)) return activeScanLabel(snapshot);
-        if (queued.contains(key)) return ChunkCaptureStatus.QUEUED;
-        if (done.contains(key)) return ChunkCaptureStatus.DONE;
-        return snapshot == null ? ChunkCaptureStatus.UNKNOWN : snapshot.effectiveStatus();
-    }
-
-    private ChunkCaptureStatus activeScanLabel(ChunkSnapshot snapshot) {
-        if (snapshot != null && snapshot.effectiveStatus() == ChunkCaptureStatus.PARTIAL) {
-            return ChunkCaptureStatus.PARTIAL;
-        }
-        return ChunkCaptureStatus.SCANNING;
-    }
-
-    private boolean isIncomplete(ChunkCaptureStatus status) {
-        return status == ChunkCaptureStatus.QUEUED
-                || status == ChunkCaptureStatus.SCANNING
-                || status == ChunkCaptureStatus.PARTIAL
-                || status == ChunkCaptureStatus.FAILED
-                || status == ChunkCaptureStatus.RECOVERY;
-    }
-
-    private String statusLabel(ChunkCaptureStatus status) {
-        return switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
-            case UNKNOWN -> Lang.string("worldbinder.map.status.unknown");
-            case QUEUED -> Lang.string("worldbinder.map.status.queued");
-            case SCANNING -> Lang.string("worldbinder.map.status.scanning");
-            case DONE -> Lang.string("worldbinder.map.status.done");
-            case PARTIAL -> Lang.string("worldbinder.map.status.partial");
-            case FAILED -> Lang.string("worldbinder.map.status.error");
-            case RECOVERY -> Lang.string("worldbinder.map.status.recovery");
-        };
-    }
-
-    private String filterStatusLine() {
-        if (!filterMissing && !filterIncomplete && !filterEntities && !filterBlockEntities) {
-            return Lang.string("worldbinder.map.filters_none");
-        }
-        StringBuilder builder = new StringBuilder(Lang.string("worldbinder.map.filters_prefix"));
-        if (filterMissing) builder.append(' ').append(Lang.string("worldbinder.map.missing"));
-        if (filterIncomplete) builder.append(' ').append(Lang.string("worldbinder.map.incomplete"));
-        if (filterEntities) builder.append(' ').append(Lang.string("worldbinder.map.entities"));
-        if (filterBlockEntities) builder.append(' ').append(Lang.string("worldbinder.map.blockentities"));
-        return builder.toString();
-    }
-
-
-    private void drawMapStatusChips(GuiGraphicsExtractor context) {
-        int y = statusY();
-        int x = mapOuterMargin();
-        int startX = x;
-        int right = width - mapOuterMargin();
-        String[] labels = {
-                Lang.string("worldbinder.map.saved"),
-                Lang.string("worldbinder.map.partial"),
-                Lang.string("worldbinder.map.queued"),
-                Lang.string("worldbinder.map.errors")
-        };
-        int[] values = {cachedSavedCount, cachedScanningCount, cachedQueuedCount, cachedErrorCount};
-        int[] accents = {WbTheme.OK, WbTheme.WARN, WbTheme.ACCENT_RIGHT, WbTheme.ERROR};
-        for (int i = 0; i < labels.length; i++) {
-            int chipWidth = chipWidth(labels[i], values[i]);
-            if (x > startX && x + chipWidth > right) {
-                x = startX;
-                y += 20;
-            }
-            x = chip(context, x, y, labels[i], values[i], accents[i]) + 6;
-        }
-        if (hasActiveFilters()) {
-            String label = filterStatusLine();
-            int chipWidth = chipWidth(label, -1);
-            if (x > startX && x + chipWidth > right) {
-                x = startX;
-                y += 20;
-            }
-            chip(context, x, y, label, -1, WbTheme.INFO);
-        }
-    }
-
-    private int chipWidth(String label, int value) {
-        String text = value < 0 ? label : label + " " + value;
-        return font.width(text) + 18;
-    }
-
-    private int chip(GuiGraphicsExtractor context, int x, int y, String label, int value, int accent) {
-        String text = value < 0 ? label : label + " " + value;
-        int w = font.width(text) + 18;
-        WbChrome.drawInset(context, x, y, w, 18, accent, true);
-        WbText.drawClipped(context, font, text, x + 9, y + 5, w - 18, WbTheme.TEXT_SOFT);
-        return x + w;
-    }
-
-    private void drawTopFilterStatus(GuiGraphicsExtractor context) {
-        String line = filterStatusLine();
-        int textWidth = font.width(line);
-        int x = (width - textWidth) / 2 - 10;
-        int y = 52;
-        int color = hasActiveFilters() ? 0xAA15301F : 0xAA10182A;
-        int accent = hasActiveFilters() ? WbTheme.OK : WbTheme.ACCENT;
-        context.fill(x, y, x + textWidth + 20, y + 18, color);
-        context.fill(x, y, x + textWidth + 20, y + 2, accent);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(line), x + 10, y + 6, hasActiveFilters() ? WbTheme.OK : WbTheme.TEXT_MUTED);
-    }
-
-    private boolean hasActiveFilters() {
-        return filterMissing || filterIncomplete || filterEntities || filterBlockEntities;
-    }
-
-    private void drawFilterPanel(GuiGraphicsExtractor context, int x, int y) {
-        WbChrome.drawCard(context, font, x, y, 142, 98, Lang.text("worldbinder.map.filter_panel"), hasActiveFilters() ? WbTheme.OK : WbTheme.ACCENT, false);
-        filterLine(context, x + 10, y + 28, Lang.string("worldbinder.map.missing"), filterMissing);
-        filterLine(context, x + 10, y + 42, Lang.string("worldbinder.map.incomplete"), filterIncomplete);
-        filterLine(context, x + 10, y + 56, Lang.string("worldbinder.map.entities"), filterEntities);
-        filterLine(context, x + 10, y + 70, Lang.string("worldbinder.map.blockentities"), filterBlockEntities);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.map.clear_hint"), x + 10, y + 84, WbTheme.TEXT_DIM);
-    }
-
-    private void filterLine(GuiGraphicsExtractor context, int x, int y, String label, boolean active) {
-        if (active) {
-            context.fill(x - 4, y - 1, x + 118, y + 11, WbTheme.ACCENT_MUTED);
-        }
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal((active ? "§a" + Lang.string("worldbinder.common.on") + "  " : "§7" + Lang.string("worldbinder.common.off") + " ") + "§f" + label), x, y, active ? WbTheme.OK : WbTheme.TEXT_DIM);
-    }
-
-    private void drawLegend(GuiGraphicsExtractor context, int x, int y) {
-        WbChrome.drawCard(context, font, x, y, 142, 100, Lang.text("worldbinder.map.legend"), WbTheme.ACCENT, false);
-        legend(context, x + 10, y + 28, WbTheme.OK, Lang.string("worldbinder.map.status.done"));
-        legend(context, x + 10, y + 42, WbTheme.WARN, Lang.string("worldbinder.map.status.partial"));
-        legend(context, x + 10, y + 56, WbTheme.ACCENT_RIGHT, Lang.string("worldbinder.map.status.queued"));
-        legend(context, x + 10, y + 70, WbTheme.INFO, Lang.string("worldbinder.map.status.scanning"));
-        legend(context, x + 10, y + 84, WbTheme.ERROR, Lang.string("worldbinder.map.error_missing"));
-    }
-
-    private void legend(GuiGraphicsExtractor context, int x, int y, int color, String text) {
-        context.fill(x, y + 2, x + 8, y + 10, color);
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(text), x + 14, y, WbTheme.TEXT_SOFT);
-    }
-
-    private void drawCoveragePanel(GuiGraphicsExtractor context, int x, int y) {
-        WbChrome.drawCard(context, font, x, y, 142, 132, Lang.text("worldbinder.map.coverage"), WbTheme.INFO, false);
-        int total = Math.max(1, cachedSavedCount + cachedScanningCount + cachedQueuedCount);
-        meter(context, x + 10, y + 30, 118, Lang.string("worldbinder.map.saved"), cachedSavedCount, total, WbTheme.OK);
-        meter(context, x + 10, y + 52, 118, Lang.string("worldbinder.map.status.scanning"), cachedScanningCount, total, WbTheme.INFO);
-        meter(context, x + 10, y + 74, 118, Lang.string("worldbinder.map.queued"), cachedQueuedCount, total, WbTheme.ACCENT_RIGHT);
-        meter(context, x + 10, y + 96, 118, Lang.string("worldbinder.map.errors"), cachedErrorCount, Math.max(1, cachedSnapshots.size()), WbTheme.ERROR);
-    }
-
-    private void meter(GuiGraphicsExtractor context, int x, int y, int w, String label, int value, int total, int color) {
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(label + " §f" + value), x, y, WbTheme.TEXT_MUTED);
-        WbChrome.drawProgressTrack(context, x, y + 11, w, 5, (int) (w * Math.min(1.0D, value / (double) total)), color);
-    }
-
-    private void drawInspectorPanel(GuiGraphicsExtractor context, int x, int y, long key, int cx, int cz) {
-        int w = 184;
-        int h = WorldBinder.config().queueDebugDiagnostics ? 294 : 240;
-        WbChrome.drawCard(context, font, x, y, w, h, Lang.text("worldbinder.map.inspector"), WbTheme.ACCENT, false);
-        if (key == Long.MIN_VALUE) {
-            net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.map.inspector.empty"), x + 10, y + 34, WbTheme.TEXT_MUTED);
-            return;
-        }
-        ChunkSnapshot snapshot = cachedInspectorSnapshot;
-        String status = cachedInspectorStatus;
-        int yy = y + 32;
-        line(context, x, yy, Lang.string("worldbinder.map.chunk"), cx + " / " + cz); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.block_x"), chunkMinBlock(cx) + " .. " + chunkMaxBlock(cx)); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.block_z"), chunkMinBlock(cz) + " .. " + chunkMaxBlock(cz)); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.status"), status); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.blocks"), snapshot == null ? "0" : Lang.string("worldbinder.map.scanned_blocks", snapshot.scannedBlocks)); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.entities"), snapshot == null ? "0" : Integer.toString(snapshot.entityCount)); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.blockentities"), snapshot == null ? "0" : Integer.toString(snapshot.blockEntityCount)); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.biomes"), snapshot == null ? Lang.string("worldbinder.map.status.unknown") : (snapshot.hasBiomeData ? Lang.string("worldbinder.common.yes") : Lang.string("worldbinder.common.no"))); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.light"), snapshot == null ? Lang.string("worldbinder.map.status.unknown") : (snapshot.lightEstimated ? Lang.string("worldbinder.map.estimated") : Lang.string("worldbinder.common.saved"))); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.snapshot"), snapshot == null ? Lang.string("worldbinder.common.no") : (snapshot.hasSnapshot ? Lang.string("worldbinder.common.yes") : Lang.string("worldbinder.common.no"))); yy += 16;
-        line(context, x, yy, Lang.string("worldbinder.map.last_scanned"), snapshot == null ? Lang.string("worldbinder.common.never") : snapshot.lastScannedText()); yy += 16;
-        if (WorldBinder.config().queueDebugDiagnostics && snapshot != null) {
-            line(context, x, yy, Lang.string("worldbinder.map.queued_by"), valueOrDash(snapshot.queueSource)); yy += 16;
-            line(context, x, yy, Lang.string("worldbinder.map.reason"), valueOrDash(snapshot.queueReason)); yy += 16;
-            line(context, x, yy, Lang.string("worldbinder.map.queue"), cachedQueueDiagnostics); yy += 16;
-            line(context, x, yy, Lang.string("worldbinder.map.history"), valueOrDash(snapshot.stateHistory)); yy += 16;
-        }
-        yy += 2;
-        double quality = cachedInspectorQuality;
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Lang.text("worldbinder.map.quality", (int) (quality * 100.0D)), x + 10, yy, WbTheme.TEXT_MUTED);
-        WbChrome.drawProgressTrack(context, x + 10, yy + 12, w - 20, 5, (int) ((w - 20) * quality), quality > 0.9D ? WbTheme.OK : quality > 0.55D ? WbTheme.WARN : WbTheme.ERROR);
-    }
-
-    private void line(GuiGraphicsExtractor context, int x, int y, String label, String value) {
-        String text = label + ": §f" + value;
-        if (text.length() > 42) {
-            text = text.substring(0, 39) + "...";
-        }
-        net.worldbinder.util.GuiText.drawTextWithShadow(context, font, Component.literal(text), x + 10, y, WbTheme.TEXT_MUTED);
-    }
-
-    private static String valueOrDash(String value) {
-        return value == null || value.isBlank() ? "-" : value;
-    }
-
-    private void drawChunk(GuiGraphicsExtractor context, ChunkSnapshot snapshot, int x, int y, int zoom, int fallbackColor, WorldBinderConfig.MapLayerMode mode, boolean reducedUiDetail) {
-        int chunkPixels = Math.max(16, 16 * zoom);
-        int base = mode == WorldBinderConfig.MapLayerMode.MAP_ONLY ? 0x55202A36 : fallbackColor;
-        context.fill(x, y, x + chunkPixels, y + chunkPixels, base);
-        if (snapshot != null && mode != WorldBinderConfig.MapLayerMode.CHUNKS_ONLY) {
-            tileCache.draw(context, ChunkPos.pack(snapshot.chunkX, snapshot.chunkZ), snapshot, x, y, chunkPixels);
-        }
-        if (chunkPixels >= 24) {
-            context.fill(x, y, x + chunkPixels, y + 1, 0x33111122);
-            context.fill(x, y, x + 1, y + chunkPixels, 0x33111122);
-        }
-        if (snapshot != null && snapshot.effectiveStatus() != ChunkCaptureStatus.UNKNOWN) {
-            int quality = (int) Math.min(chunkPixels, Math.max(2, chunkPixels * snapshot.qualityScore(expectedHeight())));
-            context.fill(x, y + chunkPixels - 2, x + quality, y + chunkPixels, snapshot.isDone() ? WbTheme.OK : WbTheme.WARN);
-        }
-    }
-
-    private void drawChunkBorder(GuiGraphicsExtractor context, int x, int y, int size, ChunkCaptureStatus status, boolean player, boolean selected) {
-        int color = player ? WbTheme.ACCENT : switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
-            case DONE -> WbTheme.OK;
-            case PARTIAL, RECOVERY -> WbTheme.WARN;
-            case QUEUED -> WbTheme.ACCENT_RIGHT;
-            case SCANNING -> WbTheme.INFO;
-            case FAILED -> WbTheme.ERROR;
-            case UNKNOWN -> 0xFF555566;
-        };
-        if (selected) color = 0xFFFFFFFF;
-        int t = size < 32 ? 1 : 2;
-        context.fill(x, y, x + size, y + t, color);
-        context.fill(x, y + size - t, x + size, y + size, color);
-        context.fill(x, y, x + t, y + size, color);
-        context.fill(x + size - t, y, x + size, y + size, color);
-    }
-
-    private void drawPlayerCross(GuiGraphicsExtractor context, int x, int y, int size) {
-        int color = WbTheme.ACCENT;
-        int mid = size / 2;
-        context.fill(x, y + mid - 1, x + size, y + mid + 1, color);
-        context.fill(x + mid - 1, y, x + mid + 1, y + size, color);
-        int t = size < 32 ? 1 : 2;
-        context.fill(x, y, x + size, y + t, color);
-        context.fill(x, y + size - t, x + size, y + size, color);
-        context.fill(x, y, x + t, y + size, color);
-        context.fill(x + size - t, y, x + size, y + size, color);
-    }
-
-    private static WorldBinderConfig.MapLayerMode nextMode(WorldBinderConfig.MapLayerMode mode) {
-        return switch (mode == null ? WorldBinderConfig.MapLayerMode.BOTH : mode) {
-            case BOTH -> WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
-            case CHUNKS_ONLY -> WorldBinderConfig.MapLayerMode.MAP_ONLY;
-            case MAP_ONLY -> WorldBinderConfig.MapLayerMode.BOTH;
-        };
-    }
-
-    private static String modeLabel(WorldBinderConfig.MapLayerMode mode) {
-        return switch (mode == null ? WorldBinderConfig.MapLayerMode.BOTH : mode) {
-            case BOTH -> Lang.string("worldbinder.config.map_mode.both");
-            case CHUNKS_ONLY -> Lang.string("worldbinder.config.map_mode.chunks");
-            case MAP_ONLY -> Lang.string("worldbinder.config.map_mode.map");
-        };
-    }
-
-    private int fallbackChunkColor(ChunkCaptureStatus status) {
-        return switch (status == null ? ChunkCaptureStatus.UNKNOWN : status) {
-            case FAILED -> 0x8846222C;
-            case SCANNING -> 0x88304F68;
-            case PARTIAL, RECOVERY -> 0x88705E24;
-            case QUEUED -> 0x7751381A;
-            case DONE -> 0x66315B48;
-            case UNKNOWN -> 0x44202A3A;
-        };
-    }
-
-    private int expectedHeight() {
-        return WorldBinder.config().effectiveCaptureHeight();
-    }
-
-    private void jumpToFields() {
-        try {
-            panChunkX = Integer.parseInt(goX.getValue().trim());
-            panChunkZ = Integer.parseInt(goZ.getValue().trim());
-            followPlayer = false;
-            panOffsetX = panOffsetY = 0;
+            setFollow(false);
+            targetCamX = x;
+            targetCamZ = z;
+            WbSounds.mapPing();
         } catch (NumberFormatException ignored) {
+            WbSounds.error();
         }
     }
 
     private void jumpToOrigin() {
         ChunkSnapshot first = WorldBinderClient.capture().chunkSnapshotsView().values().stream().findFirst().orElse(null);
         if (first != null) {
-            panChunkX = first.chunkX;
-            panChunkZ = first.chunkZ;
-            followPlayer = false;
-            panOffsetX = panOffsetY = 0;
+            setFollow(false);
+            targetCamX = first.chunkX * 16 + 8;
+            targetCamZ = first.chunkZ * 16 + 8;
+        } else if (cachedBounds != null) {
+            setFollow(false);
+            targetCamX = (cachedBounds[0] + cachedBounds[2] + 1) * 8.0;
+            targetCamZ = (cachedBounds[1] + cachedBounds[3] + 1) * 8.0;
         }
     }
 
     private void queueSelectedRescan() {
         if (selectedChunk != Long.MIN_VALUE) {
-            WorldBinderClient.capture().queueChunkForRescan(chunkXFromKey(selectedChunk), chunkZFromKey(selectedChunk));
+            WorldBinderClient.capture().queueChunkForRescan(chunkX(selectedChunk), chunkZ(selectedChunk));
+            footer(Component.translatable("worldbinder.map.rescan_queued", chunkX(selectedChunk), chunkZ(selectedChunk)), WbTheme.OK);
+            WbSounds.mapPing();
         }
     }
 
     private void copySelectedChunkCenter() {
-        int x = chunkMiddleBlock(chunkXFromKey(selectedChunk));
-        int z = chunkMiddleBlock(chunkZFromKey(selectedChunk));
+        int x = (chunkX(selectedChunk) << 4) + 8;
+        int z = (chunkZ(selectedChunk) << 4) + 8;
         int y = 80;
         Minecraft mc = Minecraft.getInstance();
-        if (mc != null && mc.player != null) {
+        String height = heightAt(lookup.apply(selectedChunk), x, z);
+        if (!height.equals("?")) {
+            y = Integer.parseInt(height) + 1;
+        } else if (mc.player != null) {
             y = mc.player.blockPosition().getY();
         }
         String coordinate = x + " " + y + " " + z;
-        if (mc != null) {
-            mc.keyboardHandler.setClipboard(coordinate);
-        }
+        mc.keyboardHandler.setClipboard(coordinate);
+        footer(Component.translatable("worldbinder.chat.copied_chunk_center", coordinate), WbTheme.OK);
         Chat.info(Lang.string("worldbinder.chat.copied_chunk_center", coordinate));
     }
 
     private void clearFilters() {
-        filterMissing = false;
-        filterIncomplete = false;
-        filterEntities = false;
-        filterBlockEntities = false;
-        updateFilterButtons();
+        STATUS_FILTERS.clear();
+        CONTENT_FILTERS.clear();
+        filterInvert = false;
+        filterHide = false;
+        rebuild();
     }
 }
