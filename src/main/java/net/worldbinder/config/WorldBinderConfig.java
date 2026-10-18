@@ -70,7 +70,7 @@ public final class WorldBinderConfig {
     public boolean radarRotate = false;
     public boolean radarShowOutsideCapture = false;
     public boolean radarShowEntities = true;
-    public boolean radarShowCoordinates = true;
+    public boolean radarShowCoordinates = false;
 
     public MessageMode effectiveMessageMode() {
         return messageMode == null ? MessageMode.TOAST : messageMode;

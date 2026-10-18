@@ -42,9 +42,11 @@ public final class WorldBinderHud {
     private static final int STATUS_FULL_HEIGHT = 76;
     private static final int STATUS_STORAGE_HEIGHT = 58;
     private static final int STATUS_DETAIL_HEIGHT = 42;
-    private static final int RADAR_HEADER = 22;
-    private static final int RADAR_FOOTER = 14;
+    private static final int RADAR_PAD = 5;
+    private static final int RADAR_INFO = 26;
+    private static final int RADAR_COORDS = 12;
     private static final MapStatusOverlay RADAR_STATUS = new MapStatusOverlay();
+    private static final Identifier LOGO = Identifier.fromNamespaceAndPath("worldbinder", "textures/gui/logo.png");
     private static long radarSyncSignature = Long.MIN_VALUE;
     private static long radarStatsMillis;
     private static int radarDoneInView;
@@ -123,17 +125,46 @@ public final class WorldBinderHud {
         WbChrome.rounded(context, 0, 0, STATUS_WIDTH, height, WbMotion.mix(background, accent, 0.35F));
         WbChrome.roundedGradient(context, 1, 1, STATUS_WIDTH - 2, height - 2,
                 WbMotion.mix(withAlpha(background, 0xF0), accent, 0.08F), withAlpha(background, 0xE6));
-        WbChrome.rounded(context, 6, 4, 16, 16, WbTheme.withAlpha(accent, 0x30));
-        icon.draw(context, 8, 6, 2, accent);
-        context.text(font, Component.literal(shorten(title, 60)).withStyle(ChatFormatting.BOLD), 28, 8, WbTheme.TEXT, true);
+        context.fillGradient(3, 1, STATUS_WIDTH - 3, 20, WbTheme.withAlpha(accent, 0x22), 0x00000000);
+        // Centered brand: real WorldBinder logo + title
+        Component titleText = Component.literal(shorten(title, 56)).withStyle(ChatFormatting.BOLD);
+        int logo = 14;
+        int groupW = logo + 6 + font.width(titleText);
+        int groupX = (STATUS_WIDTH - groupW) / 2;
+        WbChrome.rounded(context, groupX - 8, 3, groupW + 16, 17, WbTheme.withAlpha(accent, 0x1C));
+        context.blit(LOGO, groupX, 4, groupX + logo, 4 + logo, 0.0F, 1.0F, 0.0F, 1.0F);
+        context.text(font, titleText, groupX + logo + 6, 8, WbTheme.TEXT, true);
+        icon.draw(context, 9, 8, 1, WbTheme.withAlpha(accent, 0xB0));
         String percent = Math.round(Math.max(0.0D, Math.min(1.0D, progress)) * 100.0D) + "%";
-        context.text(font, percent, STATUS_WIDTH - 10 - font.width(percent), 8, WbMotion.mix(accent, WbTheme.TEXT, 0.4F), true);
+        int percentW = font.width(percent) + 10;
+        WbChrome.rounded(context, STATUS_WIDTH - 8 - percentW, 4, percentW, 14, WbTheme.withAlpha(accent, 0x30));
+        context.text(font, percent, STATUS_WIDTH - 8 - percentW + 5, 7, WbMotion.mix(accent, WbTheme.TEXT, 0.5F), true);
         int barX = 8;
         int barW = STATUS_WIDTH - 16;
         int fill = (int) Math.round((barW - 2) * Math.max(0.0D, Math.min(1.0D, progress)));
         WbChrome.drawProgressTrack(context, barX, 22, barW, 5, fill, active ? accent : WbTheme.OK);
         if (active) {
             WbChrome.drawProgressShimmer(context, barX, 22, Math.max(4, fill + 2), 5, accent);
+        }
+    }
+
+    /** Centered status line with a pulsing state dot and optional dimmed suffix (ETA, details). */
+    private static void drawStatusLine(GuiGraphicsExtractor context, Font font, int y, String text, String suffix, int dotColor, boolean pulse) {
+        String separator = suffix == null || suffix.isBlank() ? "" : "  •  ";
+        String safeSuffix = suffix == null ? "" : suffix;
+        int textW = font.width(text);
+        int totalW = 10 + textW + font.width(separator) + font.width(safeSuffix);
+        int maxW = STATUS_WIDTH - 24;
+        if (totalW > maxW) {
+            safeSuffix = WbText.ellipsize(font, safeSuffix, Math.max(20, maxW - 10 - textW - font.width(separator)));
+            totalW = 10 + textW + font.width(separator) + font.width(safeSuffix);
+        }
+        int x = (STATUS_WIDTH - totalW) / 2;
+        float glow = pulse ? WbMotion.pulse(1400L) : 1.0F;
+        WbChrome.fillCircle(context, x + 3, y + 4, 3, WbMotion.mix(dotColor, 0xFFFFFFFF, glow * 0.3F));
+        context.text(font, text, x + 10, y, WbTheme.TEXT_SOFT, true);
+        if (!separator.isEmpty()) {
+            context.text(font, separator + safeSuffix, x + 10 + textW, y, WbTheme.TEXT_DIM, true);
         }
     }
 
@@ -150,16 +181,16 @@ public final class WorldBinderHud {
         double shownProgress = storageMode ? storage.progress() : OperationStatus.progress();
         if (storageMode) {
             drawStatusFrame(context, renderer, config, logicalHeight, WbIcon.SAVE, Lang.string("worldbinder.storage.title"), shownProgress, true);
-            WbText.drawClipped(context, renderer, storage.stage().label(), 10, 33, STATUS_WIDTH / 2, WbTheme.TEXT_SOFT);
             String eta = Lang.string("worldbinder.storage.elapsed_remaining", StorageProgress.formatMillis(storage.elapsedMillis()), storage.etaText());
-            context.text(renderer, eta, STATUS_WIDTH - 10 - renderer.width(eta), 33, WbTheme.TEXT_DIM, true);
+            drawStatusLine(context, renderer, 35, storage.stage().label(), eta, 0xFF000000 | (config.bossbarAccentColor & 0xFFFFFF), true);
             return;
         }
         boolean active = OperationStatus.active();
         drawStatusFrame(context, renderer, config, logicalHeight, captureMode ? WbIcon.CAPTURE : WbIcon.INFO,
                 OperationStatus.title(), captureMode ? captureProgress(capture) : shownProgress, active || captureMode);
         if (!captureMode) {
-            WbText.drawClipped(context, renderer, OperationStatus.detail(), 10, 31, STATUS_WIDTH - 20, WbTheme.TEXT_SOFT);
+            String detail = WbText.ellipsize(renderer, OperationStatus.detail(), STATUS_WIDTH - 40);
+            drawStatusLine(context, renderer, 31, detail, null, active ? 0xFF000000 | (config.bossbarAccentColor & 0xFFFFFF) : WbTheme.OK, active);
             return;
         }
         int done = capture.scannedChunks();
@@ -168,11 +199,8 @@ public final class WorldBinderHud {
         int total = Math.max(1, done + scanning + queued);
         boolean paused = capture.isPaused();
         int stateColor = paused ? WbTheme.WARN : WbTheme.OK;
-        float pulse = paused ? 1.0F : WbMotion.pulse(1400L);
-        WbChrome.fillCircle(context, 14, 37, 3, WbMotion.mix(stateColor, 0xFFFFFFFF, pulse * 0.3F));
-        context.text(renderer, Lang.string(paused ? "worldbinder.common.paused" : "worldbinder.hud.downloading"), 22, 33, WbTheme.TEXT_SOFT, true);
         String eta = Lang.string("worldbinder.common.eta") + ": " + capture.estimatedFinishText();
-        context.text(renderer, eta, STATUS_WIDTH - 10 - renderer.width(eta), 33, WbTheme.TEXT_DIM, true);
+        drawStatusLine(context, renderer, 33, Lang.string(paused ? "worldbinder.common.paused" : "worldbinder.hud.downloading"), eta, stateColor, !paused);
         int gap = 6;
         int meterW = (STATUS_WIDTH - 16 - gap * 2) / 3;
         drawMeter(context, renderer, 8, 46, meterW, WbIcon.CHUNK, Lang.string("worldbinder.hud.meter.chunks"), done + "/" + total, done / (double) total, WbTheme.OK);
@@ -256,8 +284,7 @@ public final class WorldBinderHud {
         try {
             drawStatusFrame(context, font, config, STATUS_FULL_HEIGHT, WbIcon.CAPTURE,
                     Lang.string("worldbinder.widget_editor.preview.status_title"), 0.62D, true);
-            WbChrome.fillCircle(context, 14, 37, 3, WbTheme.OK);
-            context.text(font, Lang.string("worldbinder.widget_editor.preview.status_message"), 22, 33, WbTheme.TEXT_SOFT, true);
+            drawStatusLine(context, font, 33, Lang.string("worldbinder.widget_editor.preview.status_message"), Lang.string("worldbinder.common.eta") + ": 1m 20s", WbTheme.OK, true);
             int gap = 6;
             int meterW = (STATUS_WIDTH - 16 - gap * 2) / 3;
             drawMeter(context, font, 8, 46, meterW, WbIcon.CHUNK, Lang.string("worldbinder.hud.meter.chunks"), "84/120", 0.7D, WbTheme.OK);
@@ -277,9 +304,9 @@ public final class WorldBinderHud {
         int requestedSize = Math.max(3, config.chunkRadarSize | 1);
         int size = cappedOddSize(requestedSize, config.effectiveRadarMaxRenderedChunks());
         int cell = Math.max(2, Math.min(16, config.chunkRadarCellSize));
-        int grid = size * cell;
-        int logicalW = Math.max(118, grid + 16);
-        int logicalH = RADAR_HEADER + grid + 8 + (config.radarShowCoordinates ? RADAR_FOOTER : 0);
+        int logicalW = Math.max(110, size * cell + 16);
+        int grid = logicalW - RADAR_PAD * 2;
+        int logicalH = RADAR_PAD + grid + RADAR_INFO + (config.radarShowCoordinates ? RADAR_COORDS : 0) + 2;
         float requestedScale = hudScale(screenW, screenH) * config.effectiveChunkRadarScalePercent() / 100.0F;
         float fitScale = Math.min(
                 (screenW - WorldBinderWidgetLayout.SCREEN_MARGIN * 2) / (float) logicalW,
@@ -319,15 +346,12 @@ public final class WorldBinderHud {
             WbChrome.softShadow(context, 0, 0, panelW, panelH, 0x80);
             WbChrome.rounded(context, 0, 0, panelW, panelH, WbMotion.mix(background, accent, 0.35F));
             WbChrome.roundedGradient(context, 1, 1, panelW - 2, panelH - 2, WbMotion.mix(background, accent, 0.08F), background);
-            WbIcon.MAP.draw(context, 7, 7, 1, accent);
-            int gridX = (panelW - grid) / 2;
-            int gridY = RADAR_HEADER;
+            int gridX = RADAR_PAD;
+            int gridY = RADAR_PAD;
             if (!live) {
-                context.text(font, Component.translatable("worldbinder.widget_editor.preview.radar_title").withStyle(ChatFormatting.BOLD), 18, 6, WbTheme.TEXT, true);
-                drawRadarPlaceholder(context, gridX, gridY, grid, layout.cell(), accent);
-                if (config.radarShowCoordinates) {
-                    context.text(font, "X 128  Y 64  Z -256", 7, gridY + grid + 6, WbTheme.TEXT_DIM, false);
-                }
+                drawRadarPlaceholder(context, gridX, gridY, grid, Math.max(2, grid / layout.size()), accent);
+                drawRadarInfo(context, font, panelW, gridY + grid, Lang.string("worldbinder.hud.chunk_title", 8, -3), 0.72F, accent,
+                        config.radarShowCoordinates ? "128 / 64 / -48" : null, "N");
                 return;
             }
             float partial = client.getDeltaTracker().getGameTimeDeltaPartialTick(true);
@@ -340,17 +364,9 @@ public final class WorldBinderHud {
             LongFunction<ChunkSnapshot> lookup = MapData.lookup(snapshots);
             updateRadarStats(capture, playerChunkX, playerChunkZ, layout.size());
 
-            String title = Lang.string("worldbinder.hud.chunk_title", playerChunkX, playerChunkZ);
-            String coverage = radarKnownInView == 0 ? "" : Math.round(radarDoneInView * 100.0F / Math.max(1, layout.size() * layout.size())) + "%";
-            WbText.drawClipped(context, font, Component.literal(title).withStyle(ChatFormatting.BOLD), 18, 7,
-                    panelW - 26 - font.width(coverage), WbTheme.TEXT);
-            if (!coverage.isEmpty()) {
-                context.text(font, coverage, panelW - 7 - font.width(coverage), 7, WbMotion.mix(WbTheme.OK, WbTheme.TEXT, 0.3F), true);
-            }
-
             context.fill(gridX - 1, gridY - 1, gridX + grid + 1, gridY + grid + 1, WbTheme.withAlpha(accent, 0x70));
             context.fill(gridX, gridY, gridX + grid, gridY + grid, 0xFF0B1016);
-            double zoom = layout.cell() / 16.0D;
+            double zoom = grid / (layout.size() * 16.0D);
             double centerX = gridX + grid / 2.0D;
             double centerY = gridY + grid / 2.0D;
             double reach = grid / 2.0D / zoom * (config.radarRotate ? 1.45D : 1.0D);
@@ -401,7 +417,7 @@ public final class WorldBinderHud {
                     RADAR_STATUS.draw(context, originX, originY, zoom, minRegionX, minRegionZ, maxRegionX, maxRegionZ);
                 }
                 WorldBinderConfig.RadarDetailMode detail = config.radarDetailMode == null ? WorldBinderConfig.RadarDetailMode.AUTO : config.radarDetailMode;
-                if (detail != WorldBinderConfig.RadarDetailMode.LOW && layout.cell() >= 6) {
+                if (detail != WorldBinderConfig.RadarDetailMode.LOW && zoom * 16.0D >= 6.0D) {
                     int lineColor = detail == WorldBinderConfig.RadarDetailMode.HIGH ? 0x30FFFFFF : 0x18FFFFFF;
                     for (int cx = minChunkX; cx <= maxChunkX + 1; cx++) {
                         int lx = (int) Math.round(originX + cx * 16 * zoom);
@@ -436,7 +452,7 @@ public final class WorldBinderHud {
                             WbChrome.fillCircle(context, (int) Math.round(ex), (int) Math.round(ez), 3, 0xE0050709);
                             WbChrome.fillCircle(context, (int) Math.round(ex), (int) Math.round(ez), 2, kind.color);
                         } else {
-                            MapMarkers.drawEntity(context, (int) Math.round(ex), (int) Math.round(ez), kind, layout.cell() >= 8 ? 2 : 1);
+                            MapMarkers.drawEntity(context, (int) Math.round(ex), (int) Math.round(ez), kind, zoom * 16.0D >= 8.0D ? 2 : 1);
                         }
                     }
                 }
@@ -446,14 +462,41 @@ public final class WorldBinderHud {
                 context.disableScissor();
             }
             drawRadarNorth(context, font, gridX, gridY, grid, config.radarRotate ? yaw : 180.0F);
-            if (config.radarShowCoordinates) {
-                String coords = "X " + client.player.blockPosition().getX() + "  Y " + client.player.blockPosition().getY()
-                        + "  Z " + client.player.blockPosition().getZ();
-                WbText.drawClipped(context, font, coords, 7, gridY + grid + 6, panelW - 14 - 12, WbTheme.TEXT_MUTED);
-                String facing = facing(yaw);
-                context.text(font, facing, panelW - 7 - font.width(facing), gridY + grid + 6, accent, true);
-            }
+            float coverage = radarDoneInView / (float) Math.max(1, layout.size() * layout.size());
+            String coords = config.radarShowCoordinates ? client.player.blockPosition().getX() + " / " + client.player.blockPosition().getY()
+                    + " / " + client.player.blockPosition().getZ() : null;
+            drawRadarInfo(context, font, panelW, gridY + grid, Lang.string("worldbinder.hud.chunk_title", playerChunkX, playerChunkZ),
+                    coverage, accent, coords, facing(yaw));
         } finally {
+            context.pose().popMatrix();
+        }
+    }
+
+    /**
+     * Info strip below the radar map: current chunk and capture coverage of the radar area with a slim bar,
+     * plus an optional compact coordinate line (scaled down so long coordinates always fit).
+     */
+    private static void drawRadarInfo(GuiGraphicsExtractor context, Font font, int panelW, int top, String chunk, float coverage,
+                                      int accent, String coords, String facing) {
+        int y = top + 5;
+        WbIcon.CHUNK.draw(context, RADAR_PAD + 1, y + 1, 1, accent);
+        String percent = Math.round(coverage * 100.0F) + "%";
+        int percentColor = coverage >= 0.9F ? WbTheme.OK : coverage >= 0.5F ? WbTheme.WARN : WbMotion.mix(accent, WbTheme.TEXT, 0.3F);
+        context.text(font, percent, panelW - RADAR_PAD - font.width(percent), y, percentColor, true);
+        WbText.drawClipped(context, font, Component.literal(chunk).withStyle(ChatFormatting.BOLD), RADAR_PAD + 12, y,
+                panelW - RADAR_PAD * 2 - 16 - font.width(percent), WbTheme.TEXT);
+        int barW = panelW - RADAR_PAD * 2;
+        WbChrome.drawProgressTrack(context, RADAR_PAD, y + 12, barW, 4, Math.round((barW - 2) * Math.max(0.0F, Math.min(1.0F, coverage))), percentColor);
+        if (coords != null) {
+            String line = coords + "  " + facing;
+            float scale = Math.min(1.0F, (barW - 2) / (float) Math.max(1, font.width(line)));
+            scale = Math.max(0.6F, Math.min(0.85F, scale));
+            int lineW = Math.round(font.width(line) * scale);
+            context.pose().pushMatrix();
+            context.pose().translate(RADAR_PAD + (barW - lineW) / 2.0F, y + 20);
+            context.pose().scale(scale, scale);
+            context.text(font, coords, 0, 0, WbTheme.TEXT_MUTED, false);
+            context.text(font, facing, font.width(coords + "  "), 0, accent, false);
             context.pose().popMatrix();
         }
     }

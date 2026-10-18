@@ -1,8 +1,12 @@
-# WorldBinder 1.6.0
+# WorldBinder 1.6.1
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
+
+> **1.6.1 – HUD polish:**
+> - **Chunk radar:** the radar map now fills the full widget width; current chunk, coverage percentage and a coverage bar sit in one info strip below. Coordinates are optional (off by default) and shown as one compact line that no longer gets cut off.
+> - **Status bar:** title and status line are centered, with the real WorldBinder logo, a pulsing status dot, the ETA and a percentage pill.
 
 > **1.6.0 – Interface, Movement & Live Map update:**
 > - **New interface system:** rounded panels with soft shadows and gradients, pixel icons in every navigation, animated toggle switches, sliders with value bubbles, smooth screen/page transitions, eight theme accents plus a custom color, adjustable background dim and animation speed.
@@ -234,6 +238,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.6.0 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.0 release texts are in `Publish/`; 1.4.x and 1.5.0 files remain as historical release records.
+WorldBinder 1.6.1 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.1 release texts are in `Publish/`; 1.4.x, 1.5.0 and 1.6.0 files remain as historical release records.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

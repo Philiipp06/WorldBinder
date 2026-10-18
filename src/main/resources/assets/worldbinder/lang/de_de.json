@@ -66,7 +66,7 @@
   "worldbinder.about.legal_title": "Erlaubte Nutzung",
   "worldbinder.about.title": "Über WorldBinder",
   "worldbinder.about.tooltip": "Version, Steuerung, Datenpfade und erlaubte Nutzung.",
-  "worldbinder.about.version": "WorldBinder 1.6.0 • Fabric-Client-Mod • Minecraft 26.1 – 26.3",
+  "worldbinder.about.version": "WorldBinder 1.6.1 • Fabric-Client-Mod • Minecraft 26.1 – 26.3",
   "worldbinder.activity.capture_cancelled": "Capture abgebrochen",
   "worldbinder.activity.capture_paused": "Capture pausiert",
   "worldbinder.activity.capture_resumed": "Capture fortgesetzt",
