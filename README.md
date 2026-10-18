@@ -4,6 +4,13 @@ WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, a
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
 
+> **1.6.1 – 3D map, custom blocks & waypoints:**
+> - **3D live map:** press **V** (or the 3D button) in F10 to see the known terrain as a rotatable, tiltable 3D landscape with entity and player markers. Right-drag rotates and tilts, the height scale is adjustable.
+> - **3D export:** export the map as a colored 3D block model (`.glb`, plus `.obj` for smaller areas) or as a high-resolution 3D render (PNG).
+> - **Custom server blocks on the map:** map colors can now come from the active resource packs. In *Auto* mode, blocks that a server pack adds through unused block states (for example note block instruments) or replaces get their real texture color.
+> - **Waypoints:** place named points with **P** or Shift+right click, see them in 2D and 3D (with edge markers when off-screen) and get an automatic "last death" point.
+> - **Community docs:** reworked Code of Conduct, Contributing guide and Security policy, a new Accessibility statement and GitHub issue/PR templates.
+
 > **1.6.1 – HUD polish:**
 > - **Chunk radar:** the radar map now fills the full widget width; current chunk, coverage percentage and a coverage bar sit in one info strip below. Coordinates are optional (off by default) and shown as one compact line that no longer gets cut off.
 > - **Status bar:** title and status line are centered, with the real WorldBinder logo, a pulsing status dot, the ETA and a percentage pill.
@@ -125,13 +132,23 @@ The live map renders captured chunks as cached region textures (16×16 chunks ea
 | Mouse wheel / + / - | Zoom (towards the cursor) |
 | Click | Select a chunk (sidebar inspector) |
 | Double-click | Center on a chunk |
-| Right-click | Queue a chunk for rescan |
+| Right-click | Queue a chunk for rescan (on a waypoint: remove it) |
+| P / Shift+right-click / middle click | Place a waypoint |
+| V | Toggle the 3D view |
+| Right-drag (3D) | Rotate and tilt |
+| , / . and Page Up / Page Down (3D) | Rotate / tilt |
 | Space / F | Center on player / toggle follow |
 | G / H | Toggle grid / sidebar |
 | E | Toggle explore mode |
 | Ctrl+C | Copy the selected chunk center |
 
 The toolbar offers Follow, Player, Origin, zoom, **Layers** (view mode, relief, grid, status tint, players, hostile mobs, animals, items, other entities, stay-in-map-area), **Filters** (status: not captured, saved, in progress, failed – content: entities, block entities, low quality, recently scanned, explored only – plus Invert and Hide others), **Explore** (E), **Export** (full PNG or 256×256 region tiles named `r.<x>.<z>.png`, optional status tint, written to `saves/WorldBinder/map_exports/`) and a coordinate jump field (`X Z` or `X Y Z`). The sidebar shows coverage statistics with saved area and explored chunks, cursor coordinates/height/status or nearby entity counts, and the selected chunk with quality bar and Rescan/Copy/Center actions. Hover an entity marker to see its type, position and distance.
+
+**3D view** (V) draws the known surface as an orthographic 3D landscape that you can rotate, tilt (20–89°) and exaggerate in height (50–300 %). Players, entities and waypoints are shown with small stems so their position stays readable. The buttons at the bottom right rotate, tilt, change the height scale and reset the view. The Export menu adds **3D model (GLB/OBJ)** – the known surface as a colored block mesh, merged into larger cells for huge areas – and **3D render (PNG)**, a high-resolution image of the current 3D view with a transparent background.
+
+**Map colors** (Layers > Colors) can be *Auto* (vanilla map colors; blocks changed by a resource pack, such as custom server blocks made from note block states, use their texture color), *Vanilla* or *Textures* (every block uses its texture color). Colors are read from the blockstate, model and texture files of the active resource packs, including server packs.
+
+**Waypoints** are stored per world/server and dimension. Place one with P, Shift+right click or middle click; right click a waypoint to remove it. The last death point is added automatically and can be turned off in the config (`mapDeathWaypoint`).
 
 **Explore mode** samples the surface of every chunk your client has loaded (colors and heights only, nothing is captured or written to an archive) so you can build overview maps or exports while simply playing. It resets on disconnect and dimension change.
 
@@ -226,6 +243,13 @@ Helpful reports include:
 - Whether the export was opened in singleplayer, Paper or Multiverse
 - Screenshots, logs or exported test worlds if possible
 
+## Community
+
+- [Code of Conduct](CODE_OF_CONDUCT.md) – how we treat each other in all WorldBinder spaces
+- [Contributing](CONTRIBUTING.md) – bug reports, translations, development setup and pull requests
+- [Security policy](SECURITY.md) – how to report vulnerabilities privately
+- [Accessibility](ACCESSIBILITY.md) – our commitment, supported features, known limitations and how to report barriers
+
 ## Build from source
 
 WorldBinder requires Java 25, Fabric Loader 0.19.5 or newer and a Fabric API build matching Minecraft 26.1-26.3. The build targets 26.3 while compatibility tests load the same packaged jar on the earlier releases.
@@ -238,6 +262,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.6.1 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.1 release texts are in `Publish/`; 1.4.x, 1.5.0 and 1.6.0 files remain as historical release records.
+WorldBinder 1.6.1 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.1 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0 and 1.6.1 files remain as historical release records.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

@@ -1,128 +1,100 @@
-# Contributor Covenant Code of Conduct
+# WorldBinder Code of Conduct
 
-## Our Pledge
+WorldBinder is a client-side Fabric mod for permitted world capture, archive recovery and target-version export, with optional Movement Tools. People come to this project as players, builders, server owners, preservationists, translators and developers, with very different levels of experience. This Code of Conduct describes how we treat each other in every WorldBinder space and what happens when someone does not.
 
-We as members, contributors, and leaders pledge to make participation in our
-community a harassment-free experience for everyone, regardless of age, body
-size, visible or invisible disability, ethnicity, sex characteristics, gender
-identity and expression, level of experience, education, socio-economic status,
-nationality, personal appearance, race, religion, or sexual identity
-and orientation.
+## Our pledge
 
-We pledge to act and interact in ways that contribute to an open, welcoming,
-diverse, inclusive, and healthy community.
+We as members, contributors and maintainers pledge to make participation in the WorldBinder community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, color, religion, or sexual identity and orientation.
 
-## Our Standards
+We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive and healthy community.
 
-Examples of behavior that contributes to a positive environment for our
-community include:
+## Our standards
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
-  and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the
-  overall community
+Examples of behavior that contributes to a positive environment:
 
-Examples of unacceptable behavior include:
+- Being kind, patient and respectful, especially towards newcomers and people asking "basic" questions.
+- Giving and gracefully accepting constructive feedback on code, designs, translations and bug reports.
+- Assuming good intent, asking before assuming, and explaining decisions instead of only stating them.
+- Accepting responsibility for mistakes, apologizing to those affected and learning from them.
+- Writing issues and messages that others can follow: steps to reproduce, versions, screenshots, logs.
+- Respecting that maintainers work on WorldBinder in their free time.
 
-* The use of sexualized language or imagery, and sexual attention or
-  advances of any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email
-  address, without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+Examples of unacceptable behavior:
 
-## Enforcement Responsibilities
+- Sexualized language or imagery, and sexual attention or advances of any kind.
+- Trolling, insulting or derogatory comments, and personal or political attacks.
+- Public or private harassment, including repeated unwanted pings or direct messages.
+- Publishing others' private information, such as real names, addresses, IP addresses or account details, without their explicit permission. This includes information found in captured worlds, server logs or screenshots.
+- Other conduct which could reasonably be considered inappropriate in a professional setting.
 
-Community leaders are responsible for clarifying and enforcing our standards of
-acceptable behavior and will take appropriate and fair corrective action in
-response to any behavior that they deem inappropriate, threatening, offensive,
-or harmful.
+### Project-specific standards
 
-Community leaders have the right and responsibility to remove, edit, or reject
-comments, commits, code, wiki edits, issues, and other contributions that are
-not aligned to this Code of Conduct, and will communicate reasons for moderation
-decisions when appropriate.
+WorldBinder can save worlds and builds that other people created. In WorldBinder spaces we therefore also expect:
+
+- **Respect for creators and server owners.** Do not post, share or request captures, exports or resource packs of worlds, maps or builds you have no permission to archive or redistribute. Do not ask for help copying content you clearly have no right to.
+- **No help with circumventing rules.** Do not request, share or advertise ways to bypass server permissions, anti-cheat systems or bans with WorldBinder or its Movement Tools. Movement Tools are meant for singleplayer, local test worlds and servers that explicitly allow them.
+- **Responsible security reports.** Security problems are reported privately as described in [SECURITY.md](SECURITY.md), not posted as public exploits.
+- **Accessible communication.** Describe screenshots in text when they matter, avoid conveying information only through color, and be patient with people using assistive technology or writing in a second language. See [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## Scope
 
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official e-mail address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
+This Code of Conduct applies in all WorldBinder community spaces:
 
-## Enforcement
+- the GitHub repositories [Philiipp06/WorldBinder](https://github.com/Philiipp06/WorldBinder) and [Philiipp06/WorldBinder-DEVELOPMENT](https://github.com/Philiipp06/WorldBinder-DEVELOPMENT), including issues, pull requests, discussions and reviews,
+- the WorldBinder Discord server,
+- the WorldBinder project pages and comment sections on Modrinth and similar platforms.
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-Via Discord.
-All complaints will be reviewed and investigated promptly and fairly.
+It also applies when someone officially represents the project in public spaces, for example when posting from an official account or acting as a moderator.
 
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+## Enforcement responsibilities
 
-## Enforcement Guidelines
+The maintainer and the Discord moderation team ("community leaders") are responsible for clarifying and enforcing these standards. They take appropriate and fair corrective action in response to behavior they deem inappropriate, threatening, offensive or harmful.
 
-Community leaders will follow these Community Impact Guidelines in determining
-the consequences for any action they deem in violation of this Code of Conduct:
+Community leaders may remove, edit or reject comments, commits, code, wiki edits, issues, Discord messages and other contributions that do not align with this Code of Conduct, and will communicate the reasons for moderation decisions when appropriate.
+
+## Reporting
+
+If you experience or witness unacceptable behavior, please report it:
+
+- **Discord:** send a direct message to a moderator or the maintainer on the [WorldBinder Discord](https://discord.com/invite/V7h3vaXxDZ). Please do not report in public channels.
+- **GitHub:** if you cannot use Discord, contact the maintainer [@Philiipp06](https://github.com/Philiipp06) on GitHub and ask for a private channel; do not include sensitive details in a public issue.
+
+Please include what happened, where and when (links or screenshots help), and who was involved. You may report anonymously or on behalf of someone else.
+
+All reports are reviewed and investigated promptly and fairly. Community leaders respect the privacy and security of the reporter. A person who is the subject of a report is never involved in handling it.
+
+## Enforcement guidelines
+
+Community leaders follow these impact guidelines to decide on consequences:
 
 ### 1. Correction
 
-**Community Impact**: Use of inappropriate language or other behavior deemed
-unprofessional or unwelcome in the community.
+**Community impact:** Use of inappropriate language or other behavior deemed unprofessional or unwelcome in the community.
 
-**Consequence**: A private, written warning from community leaders, providing
-clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
+**Consequence:** A private, written warning, providing clarity about the nature of the violation and why the behavior was inappropriate. A public apology may be requested.
 
 ### 2. Warning
 
-**Community Impact**: A violation through a single incident or series
-of actions.
+**Community impact:** A violation through a single incident or series of actions, for example repeatedly asking for help with captures of content without permission after being told not to.
 
-**Consequence**: A warning with consequences for continued behavior. No
-interaction with the people involved, including unsolicited interaction with
-those enforcing the Code of Conduct, for a specified period of time. This
-includes avoiding interactions in community spaces as well as external channels
-like social media. Violating these terms may lead to a temporary or
-permanent ban.
+**Consequence:** A warning with consequences for continued behavior. No interaction with the people involved, including unsolicited interaction with those enforcing the Code of Conduct, for a specified period. This includes avoiding interaction in community spaces as well as external channels. Violating these terms may lead to a temporary or permanent ban.
 
-### 3. Temporary Ban
+### 3. Temporary ban
 
-**Community Impact**: A serious violation of community standards, including
-sustained inappropriate behavior.
+**Community impact:** A serious violation of community standards, including sustained inappropriate behavior or sharing content captured without permission.
 
-**Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
+**Consequence:** A temporary ban from any sort of interaction or public communication with the community for a specified period. Violating these terms may lead to a permanent ban.
 
-### 4. Permanent Ban
+### 4. Permanent ban
 
-**Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior,  harassment of an
-individual, or aggression toward or disparagement of classes of individuals.
+**Community impact:** A pattern of violations, harassment of an individual, aggression toward or disparagement of classes of individuals, doxxing, or publishing exploits against users or servers.
 
-**Consequence**: A permanent ban from any sort of public interaction within
-the community.
+**Consequence:** A permanent ban from all public interaction within the community.
 
 ## Attribution
 
-This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 2.0, available at
-https://www.contributor-covenant.org/version/2/0/code_of_conduct.html.
+This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org), version 2.1, available at https://www.contributor-covenant.org/version/2/1/code_of_conduct.html, with project-specific additions for WorldBinder.
 
-Community Impact Guidelines were inspired by [Mozilla's code of conduct
-enforcement ladder](https://github.com/mozilla/diversity).
+Community impact guidelines were inspired by [Mozilla's code of conduct enforcement ladder](https://github.com/mozilla/diversity).
 
-[homepage]: https://www.contributor-covenant.org
-
-For answers to common questions about this code of conduct, see the FAQ at
-https://www.contributor-covenant.org/faq. Translations are available at
-https://www.contributor-covenant.org/translations.
+For answers to common questions about this code of conduct, see the FAQ at https://www.contributor-covenant.org/faq. Translations are available at https://www.contributor-covenant.org/translations.

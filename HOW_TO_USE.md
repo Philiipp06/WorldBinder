@@ -136,6 +136,10 @@ Use **F10** to open the live map. Captured chunks are drawn with real vanilla ma
 - **Explore** (or **E**) adds every chunk your client has loaded to the map without capturing; **Export** writes the map as one PNG or as 256×256 region tiles to `saves/WorldBinder/map_exports/`.
 - Layers can show hostile mobs, animals, dropped items, other entities and players as markers; hover a marker for details.
 - With **Stay in map area** enabled you cannot pan far away from known chunks.
+- **3D view:** press **V** or the **3D** button. Drag with the right mouse button to rotate and tilt, drag with the left button to move, use the wheel to zoom. The buttons at the bottom right rotate by 45°, tilt, cycle the height scale (50–300 %) and reset the view; `,` / `.` and Page Up / Page Down work on the keyboard.
+- **Export > 3D model (GLB/OBJ)** saves the known surface as a colored 3D model for Blender, the Windows 3D Viewer or web viewers; **Export > 3D render (PNG)** saves the current 3D view in high resolution.
+- **Layers > Colors** chooses map colors: *Auto* shows custom server blocks (for example note block based blocks from a server resource pack) in their real texture color, *Vanilla* uses only the vanilla map palette, *Textures* uses texture colors for every block. Already captured chunks keep the colors they were recorded with; explored chunks are redrawn.
+- **Waypoints:** press **P**, Shift+right click or middle click to place a waypoint at the cursor; right click a waypoint to remove it. Your last death point appears automatically. Waypoints are saved per world/server and dimension and can be hidden in Layers.
 
 The map keeps a texture cache of the captured area, so reopening it is instant and large captures stay smooth. The HUD chunk radar uses the same textures; range, zoom, rotation, entities, coordinates and *Show without capture* are set in the Widget Editor. The radar map uses the full widget width; below it, the info strip shows the current chunk and how much of the radar area is captured. Coordinates are off by default and can be enabled on the Extras page.
 
@@ -232,6 +236,8 @@ WorldBinder is a preservation and export tool. It does not give permission to co
 Use it only when you own the content, administer the server, created the build yourself, or have explicit permission.
 
 ## 11. Reporting bugs
+
+See also [CONTRIBUTING.md](CONTRIBUTING.md) for good bug reports, [SECURITY.md](SECURITY.md) for security problems (never as public issues) and [ACCESSIBILITY.md](ACCESSIBILITY.md) for accessibility barriers.
 
 Please report issues here:
 
