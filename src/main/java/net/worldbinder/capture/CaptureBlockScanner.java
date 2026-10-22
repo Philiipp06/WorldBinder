@@ -479,8 +479,18 @@ abstract class CaptureBlockScanner {
         int chunkX = pos.getX() >> 4;
         int chunkZ = pos.getZ() >> 4;
         long key = ChunkPos.pack(chunkX, chunkZ);
+        int marker = net.worldbinder.render.BlockMapColors.markerColor(state);
+        boolean transparent = marker == 0 && Minecraft.getInstance().level != null
+                && net.worldbinder.render.BlockMapColors.isMapTransparent(state, Minecraft.getInstance().level, pos);
+        if (transparent) {
+            return; // glass, panes, iron bars …: the map shows the block below, like a vanilla map
+        }
         ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
+        if (marker != 0) {
+            snapshot.sampleMarker(pos.getX() & 15, pos.getZ() & 15, pos.getY(), marker);
+        } else {
+            snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
+        }
         activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
     }
 

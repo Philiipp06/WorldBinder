@@ -149,15 +149,26 @@ public final class MapRenderer3D {
                     return 0;
                 }
                 int height = snapshot.heights[column];
+                int count = 0;
+                if (snapshot.markerHeights != null && snapshot.markerHeights.length == 256 && snapshot.markerHeights[column] != Integer.MIN_VALUE
+                        && snapshot.markerHeights[column] > height && net.worldbinder.WorldBinder.config().mapShowInvisibleBlocks) {
+                    int marker = snapshot.markerColors[column];
+                    out[0] = snapshot.markerHeights[column];
+                    out[1] = snapshot.markerHeights[column];
+                    out[2] = marker;
+                    out[3] = shade(marker, 0.8F);
+                    count = 1;
+                }
                 if (height == Integer.MIN_VALUE) {
-                    return 0;
+                    return count;
                 }
                 int color = snapshot.colors == null || snapshot.colors[column] == 0 ? 0xFF6F7680 : 0xFF000000 | snapshot.colors[column];
-                out[0] = height;
-                out[1] = MapVoxels.FLOOR;
-                out[2] = color;
-                out[3] = shade(color, 0.86F);
-                return 1;
+                int o = count * MapVoxels.INTS_PER_SPAN;
+                out[o] = height;
+                out[o + 1] = MapVoxels.FLOOR;
+                out[o + 2] = color;
+                out[o + 3] = shade(color, 0.86F);
+                return count + 1;
             }
         };
     }

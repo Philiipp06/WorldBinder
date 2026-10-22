@@ -142,7 +142,7 @@ public final class SceneLibrary {
         writeCaptureMetadata(scene, folder, export);
 
         if (progress != null) progress.update(StorageStage.RESOURCE_PACK, "Copying server resource pack", 0.75D);
-        copyLatestServerResourcePack(folder);
+        copyLatestServerResourcePack(scene, folder);
 
         if (net.worldbinder.WorldBinder.config().autoDeleteRecovery && !folder.getFileName().toString().startsWith("_recovery_")) {
             deleteRecoveryFolders();
@@ -300,6 +300,28 @@ public final class SceneLibrary {
             graphics.dispose();
         }
         ImageIO.write(image, "png", target.toFile());
+    }
+
+    /** True for a normal world export that still contains its WorldBinder archive and can be exported again. */
+    public boolean canReexport(Path path) {
+        return path != null && !isRecovery(path) && Files.isDirectory(path) && Files.exists(archivePath(path));
+    }
+
+    /**
+     * Exports the archive stored in an existing world export again into a new save folder, using the current
+     * exporter (for example to repair worlds written by an older WorldBinder version). The original folder is kept.
+     */
+    public Path reexport(Path exportFolder) throws IOException {
+        if (!canReexport(exportFolder)) {
+            throw new IOException("Not a WorldBinder world export: " + exportFolder);
+        }
+        WorldScene scene = read(exportFolder);
+        String base = exportFolder.getFileName().toString() + "_" + net.worldbinder.ui.component.WbBrand.VERSION.replace(".", "_");
+        Path target = uniqueFinalizedFolder(base);
+        saveWorldFolder(scene, target);
+        WorldBinderActivityLog.add("Archive exported again: " + target.getFileName());
+        refresh();
+        return target;
     }
 
     public Path finalizeRecovery(Path recoveryFolder) throws IOException {
@@ -826,14 +848,22 @@ public final class SceneLibrary {
         }
     }
 
-    private void copyLatestServerResourcePack(Path worldFolder) {
+    /** Minecraft 26.x loads the bundled world pack from {@code resourcepacks/resources.zip}; older versions from the world root. */
+    public static Path bundledResourcePackPath(Path worldFolder, int targetDataVersion) {
+        return targetDataVersion >= 4786 ? worldFolder.resolve("resourcepacks").resolve("resources.zip") : worldFolder.resolve("resources.zip");
+    }
+
+    private void copyLatestServerResourcePack(WorldScene scene, Path worldFolder) {
         if (!WorldBinder.config().includeServerResourcePack) {
             return;
         }
         try {
             Optional<Path> pack = ServerResourcePackLocator.findBestPack();
             if (pack.isPresent()) {
-                Files.copy(pack.get(), worldFolder.resolve("resources.zip"), StandardCopyOption.REPLACE_EXISTING);
+                int dataVersion = net.worldbinder.version.TargetMinecraftVersion.resolve(scene == null ? null : scene.targetMinecraftVersion).effectiveDataVersion();
+                Path target = bundledResourcePackPath(worldFolder, dataVersion);
+                Files.createDirectories(target.getParent());
+                Files.copy(pack.get(), target, StandardCopyOption.REPLACE_EXISTING);
                 WorldBinderActivityLog.add("Server resource pack copied");
             }
         } catch (IOException exception) {

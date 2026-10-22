@@ -1,8 +1,15 @@
-# WorldBinder 1.6.2
+# WorldBinder 1.6.3
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
+
+> **1.6.3 – Hotfix for Minecraft 26.3 exports:**
+> - **Blocks are exported again:** Minecraft 26.3 changed how block states are stored in chunks (`id`/`properties` instead of `Name`/`Properties`). Exports for 26.3 now use the new format; before, every block loaded as air and only entities remained.
+> - **Server resource pack is loaded again:** 26.x expects the bundled world pack at `resourcepacks/resources.zip`; exports now place it there, so Minecraft offers it when you open the world.
+> - **No more "experimental settings" warning:** exports define the complete vanilla dimension set (Overworld, Nether, End) and write `stopwatches.dat` in the expected format.
+> - **Map shows the ground under barriers again:** blocks without a map color (barriers, light blocks, glass, panes …) are now looked through like on a vanilla map, so grass under a barrier layer no longer appears as gray stone on the radar, the 2D and the 3D map. A new **Layers > Invisible blocks** toggle shows barriers, light blocks and structure voids when you need them.
+> - **Export again:** select an older export in the archive list and click **Export again** to rebuild it from its stored archive with the fixed exporter (the original folder is kept).
 
 > **1.6.2 – 3D map, custom blocks & waypoints:**
 > - **3D live map:** press **V** (or the 3D button) in F10 for a rotatable, tiltable 3D landscape with an animated switch from the 2D map. Loaded chunks are drawn with their real vertical structure – air under bridges, roller coasters or tree crowns stays visible – with directional light, sun shadows and block edges. Rendering runs in the background, so the game keeps its frame rate.
@@ -263,6 +270,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.6.2 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.2 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0 and 1.6.1 files remain as historical release records.
+WorldBinder 1.6.3 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.3 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0, 1.6.1 and 1.6.2 files remain as historical release records.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

@@ -96,7 +96,7 @@ final class WorldExportMetadataWriter {
     private static CompoundTag worldGenSettings(WorldScene scene) {
         CompoundTag settings = new CompoundTag();
         settings.putLong("seed", 0L);
-        settings.putBoolean("generate_features", false);
+        settings.putBoolean("generate_structures", false);
         settings.putBoolean("bonus_chest", false);
         settings.putString("worldbinder_target_version", targetVersion(scene).name());
         settings.putString("worldbinder_generation_profile", targetVersion(scene).profile().name());
@@ -106,8 +106,36 @@ final class WorldExportMetadataWriter {
         overworld.putString("type", "minecraft:overworld");
         overworld.put("generator", flatGenerator());
         dimensions.put("minecraft:overworld", overworld);
+        // The vanilla dimension set must be complete; a missing Nether or End marks the world as using
+        // experimental settings and shows the "unsupported experimental settings" warning on load.
+        dimensions.put("minecraft:the_nether", noiseDimension("minecraft:the_nether", "minecraft:nether", netherBiomeSource()));
+        dimensions.put("minecraft:the_end", noiseDimension("minecraft:the_end", "minecraft:end", endBiomeSource()));
         settings.put("dimensions", dimensions);
         return settings;
+    }
+
+    private static CompoundTag noiseDimension(String type, String noiseSettings, CompoundTag biomeSource) {
+        CompoundTag dimension = new CompoundTag();
+        dimension.putString("type", type);
+        CompoundTag generator = new CompoundTag();
+        generator.putString("type", "minecraft:noise");
+        generator.putString("settings", noiseSettings);
+        generator.put("biome_source", biomeSource);
+        dimension.put("generator", generator);
+        return dimension;
+    }
+
+    private static CompoundTag netherBiomeSource() {
+        CompoundTag source = new CompoundTag();
+        source.putString("type", "minecraft:multi_noise");
+        source.putString("preset", "minecraft:nether");
+        return source;
+    }
+
+    private static CompoundTag endBiomeSource() {
+        CompoundTag source = new CompoundTag();
+        source.putString("type", "minecraft:the_end");
+        return source;
     }
 
     private static CompoundTag flatGenerator() {

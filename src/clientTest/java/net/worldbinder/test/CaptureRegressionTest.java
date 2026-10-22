@@ -41,6 +41,11 @@ final class CaptureRegressionTest {
                 try (var regions = Files.walk(folder.resolve("region"))) {
                     check(regions.anyMatch(path -> path.toString().endsWith(".mca")), "Exported region data");
                 }
+                ExportFormatCheck.paletteMatchesRunningVersion();
+                ExportFormatCheck.exportedWorld(folder, scene.targetMinecraftVersion);
+                check(library.canReexport(folder), "World export can be exported again from its archive");
+                var again = library.reexport(folder);
+                ExportFormatCheck.exportedWorld(again, scene.targetMinecraftVersion);
                 var cacheFolder = WorldBinderPaths.CACHE_ROOT.resolve(name + "_roundtrip");
                 var cache = new BlockRecordChunkCache(cacheFolder);
                 cache.writeChunk(0L, scene.blocks);

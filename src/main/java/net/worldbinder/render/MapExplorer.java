@@ -140,11 +140,16 @@ public final class MapExplorer {
                 } else {
                     y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);
                 }
-                if (y < minY) {
-                    continue;
-                }
                 BlockState state = chunk.getBlockState(pos.set(worldX, y, worldZ));
-                if (state.isAir()) {
+                while (y > minY && BlockMapColors.isMapTransparent(state, level, pos)) {
+                    int marker = BlockMapColors.markerColor(state);
+                    if (marker != 0) {
+                        snapshot.sampleMarker(lx, lz, y, marker);
+                    }
+                    y--;
+                    state = chunk.getBlockState(pos.set(worldX, y, worldZ));
+                }
+                if (y < minY || state.isAir()) {
                     continue;
                 }
                 int color = BlockMapColors.color(state, level, pos);

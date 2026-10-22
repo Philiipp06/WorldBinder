@@ -39,7 +39,7 @@ public final class ExportValidator {
         report.exportReadme = Files.isRegularFile(folder.resolve("README.md"));
         report.modernSavedData = Files.isRegularFile(folder.resolve("data/minecraft/game_rules.dat"))
                 && Files.isRegularFile(folder.resolve("data/minecraft/world_gen_settings.dat"));
-        report.resourcePack = Files.isRegularFile(folder.resolve("resources.zip"));
+        report.resourcePack = Files.isRegularFile(folder.resolve("resources.zip")) || Files.isRegularFile(folder.resolve("resourcepacks").resolve("resources.zip"));
         report.zipFile = Files.isRegularFile(folder.resolveSibling(folder.getFileName().toString() + ".zip"));
         report.vanillaWorld = report.levelDat || report.sessionLock || report.regionFiles || report.entityFiles || report.poiFiles || report.metadataJson;
         if (!report.vanillaWorld && scene != null) {

@@ -382,7 +382,7 @@ public final class WorldBinderHud {
             boolean terrain = mode != WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
             MapRegionTextures textures = MapRegionTextures.shared();
             long signature = capture.mapDataRevision() * 31L + net.worldbinder.render.MapExplorer.get().revision() * 17L
-                    + minChunkX * 7919L + minChunkZ * 104729L + (config.mapHillshade ? 1 : 0);
+                    + minChunkX * 7919L + minChunkZ * 104729L + (config.mapHillshade ? 1 : 0) + (config.mapShowInvisibleBlocks ? 2 : 0);
             if (terrain && signature != radarSyncSignature) {
                 radarSyncSignature = signature;
                 textures.sync(lookup, minChunkX, minChunkZ, maxChunkX, maxChunkZ, config.mapHillshade);

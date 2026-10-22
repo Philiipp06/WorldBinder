@@ -66,7 +66,7 @@
   "worldbinder.about.legal_title": "Erlaubte Nutzung",
   "worldbinder.about.title": "Über WorldBinder",
   "worldbinder.about.tooltip": "Version, Steuerung, Datenpfade und erlaubte Nutzung.",
-  "worldbinder.about.version": "WorldBinder 1.6.2 • Fabric-Client-Mod • Minecraft 26.1 – 26.3",
+  "worldbinder.about.version": "WorldBinder 1.6.3 • Fabric-Client-Mod • Minecraft 26.1 – 26.3",
   "worldbinder.activity.capture_cancelled": "Capture abgebrochen",
   "worldbinder.activity.capture_paused": "Capture pausiert",
   "worldbinder.activity.capture_resumed": "Capture fortgesetzt",
@@ -1415,5 +1415,15 @@
   "worldbinder.map.export.render": "3D-Render (PNG)",
   "worldbinder.map.export.render.tooltip": "Speichert die aktuelle 3D-Ansicht in hoher Auflösung mit transparentem Hintergrund. Nutzt Drehung, Neigung und Höhenfaktor der 3D-Ansicht.",
   "worldbinder.map.export.model_done": "3D-Modell exportiert (%s Chunks)",
-  "worldbinder.map.export.render_done": "3D-Render gespeichert (%s Chunks)"
+  "worldbinder.map.export.render_done": "3D-Render gespeichert (%s Chunks)",
+  "worldbinder.gui.reexport": "Neu exportieren",
+  "worldbinder.tooltip.reexport": "Erstellt aus dem in diesem Export gespeicherten Archiv einen neuen Weltordner mit dem aktuellen Exporter. So reparierst du Welten, die mit WorldBinder 1.6.0–1.6.2 für Minecraft 26.3 exportiert wurden (fehlende Blöcke, fehlendes Resourcepack, Experimental-Warnung). Der Originalordner bleibt erhalten.",
+  "worldbinder.status.reexport_title": "Neu exportieren",
+  "worldbinder.operation.reexporting": "Archiv wird neu exportiert",
+  "worldbinder.status.reexport_done": "Archiv neu exportiert",
+  "worldbinder.status.reexport_failed": "Neu exportieren fehlgeschlagen",
+  "worldbinder.chat.reexport_done": "Neu exportiert als Weltordner: §f%s",
+  "worldbinder.chat.reexport_failed": "Das Archiv konnte nicht neu exportiert werden. Details stehen im Log.",
+  "worldbinder.map.layer.invisible": "Unsichtbare Blöcke",
+  "worldbinder.map.layer.invisible.tooltip": "Zeigt Barrieren, Lichtblöcke und Strukturleere auf der 2D-Karte, dem Radar und in 3D (rot, gelb und lila). Im Spiel sind sie unsichtbar, deshalb sind sie standardmäßig ausgeblendet und die Karte zeigt das Gelände darunter. Gecapturte Chunks zeigen die Änderung nach dem nächsten Scan."
 }

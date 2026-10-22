@@ -9,6 +9,9 @@ public final class ChunkSnapshot {
     public int[] colors = new int[16 * 16];
     public int[] heights = new int[16 * 16];
     public transient String[] states;
+    /** Topmost invisible marker block per column (barrier, light, structure void); session only. */
+    public transient int[] markerHeights;
+    public transient int[] markerColors;
 
     public int scannedBlocks;
     public int savedBlocks;
@@ -70,6 +73,8 @@ public final class ChunkSnapshot {
             Arrays.fill(heights, Integer.MIN_VALUE);
         }
         states = null;
+        markerHeights = null;
+        markerColors = null;
         touchVisual();
     }
 
@@ -153,6 +158,24 @@ public final class ChunkSnapshot {
             }
             colors[index] = color;
             hasSnapshot = true;
+            touchVisual();
+        }
+    }
+
+    /** Records an invisible marker block (barrier, light, structure void) without hiding the terrain below it. */
+    public void sampleMarker(int localX, int localZ, int y, int color) {
+        if (localX < 0 || localX > 15 || localZ < 0 || localZ > 15) {
+            return;
+        }
+        if (markerHeights == null || markerHeights.length != 256) {
+            markerHeights = new int[256];
+            markerColors = new int[256];
+            Arrays.fill(markerHeights, Integer.MIN_VALUE);
+        }
+        int index = localZ * 16 + localX;
+        if (y >= markerHeights[index]) {
+            markerHeights[index] = y;
+            markerColors[index] = color;
             touchVisual();
         }
     }

@@ -479,6 +479,18 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
                 check((note >>> 24) == 0xFF, "Texture map color for note blocks");
                 WorldBinder.config().mapBlockColors = WorldBinderConfig.MapBlockColors.AUTO;
                 net.worldbinder.render.BlockMapColors.invalidate();
+                var pos = client.player.blockPosition();
+                check(net.worldbinder.render.BlockMapColors.isMapTransparent(net.minecraft.world.level.block.Blocks.BARRIER.defaultBlockState(), client.level, pos)
+                        && net.worldbinder.render.BlockMapColors.markerColor(net.minecraft.world.level.block.Blocks.BARRIER.defaultBlockState()) != 0,
+                        "Barriers are invisible on the map and marked as invisible blocks");
+                check(net.worldbinder.render.BlockMapColors.isMapTransparent(net.minecraft.world.level.block.Blocks.GLASS.defaultBlockState(), client.level, pos),
+                        "The map looks through glass like a vanilla map");
+                check(!net.worldbinder.render.BlockMapColors.isMapTransparent(net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), client.level, pos),
+                        "Grass is drawn on the map");
+                var markerSnapshot = new net.worldbinder.scene.ChunkSnapshot(0, 0);
+                markerSnapshot.sample(1, 1, 64, "minecraft:grass_block", 0xFF7FB238);
+                markerSnapshot.sampleMarker(1, 1, 70, 0xFFD9534F);
+                check(markerSnapshot.heights[17] == 64, "Barrier above grass keeps the grass height on the map");
             });
             context.runOnClient(client -> {
                 // a floating block must not hide the ground behind/below it (spans instead of a height map)

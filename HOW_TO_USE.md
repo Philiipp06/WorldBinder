@@ -1,4 +1,4 @@
-# WorldBinder 1.6.2 — How to Use
+# WorldBinder 1.6.3 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -8,7 +8,7 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 1. Install Minecraft 26.1, 26.1.1, 26.1.2, 26.2 or 26.3 with Fabric Loader 0.19.5 or newer.
 2. Install a Fabric API build for that Minecraft version (for example, 0.145.1+26.1 for 26.1 or 0.160.7+26.3 for 26.3).
-3. Place the same WorldBinder 1.6.2 jar into your `mods` folder on any of those versions.
+3. Place the same WorldBinder 1.6.3 jar into your `mods` folder on any of those versions.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
 
@@ -41,7 +41,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.6.2 keeps the fixed virtual GUI canvas, so menus remain at a stable size across fullscreen, windowed mode and GUI scales. F9 uses the visible sidebar for navigation. To choose an export target, select **Minecraft version** in Capture, General settings or the F6 dialog. The picker groups every supported release by its official update (Update Aquatic, Village & Pillage, … Chase the Skies, Game Drops 2026) with color, emblem and release year. Hover a version to see its DataVersion, generation profile, which file formats it uses and whether the export is native or a downgrade; click it to use it. Search by version, update name or year. The Gamerules page only shows rules available for the selected target. The HUD Widget Editor continues to provide live placement, size and color controls.
+WorldBinder 1.6.3 keeps the fixed virtual GUI canvas, so menus remain at a stable size across fullscreen, windowed mode and GUI scales. F9 uses the visible sidebar for navigation. To choose an export target, select **Minecraft version** in Capture, General settings or the F6 dialog. The picker groups every supported release by its official update (Update Aquatic, Village & Pillage, … Chase the Skies, Game Drops 2026) with color, emblem and release year. Hover a version to see its DataVersion, generation profile, which file formats it uses and whether the export is native or a downgrade; click it to use it. Search by version, update name or year. The Gamerules page only shows rules available for the selected target. The HUD Widget Editor continues to provide live placement, size and color controls.
 
 Use **Tab** and **Shift+Tab** to move focus between controls. Focused buttons, fields and sliders have a visible glow; **Enter** or **Space** activates a focused button. **Ctrl+Tab** and **Ctrl+Shift+Tab** switch F9 sections or Settings tabs, **Ctrl+S** saves Settings without closing them. Hover any control to see a tooltip with a short explanation and, where available, its shortcut.
 
@@ -139,6 +139,7 @@ Use **F10** to open the live map. Captured chunks are drawn with real vanilla ma
 - **3D view:** press **V** or the **3D** button – the map tilts smoothly into 3D (and back). Bridges, roller coasters, trees and overhangs of loaded chunks keep the air beneath them; your marker lies on the ground at your position and turns into an outline when something covers it. Drag with the right mouse button to rotate and tilt, drag with the left button to move, use the wheel to zoom. The buttons at the bottom right rotate by 45°, tilt, cycle the height scale (50–300 %) and reset the view; `,` / `.` and Page Up / Page Down work on the keyboard.
 - **Export > 3D model (GLB/OBJ)** saves the known surface as a colored 3D model for Blender, the Windows 3D Viewer or web viewers; **Export > 3D render (PNG)** saves the current 3D view in high resolution, anti-aliased, with a transparent and a sky background. Every export folder contains a `map_info.txt` with the legal notice.
 - **Layers > Colors** chooses map colors: *Auto* shows custom server blocks (for example note block based blocks from a server resource pack) in their real texture color, *Vanilla* uses only the vanilla map palette, *Textures* uses texture colors for every block. Already captured chunks keep the colors they were recorded with; explored chunks are redrawn.
+- **Layers > Invisible blocks** shows barriers (red), light blocks (yellow) and structure voids (purple). By default they are hidden and the map shows the terrain below them; blocks without a map color such as glass are always looked through, like on a vanilla map.
 - **Waypoints:** press **P**, Shift+right click or middle click to place a waypoint at the cursor; right click a waypoint to remove it. Your last death point appears automatically. Waypoints are saved per world/server and dimension and can be hidden in Layers.
 
 The map keeps a texture cache of the captured area, so reopening it is instant and large captures stay smooth. The HUD chunk radar uses the same textures; range, zoom, rotation, entities, coordinates and *Show without capture* are set in the Widget Editor. The radar map uses the full widget width; below it, the info strip shows the current chunk and how much of the radar area is captured. Coordinates are off by default and can be enabled on the Extras page.
@@ -173,6 +174,10 @@ worldbinder/
 The export `README.md` explains what was captured and how to review the result.
 
 ## 6. Open or import an export
+
+If the export contains the server resource pack, Minecraft 26.x offers to load it when you open the world (the pack is stored as `resourcepacks/resources.zip` inside the world folder). Packs made for an older Minecraft version may be marked as incompatible; you can still choose to load them.
+
+**Repairing exports from WorldBinder 1.6.0–1.6.2 for Minecraft 26.3:** those exports loaded without blocks and resource pack and showed an experimental-settings warning. Select the export in the archive list (F9 > Archives) and click **Export again**. WorldBinder builds a new save folder from the archive stored in `worldbinder/`; the original folder stays untouched. Opening a broken export in Minecraft overwrites its chunks, so always use **Export again** instead of repairing the old folder.
 
 For local testing, place the exported folder in your Minecraft `saves` folder and open it from singleplayer.
 

@@ -66,7 +66,7 @@
   "worldbinder.about.legal_title": "Allowed usage",
   "worldbinder.about.title": "About WorldBinder",
   "worldbinder.about.tooltip": "Version, controls, data paths and permitted usage.",
-  "worldbinder.about.version": "WorldBinder 1.6.2 • Fabric client mod • Minecraft 26.1 – 26.3",
+  "worldbinder.about.version": "WorldBinder 1.6.3 • Fabric client mod • Minecraft 26.1 – 26.3",
   "worldbinder.activity.capture_cancelled": "Capture cancelled",
   "worldbinder.activity.capture_paused": "Capture paused",
   "worldbinder.activity.capture_resumed": "Capture resumed",
@@ -1415,5 +1415,15 @@
   "worldbinder.map.export.render": "3D render (PNG)",
   "worldbinder.map.export.render.tooltip": "Saves the current 3D view in high resolution with a transparent background. Uses the rotation, tilt and height scale of the 3D view.",
   "worldbinder.map.export.model_done": "3D model exported (%s chunks)",
-  "worldbinder.map.export.render_done": "3D render saved (%s chunks)"
+  "worldbinder.map.export.render_done": "3D render saved (%s chunks)",
+  "worldbinder.gui.reexport": "Export again",
+  "worldbinder.tooltip.reexport": "Builds a new save folder from the archive stored in this export, using the current exporter. Use this to repair worlds exported with WorldBinder 1.6.0–1.6.2 for Minecraft 26.3 (blocks missing, resource pack missing, experimental warning). The original folder is kept.",
+  "worldbinder.status.reexport_title": "Export again",
+  "worldbinder.operation.reexporting": "Exporting the archive again",
+  "worldbinder.status.reexport_done": "Archive exported again",
+  "worldbinder.status.reexport_failed": "Export again failed",
+  "worldbinder.chat.reexport_done": "Exported again as save folder: §f%s",
+  "worldbinder.chat.reexport_failed": "Exporting the archive again failed. See the log for details.",
+  "worldbinder.map.layer.invisible": "Invisible blocks",
+  "worldbinder.map.layer.invisible.tooltip": "Shows barriers, light blocks and structure voids on the 2D map, the radar and in 3D (red, yellow and purple). They are invisible in game, so they are hidden by default and the map shows the terrain below them. Captured chunks show the change after the next scan."
 }

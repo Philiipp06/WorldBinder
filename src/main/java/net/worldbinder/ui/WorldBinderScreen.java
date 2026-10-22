@@ -551,7 +551,12 @@ private void toolsWidgets(int x, int top, int width) {
         if (placeSelectedButton != null) placeSelectedButton.active = hasSelection && !recovery && worldAvailable();
         if (openSelectedButton != null) openSelectedButton.active = hasSelection;
         if (continueRecoveryButton != null) continueRecoveryButton.active = hasSelection && library.canFinalizeRecovery(selected) && !capture.isCapturing() && worldAvailable();
-        if (finalizeRecoveryButton != null) finalizeRecoveryButton.active = hasSelection && library.canFinalizeRecovery(selected);
+        if (finalizeRecoveryButton != null) {
+            boolean reexport = hasSelection && !recovery && library.canReexport(selected);
+            finalizeRecoveryButton.active = hasSelection && (library.canFinalizeRecovery(selected) || reexport);
+            finalizeRecoveryButton.setMessage(Component.literal(Lang.string(reexport ? "worldbinder.gui.reexport" : "worldbinder.gui.finalize_recovery")));
+            WbTooltips.register(finalizeRecoveryButton, Component.translatable(reexport ? "worldbinder.tooltip.reexport" : "worldbinder.tooltip.finalize_recovery"));
+        }
         if (saveAsArchiveButton != null) saveAsArchiveButton.active = hasSelection;
         if (exportPreviewButton != null) exportPreviewButton.active = hasSelection;
         if (validateSelectedButton != null) validateSelectedButton.active = hasSelection;
@@ -612,6 +617,10 @@ private void toolsWidgets(int x, int top, int width) {
 
     private void finalizeSelectedRecovery() {
         Path selected = selectedArchive();
+        if (selected != null && !library.isRecovery(selected) && library.canReexport(selected)) {
+            reexportSelected(selected);
+            return;
+        }
         if (selected == null) {
             Chat.warn(Lang.string("worldbinder.chat.no_recovery_selected"));
             return;
@@ -638,6 +647,30 @@ private void toolsWidgets(int x, int top, int width) {
                 OperationStatus.finish(Lang.string("worldbinder.status.recovery_finalize_failed"));
                 Chat.error(Lang.string("worldbinder.chat.recovery_finalize_failed"));
                 WorldBinder.LOGGER.warn("Failed to finalize recovery", throwable);
+                setArchiveActionsActive(true);
+            }
+        }));
+    }
+
+    private void reexportSelected(Path selected) {
+        setArchiveActionsActive(false);
+        OperationStatus.begin(Lang.string("worldbinder.status.reexport_title"), Lang.string("worldbinder.operation.reexporting"));
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return library.reexport(selected);
+            } catch (Exception exception) {
+                throw new RuntimeException(exception);
+            }
+        }).whenComplete((exported, throwable) -> runOnClient(() -> {
+            if (throwable == null) {
+                OperationStatus.finish(Lang.string("worldbinder.status.reexport_done"));
+                Chat.info(Lang.string("worldbinder.chat.reexport_done", exported.getFileName()));
+                selectedArchiveIndex = 0;
+                rebuildWidgets();
+            } else {
+                OperationStatus.finish(Lang.string("worldbinder.status.reexport_failed"));
+                Chat.error(Lang.string("worldbinder.chat.reexport_failed"));
+                WorldBinder.LOGGER.warn("Failed to export archive again", throwable);
                 setArchiveActionsActive(true);
             }
         }));

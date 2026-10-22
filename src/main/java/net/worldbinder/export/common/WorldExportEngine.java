@@ -8,6 +8,7 @@ import net.minecraft.nbt.FloatTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -318,7 +319,7 @@ public final class WorldExportEngine {
             chunk.putLong("InhabitedTime", 0L);
             chunk.putString("Status", "minecraft:full");
             chunk.putBoolean("isLightOn", true);
-            chunk.put("sections", sectionsNbt());
+            chunk.put("sections", sectionsNbt(targetVersion(scene).effectiveDataVersion()));
             chunk.put("block_entities", blockEntitiesNbt());
             chunk.put("Heightmaps", heightmapsNbt());
             chunk.put("block_ticks", new ListTag());
@@ -331,10 +332,10 @@ public final class WorldExportEngine {
             return chunk;
         }
 
-        private ListTag sectionsNbt() {
+        private ListTag sectionsNbt(int dataVersion) {
             ListTag list = new ListTag();
             for (SectionBuilder section : sections.values()) {
-                list.add(section.toNbt());
+                list.add(section.toNbt(dataVersion));
             }
             return list;
         }
@@ -399,17 +400,17 @@ public final class WorldExportEngine {
             states[index(x, y, z)] = state == null || state.isBlank() ? "minecraft:air" : state;
         }
 
-        private CompoundTag toNbt() {
+        private CompoundTag toNbt(int dataVersion) {
             CompoundTag section = new CompoundTag();
             section.putByte("Y", (byte) sectionY);
-            section.put("block_states", blockStatesNbt());
+            section.put("block_states", blockStatesNbt(dataVersion));
             section.put("biomes", biomesNbt());
             section.putByteArray("SkyLight", filledLight((byte) 0xFF));
             section.putByteArray("BlockLight", filledLight((byte) 0x00));
             return section;
         }
 
-        private CompoundTag blockStatesNbt() {
+        private CompoundTag blockStatesNbt(int dataVersion) {
             Map<String, Integer> paletteIndex = new LinkedHashMap<>();
             paletteIndex.put("minecraft:air", 0);
             int[] values = new int[SECTION_SIZE];
@@ -426,7 +427,7 @@ public final class WorldExportEngine {
             CompoundTag blockStates = new CompoundTag();
             ListTag palette = new ListTag();
             for (String state : paletteIndex.keySet()) {
-                palette.add(blockStateNbt(state));
+                palette.add(paletteEntry(state, dataVersion));
             }
             blockStates.put("palette", palette);
             if (paletteIndex.size() > 1) {
@@ -447,6 +448,33 @@ public final class WorldExportEngine {
         private static int index(int x, int y, int z) {
             return (y << 8) | (z << 4) | x;
         }
+    }
+
+    /**
+     * First data version (Minecraft 26.3) that stores block states as {@code "id"} strings for default states or
+     * {@code {id, properties}} compounds. Older versions use {@code {Name, Properties}}; 26.3 cannot read that
+     * format with its own data version (it only upgrades older data versions), so writing the old format there
+     * turns every block into air.
+     */
+    public static final int ID_PROPERTIES_STATE_FORMAT = 5023;
+
+    /** Block state palette entry in the format of the target data version. */
+    public static Tag paletteEntry(String state, int dataVersion) {
+        if (dataVersion < ID_PROPERTIES_STATE_FORMAT) {
+            return blockStateNbt(state);
+        }
+        ParsedState parsed = parseState(state);
+        if (parsed.properties.isEmpty()) {
+            return StringTag.valueOf(parsed.name);
+        }
+        CompoundTag tag = new CompoundTag();
+        tag.putString("id", parsed.name);
+        CompoundTag properties = new CompoundTag();
+        for (Map.Entry<String, String> entry : parsed.properties.entrySet()) {
+            properties.putString(entry.getKey(), entry.getValue());
+        }
+        tag.put("properties", properties);
+        return tag;
     }
 
     private static CompoundTag blockStateNbt(String state) {

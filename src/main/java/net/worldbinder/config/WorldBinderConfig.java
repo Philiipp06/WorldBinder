@@ -75,6 +75,8 @@ public final class WorldBinderConfig {
     public boolean map3dShading = true;
     public boolean mapShowWaypoints = true;
     public boolean mapDeathWaypoint = true;
+    /** Barriers, light blocks and structure voids on the map (hidden by default, like in game). */
+    public boolean mapShowInvisibleBlocks = false;
     public java.util.List<MapWaypoint> mapWaypoints = new java.util.ArrayList<>();
 
     /** A named map point, stored per world/server and dimension. */

@@ -52,7 +52,7 @@ public final class ExportReadmeWriter {
                 - root-level `region/`, `entities/` and `poi/` folders for server imports
                 - `dimensions/minecraft/overworld/` for modern 26.x compatibility
                 - `data/minecraft/` saved-data files
-                - `resources.zip` when a server resource pack was available
+                - the server resource pack when one was available: `resourcepacks/resources.zip` (Minecraft 26.x, offered automatically when the world is opened) or `resources.zip` (older versions)
                 - `worldbinder/` metadata and validation reports
 
                 ## Server import notes

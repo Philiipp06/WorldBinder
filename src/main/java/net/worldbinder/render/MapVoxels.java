@@ -256,6 +256,9 @@ public final class MapVoxels {
         if (state.isAir()) {
             return EMPTY;
         }
+        if (BlockMapColors.markerColor(state) != 0) {
+            return WorldBinder.config().mapShowInvisibleBlocks ? SOLID : EMPTY;
+        }
         if (!state.getFluidState().isEmpty() && state.getCollisionShape(level, pos).isEmpty()) {
             return FLUID;
         }

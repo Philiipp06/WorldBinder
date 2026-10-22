@@ -84,7 +84,7 @@ public final class ExportSavedDataWriter {
 
     private static CompoundTag stopwatchesData() {
         CompoundTag data = new CompoundTag();
-        data.put("stopwatches", new ListTag());
+        data.put("stopwatches", new CompoundTag());
         return data;
     }
 

@@ -42,6 +42,7 @@ public final class MapRegionTextures {
     private final ArrayDeque<Long> paintQueue = new ArrayDeque<>();
     private final Set<Long> queued = new HashSet<>();
     private boolean hillshade = true;
+    private boolean markers;
 
     public static MapRegionTextures shared() {
         return SHARED;
@@ -79,8 +80,10 @@ public final class MapRegionTextures {
      * Cost is proportional to the visible area, never to the total number of captured chunks.
      */
     public void sync(LongFunction<ChunkSnapshot> lookup, int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ, boolean hillshade) {
-        if (this.hillshade != hillshade) {
+        boolean markers = net.worldbinder.WorldBinder.config().mapShowInvisibleBlocks;
+        if (this.hillshade != hillshade || this.markers != markers) {
             this.hillshade = hillshade;
+            this.markers = markers;
             paintedVersions.clear();
         }
         int area = (maxChunkX - minChunkX + 1) * (maxChunkZ - minChunkZ + 1);
@@ -181,12 +184,21 @@ public final class MapRegionTextures {
             for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) sink.set(x, z, color);
             return;
         }
+        boolean markers = snapshot.markerHeights != null && snapshot.markerHeights.length == 256
+                && net.worldbinder.WorldBinder.config().mapShowInvisibleBlocks;
         ChunkSnapshot north = hillshade && lookup != null ? lookup.apply(ChunkPos.pack(cx, cz - 1)) : null;
         ChunkSnapshot west = hillshade && lookup != null ? lookup.apply(ChunkPos.pack(cx - 1, cz)) : null;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int index = z * 16 + x;
                 int height = snapshot.heights[index];
+                if (markers && snapshot.markerHeights[index] != Integer.MIN_VALUE && snapshot.markerHeights[index] >= height) {
+                    // invisible marker above the terrain: tint the terrain, hatched every other column
+                    int base = height == Integer.MIN_VALUE ? 0xFF2A2F36 : opaque(snapshot.colors[index] == 0 ? average : snapshot.colors[index]);
+                    float t = ((x + z) & 1) == 0 ? 0.72F : 0.5F;
+                    sink.set(x, z, mix(base, snapshot.markerColors[index], t));
+                    continue;
+                }
                 if (height == Integer.MIN_VALUE) {
                     sink.set(x, z, snapshot.hasSnapshot ? withAlpha(average, 0x90) : 0);
                     continue;
@@ -252,6 +264,13 @@ public final class MapRegionTextures {
 
     private static int opaque(int color) {
         return 0xFF000000 | (color & 0x00FFFFFF);
+    }
+
+    private static int mix(int a, int b, float t) {
+        int r = Math.round(((a >> 16) & 255) * (1 - t) + ((b >> 16) & 255) * t);
+        int g = Math.round(((a >> 8) & 255) * (1 - t) + ((b >> 8) & 255) * t);
+        int bl = Math.round((a & 255) * (1 - t) + (b & 255) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
     }
 
     private static int withAlpha(int color, int alpha) {

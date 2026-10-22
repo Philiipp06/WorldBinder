@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class BlockMapColors {
     private static final int UNRESOLVED = 0;
+    private static final int NO_MAP_COLOR = 0xFF6F7680;
     private static final int FLAG_CUSTOM = 1;
     private static final int FLAG_TINTED = 2;
     private static final int MAX_PARENT_DEPTH = 12;
@@ -100,6 +101,14 @@ public final class BlockMapColors {
         WorldBinderConfig.MapBlockColors mode = WorldBinder.config().mapBlockColors;
         if (mode == null) mode = WorldBinderConfig.MapBlockColors.AUTO;
         int vanilla = vanilla(state, level, pos);
+        if (vanilla == NO_MAP_COLOR) {
+            int marker = markerColor(state);
+            if (marker != 0) {
+                return marker;
+            }
+            Entry entry = STATES.computeIfAbsent(state, BlockMapColors::resolve);
+            return entry.color() != UNRESOLVED ? entry.color() : vanilla;
+        }
         if (mode == WorldBinderConfig.MapBlockColors.VANILLA) {
             return vanilla;
         }
@@ -117,6 +126,35 @@ public final class BlockMapColors {
         return entry.color();
     }
 
+    /**
+     * Color of invisible marker blocks (barrier, light, structure void), 0 for everything else. These blocks are
+     * invisible in game, so the map shows them only when "Invisible blocks" is enabled.
+     */
+    public static int markerColor(BlockState state) {
+        if (state == null) return 0;
+        net.minecraft.world.level.block.Block block = state.getBlock();
+        if (block == net.minecraft.world.level.block.Blocks.BARRIER) return 0xFFD9534F;
+        if (block == net.minecraft.world.level.block.Blocks.LIGHT) return 0xFFF2CF5B;
+        if (block == net.minecraft.world.level.block.Blocks.STRUCTURE_VOID) return 0xFFA98BE0;
+        return 0;
+    }
+
+    /**
+     * True for blocks the vanilla map looks through: invisible markers and every block without a map color
+     * (glass, panes, iron bars …). The map then shows the block below, exactly like a vanilla map item.
+     */
+    public static boolean isMapTransparent(BlockState state, BlockGetter level, BlockPos pos) {
+        if (state == null || state.isAir() || markerColor(state) != 0) {
+            return true;
+        }
+        try {
+            MapColor mapColor = state.getMapColor(level, pos);
+            return mapColor == null || mapColor == MapColor.NONE;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     /** True when the state is drawn from a resource pack override (used by the map hover details). */
     public static boolean isCustom(BlockState state) {
         Entry entry = STATES.get(state);
@@ -132,7 +170,7 @@ public final class BlockMapColors {
         } catch (RuntimeException ignored) {
             // Some modded states compute map colors from world data that is not loaded client-side.
         }
-        return 0xFF6F7680;
+        return NO_MAP_COLOR;
     }
 
     // ------------------------------------------------------------------ resolving

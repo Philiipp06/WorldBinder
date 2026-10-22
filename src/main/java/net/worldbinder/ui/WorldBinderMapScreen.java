@@ -377,7 +377,7 @@ public final class WorldBinderMapScreen extends Screen {
     private int[] dropdownBounds() {
         int y = TOOLBAR_Y + TOOLBAR_H + 4;
         return switch (dropdown) {
-            case LAYERS -> new int[] {dropdownX, y, 380, 10 + 14 + 7 * DROPDOWN_ROW + 2};
+            case LAYERS -> new int[] {dropdownX, y, 380, 10 + 14 + 8 * DROPDOWN_ROW + 2};
             case FILTERS -> new int[] {dropdownX, y, 380, 10 + 14 + 6 * DROPDOWN_ROW + 2};
             case EXPORT -> new int[] {dropdownX, y, 230, 10 + 6 * DROPDOWN_ROW + 6};
             case NONE -> new int[] {0, 0, 0, 0};
@@ -425,6 +425,14 @@ public final class WorldBinderMapScreen extends Screen {
         int waypointCount = MapWaypoints.current().size();
         if (waypointCount > 0) WbButton.badge(waypoints, Integer.toString(waypointCount));
         addRenderableWidget(waypoints);
+        addRenderableWidget(WbButton.icon(toggleRow(rightCol, top + r++ * DROPDOWN_ROW, colW, "worldbinder.map.layer.invisible", "worldbinder.map.layer.invisible.tooltip",
+                config.mapShowInvisibleBlocks, v -> {
+                    config.mapShowInvisibleBlocks = v;
+                    config.save();
+                    MapVoxels.get().clear();
+                    MapExplorer.get().clear();
+                    Map3DView.shared().invalidate();
+                }), WbIcon.EYE));
         addRenderableWidget(toggleRow(rightCol, top + r * DROPDOWN_ROW, colW, "worldbinder.map.layer.limit", "worldbinder.map.tooltip.limit",
                 config.mapLimitPanning, v -> config.mapLimitPanning = v));
     }
