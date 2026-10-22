@@ -1,12 +1,13 @@
-# WorldBinder 1.6.1
+# WorldBinder 1.6.2
 
 WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
 
-> **1.6.1 – 3D map, custom blocks & waypoints:**
-> - **3D live map:** press **V** (or the 3D button) in F10 to see the known terrain as a rotatable, tiltable 3D landscape with entity and player markers. Right-drag rotates and tilts, the height scale is adjustable.
-> - **3D export:** export the map as a colored 3D block model (`.glb`, plus `.obj` for smaller areas) or as a high-resolution 3D render (PNG).
+> **1.6.2 – 3D map, custom blocks & waypoints:**
+> - **3D live map:** press **V** (or the 3D button) in F10 for a rotatable, tiltable 3D landscape with an animated switch from the 2D map. Loaded chunks are drawn with their real vertical structure – air under bridges, roller coasters or tree crowns stays visible – with directional light, sun shadows and block edges. Rendering runs in the background, so the game keeps its frame rate.
+> - **3D export:** export the map as a colored 3D block model with real overhangs (`.glb`, plus `.obj` for smaller areas) or as an anti-aliased high-resolution 3D render (PNG, transparent and with sky). 2D PNG exports of small and medium areas now use up to 4 pixels per block with block relief.
+> - **Legal notice in every export:** world exports (`README.md`, `EXPORT_VALIDATION.txt`) and map exports (`map_info.txt`) now include the legal and responsible-use notice.
 > - **Custom server blocks on the map:** map colors can now come from the active resource packs. In *Auto* mode, blocks that a server pack adds through unused block states (for example note block instruments) or replaces get their real texture color.
 > - **Waypoints:** place named points with **P** or Shift+right click, see them in 2D and 3D (with edge markers when off-screen) and get an automatic "last death" point.
 > - **Community docs:** reworked Code of Conduct, Contributing guide and Security policy, a new Accessibility statement and GitHub issue/PR templates.
@@ -144,7 +145,7 @@ The live map renders captured chunks as cached region textures (16×16 chunks ea
 
 The toolbar offers Follow, Player, Origin, zoom, **Layers** (view mode, relief, grid, status tint, players, hostile mobs, animals, items, other entities, stay-in-map-area), **Filters** (status: not captured, saved, in progress, failed – content: entities, block entities, low quality, recently scanned, explored only – plus Invert and Hide others), **Explore** (E), **Export** (full PNG or 256×256 region tiles named `r.<x>.<z>.png`, optional status tint, written to `saves/WorldBinder/map_exports/`) and a coordinate jump field (`X Z` or `X Y Z`). The sidebar shows coverage statistics with saved area and explored chunks, cursor coordinates/height/status or nearby entity counts, and the selected chunk with quality bar and Rescan/Copy/Center actions. Hover an entity marker to see its type, position and distance.
 
-**3D view** (V) draws the known surface as an orthographic 3D landscape that you can rotate, tilt (20–89°) and exaggerate in height (50–300 %). Players, entities and waypoints are shown with small stems so their position stays readable. The buttons at the bottom right rotate, tilt, change the height scale and reset the view. The Export menu adds **3D model (GLB/OBJ)** – the known surface as a colored block mesh, merged into larger cells for huge areas – and **3D render (PNG)**, a high-resolution image of the current 3D view with a transparent background.
+**3D view** (V) draws the map as an orthographic 3D landscape that you can rotate, tilt (20–89°) and exaggerate in height (50–300 %); switching between 2D and 3D is animated. Chunks loaded by your client are sampled with up to six solid block spans per column, so bridges, tracks, tree crowns and overhangs keep the air beneath them; other known chunks are drawn from the height map. Faces are lit by orientation, spans cast sun shadows, and frames are rendered on a background thread (half resolution while moving, full resolution at rest). The player marker lies on the ground at your feet and is shown as an outline when terrain covers it; entities and waypoints are drawn in place. The buttons at the bottom right rotate, tilt, change the height scale and reset the view. The Export menu adds **3D model (GLB/OBJ)** – the known surface as a colored block mesh, merged into larger cells for huge areas – and **3D render (PNG)**, a 2×2 supersampled high-resolution image of the current 3D view, saved with a transparent and with a sky background. Every map export writes a `map_info.txt` with details and the legal notice.
 
 **Map colors** (Layers > Colors) can be *Auto* (vanilla map colors; blocks changed by a resource pack, such as custom server blocks made from note block states, use their texture color), *Vanilla* or *Textures* (every block uses its texture color). Colors are read from the blockstate, model and texture files of the active resource packs, including server packs.
 
@@ -262,6 +263,6 @@ The official release artifact is the Fabric jar from `build/libs/`.
 
 ## Status
 
-WorldBinder 1.6.1 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.1 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0 and 1.6.1 files remain as historical release records.
+WorldBinder 1.6.2 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.2 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0 and 1.6.1 files remain as historical release records.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

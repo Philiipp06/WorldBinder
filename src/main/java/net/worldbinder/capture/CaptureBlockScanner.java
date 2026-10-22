@@ -489,10 +489,7 @@ abstract class CaptureBlockScanner {
         try {
             Minecraft client = Minecraft.getInstance();
             if (client != null && client.level != null && state != null) {
-                net.minecraft.world.level.material.MapColor mapColor = state.getMapColor(client.level, pos);
-                if (mapColor != null && mapColor != net.minecraft.world.level.material.MapColor.NONE && mapColor.col != 0) {
-                    return 0xFF000000 | mapColor.col;
-                }
+                return net.worldbinder.render.BlockMapColors.color(state, client.level, pos);
             }
         } catch (RuntimeException ignored) {
             // Some modded states compute map colors from world data that is not loaded client-side.

@@ -203,6 +203,7 @@ public final class ExportValidator {
         builder.append("\nWarnings:\n");
         if (r.warnings.isEmpty()) builder.append(" - none\n");
         for (String value : r.warnings) builder.append(" - ").append(value).append('\n');
+        builder.append(net.worldbinder.export.common.ExportLegalNotice.text());
         return builder.toString();
     }
 }

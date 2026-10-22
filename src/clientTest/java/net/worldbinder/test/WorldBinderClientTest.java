@@ -461,6 +461,65 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
             context.waitTicks(20);
             context.takeScreenshot("map-explore-1_6");
             context.runOnClient(client -> {
+                // 1.6.2: waypoints, 3D view, block colors from resource pack textures
+                WorldBinder.config().mapWaypoints.clear();
+                check(net.worldbinder.render.MapWaypoints.add(client.player.getBlockX() + 12, client.player.getBlockY(), client.player.getBlockZ() - 8) != null,
+                        "Map waypoint can be placed");
+                check(net.worldbinder.render.MapWaypoints.current().size() == 1, "Waypoint belongs to the current world");
+                WorldBinder.config().map3d = true;
+                var modelJson = com.google.gson.JsonParser.parseString(
+                        "{\"variants\":{\"instrument=banjo,note=3,powered=false\":{\"model\":\"custom:block/ruby\"},\"instrument=harp,note=0,powered=false\":{\"model\":\"minecraft:block/note_block\"}}}")
+                        .getAsJsonObject();
+                check("custom:block/ruby".equals(net.worldbinder.render.BlockMapColors.selectModel(modelJson,
+                        java.util.Map.of("instrument", "banjo", "note", "3", "powered", "false"))), "Blockstate variant selection for custom note block states");
+                WorldBinder.config().mapBlockColors = WorldBinderConfig.MapBlockColors.TEXTURES;
+                int stone = net.worldbinder.render.BlockMapColors.color(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), client.level, client.player.blockPosition());
+                int note = net.worldbinder.render.BlockMapColors.color(net.minecraft.world.level.block.Blocks.NOTE_BLOCK.defaultBlockState(), client.level, client.player.blockPosition());
+                check((stone >>> 24) == 0xFF && (stone & 0xFFFFFF) != 0x6F7680, "Texture map color for stone");
+                check((note >>> 24) == 0xFF, "Texture map color for note blocks");
+                WorldBinder.config().mapBlockColors = WorldBinderConfig.MapBlockColors.AUTO;
+                net.worldbinder.render.BlockMapColors.invalidate();
+            });
+            context.runOnClient(client -> {
+                // a floating block must not hide the ground behind/below it (spans instead of a height map)
+                net.worldbinder.render.MapRenderer3D.ColumnSource floating = (x, z, out) -> {
+                    if (x < -24 || x > 24 || z < -24 || z > 24) return 0;
+                    out[0] = 0; out[1] = net.worldbinder.render.MapVoxels.FLOOR; out[2] = 0xFFCC3333; out[3] = 0xFF992222;
+                    if (x == 2 && z == 2) {
+                        out[4] = 0; out[5] = net.worldbinder.render.MapVoxels.FLOOR; out[6] = 0xFFCC3333; out[7] = 0xFF992222;
+                        out[0] = 10; out[1] = 10; out[2] = 0xFF3355DD; out[3] = 0xFF2233AA;
+                        return 2;
+                    }
+                    return 1;
+                };
+                var frame = new net.worldbinder.render.MapRenderer3D.Frame(100, 100, true);
+                net.worldbinder.render.MapRenderer3D.render(floating, new net.worldbinder.render.MapRenderer3D.Camera(2.5, 2.5, 5, 0, 20, 10, 1),
+                        frame, -4, 14, true);
+                check(frame.hitZ[50 * 100 + 50] < 0, "3D renderer shows the ground behind a floating block (hit z " + frame.hitZ[50 * 100 + 50] + ")");
+                check(frame.hitX[2 * 100 + 50] == 2 && frame.hitZ[2 * 100 + 50] == 2, "3D renderer draws the floating block");
+            });
+            context.setScreen(() -> new net.worldbinder.ui.WorldBinderMapScreen(null));
+            context.waitTicks(40);
+            context.takeScreenshot("map-3d-1_6_2");
+            context.runOnClient(client -> check(net.worldbinder.render.MapVoxels.get().size() > 0, "3D map samples block spans of loaded chunks"));
+            context.runOnClient(client -> {
+                try {
+                    var camera = new net.worldbinder.render.MapRenderer3D.Camera(client.player.getX(), client.player.getZ(), client.player.getY(), 45, 50, 2, 1);
+                    var model = net.worldbinder.render.MapExporter3D.export(WorldBinderClient.capture().chunkSnapshotsView(),
+                            net.worldbinder.render.MapExporter3D.Mode.MODEL, camera, 400, 240, true).get(120, java.util.concurrent.TimeUnit.SECONDS);
+                    check(java.nio.file.Files.size(model.path()) > 1000 && model.path().toString().endsWith(".glb"), "3D model export (GLB)");
+                    var render = net.worldbinder.render.MapExporter3D.export(WorldBinderClient.capture().chunkSnapshotsView(),
+                            net.worldbinder.render.MapExporter3D.Mode.RENDER, camera, 400, 240, true).get(120, java.util.concurrent.TimeUnit.SECONDS);
+                    check(java.nio.file.Files.size(render.path()) > 1000, "3D render export (PNG)");
+                    check(java.nio.file.Files.readString(render.path().resolveSibling("map_info.txt")).contains("NOT AN OFFICIAL MINECRAFT PRODUCT")
+                            && java.nio.file.Files.readString(model.path().resolveSibling("map_info.txt")).contains("LEGAL NOTICE"), "Map export info files contain the legal notice");
+                } catch (Exception e) {
+                    throw new AssertionError("3D map export", e);
+                }
+                WorldBinder.config().map3d = false;
+                WorldBinder.config().mapWaypoints.clear();
+            });
+            context.runOnClient(client -> {
                 try {
                     var result = net.worldbinder.render.MapExporter.export(WorldBinderClient.capture().chunkSnapshotsView(),
                             net.worldbinder.render.MapExporter.Mode.FULL, true, null).get(60, java.util.concurrent.TimeUnit.SECONDS);

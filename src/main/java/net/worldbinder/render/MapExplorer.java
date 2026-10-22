@@ -8,7 +8,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.material.MapColor;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.scene.ChunkSnapshot;
 
@@ -136,10 +135,10 @@ public final class MapExplorer {
                 int worldZ = (cz << 4) + lz;
                 int y;
                 if (ceiling) {
-                    y = Math.min(playerY + 8, chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz) - 1);
+                    y = Math.min(playerY + 8, chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz));
                     while (y > minY && chunk.getBlockState(pos.set(worldX, y, worldZ)).isAir()) y--;
                 } else {
-                    y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz) - 1;
+                    y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);
                 }
                 if (y < minY) {
                     continue;
@@ -148,13 +147,7 @@ public final class MapExplorer {
                 if (state.isAir()) {
                     continue;
                 }
-                int color;
-                try {
-                    MapColor mapColor = state.getMapColor(level, pos);
-                    color = mapColor == null || mapColor == MapColor.NONE ? 0xFF6F7680 : 0xFF000000 | mapColor.col;
-                } catch (RuntimeException ignored) {
-                    color = 0xFF6F7680;
-                }
+                int color = BlockMapColors.color(state, level, pos);
                 snapshot.sample(lx, lz, y, "", color);
             }
         }

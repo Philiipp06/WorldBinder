@@ -50,8 +50,7 @@ public final class MapExporter {
                 if ((color >>> 24) != 0) overlay.put(key, color);
             }
         }
-        String folderName = FileNames.cleanBaseName(worldName()) + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-        Path root = WorldBinderPaths.RECOVERY_ROOT.resolve("map_exports").resolve(folderName);
+        Path root = newExportFolder();
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Files.createDirectories(root);
@@ -71,9 +70,20 @@ public final class MapExporter {
         int blocksZ = (bounds[3] - bounds[1] + 1) * 16;
         int step = 1;
         while (blocksX / step > MAX_SIDE || blocksZ / step > MAX_SIDE) step *= 2;
-        int width = Math.max(1, blocksX / step);
-        int height = Math.max(1, blocksZ / step);
+        // small and medium maps get several pixels per block with a subtle block relief
+        int detail = 1;
+        if (step == 1) {
+            for (int candidate : new int[] {4, 3, 2}) {
+                if ((long) blocksX * candidate <= MAX_SIDE && (long) blocksZ * candidate <= MAX_SIDE) {
+                    detail = candidate;
+                    break;
+                }
+            }
+        }
+        int width = Math.max(1, blocksX / step * detail);
+        int height = Math.max(1, blocksZ / step * detail);
         int finalStep = step;
+        int finalDetail = detail;
         Path file = root.resolve("map.png");
         try (NativeImage image = new NativeImage(width, height, true)) {
             for (Map.Entry<Long, ChunkSnapshot> entry : merged.entrySet()) {
@@ -87,14 +97,31 @@ public final class MapExporter {
                     int px = baseX + x;
                     int pz = baseZ + z;
                     if (px % finalStep != 0 || pz % finalStep != 0) return;
-                    int ix = px / finalStep;
-                    int iz = pz / finalStep;
-                    if (ix < width && iz < height) image.setPixel(ix, iz, blend(argb, tint));
+                    int color = blend(argb, tint);
+                    if (finalDetail == 1) {
+                        int ix = px / finalStep;
+                        int iz = pz / finalStep;
+                        if (ix < width && iz < height) image.setPixel(ix, iz, color);
+                        return;
+                    }
+                    int bx = px * finalDetail;
+                    int bz = pz * finalDetail;
+                    boolean opaque = (color >>> 24) == 255;
+                    for (int dz = 0; dz < finalDetail; dz++) {
+                        for (int dx = 0; dx < finalDetail; dx++) {
+                            int pixel = color;
+                            if (opaque) {
+                                if (dx == 0 || dz == 0) pixel = MapRenderer3D.shade(color, 1.06F);
+                                else if (dx == finalDetail - 1 || dz == finalDetail - 1) pixel = MapRenderer3D.shade(color, 0.90F);
+                            }
+                            if (bx + dx < width && bz + dz < height) image.setPixel(bx + dx, bz + dz, pixel);
+                        }
+                    }
                 });
             }
             image.writeToFile(file);
         }
-        writeInfo(root, bounds, step, merged.size(), "map.png");
+        writeInfo(root, bounds, step, merged.size(), "map.png" + (detail > 1 ? " (" + detail + " px per block)" : ""));
         return new Result(file, width, height, merged.size(), 1);
     }
 
@@ -166,10 +193,17 @@ public final class MapExporter {
             writer.write(String.format(Locale.ROOT, "Block origin (top-left pixel): x %d, z %d%n", bounds[0] * 16, bounds[1] * 16));
             writer.write("Blocks per pixel: " + step + "\n");
             writer.write("Files: " + files + "\n");
+            writer.write(net.worldbinder.export.common.ExportLegalNotice.text());
         }
     }
 
-    private static String worldName() {
+    /** New timestamped folder below {@code map_exports} (not created yet). */
+    public static Path newExportFolder() {
+        String folderName = FileNames.cleanBaseName(worldName()) + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+        return WorldBinderPaths.RECOVERY_ROOT.resolve("map_exports").resolve(folderName);
+    }
+
+    public static String worldName() {
         Minecraft client = Minecraft.getInstance();
         try {
             if (client.getSingleplayerServer() != null) {

@@ -36,7 +36,12 @@ public final class WorldBinderClient implements ClientModInitializer {
         WorldBinderKeybinds.register(selectionManager, captureService, placementService, sceneLibrary);
         ClientTickEvents.END_CLIENT_TICK.register(FlightMotion::tick);
         ClientTickEvents.END_CLIENT_TICK.register(WorldBinderClient::showRecoveryNoticeOnce);
-        ClientTickEvents.END_CLIENT_TICK.register(client -> net.worldbinder.render.MapExplorer.get().tick(client));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            net.worldbinder.render.BlockMapColors.tick(client);
+            net.worldbinder.render.MapExplorer.get().tick(client);
+            net.worldbinder.render.MapVoxels.get().tick(client);
+            net.worldbinder.render.MapWaypoints.tick(client);
+        });
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> WorldBinderNotifications.clear());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             WorldBinderNotifications.clear();

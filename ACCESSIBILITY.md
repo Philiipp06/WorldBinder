@@ -75,4 +75,4 @@ Please check interface changes against this list before opening a pull request (
 - [Accessibility best practices for your project](https://opensource.guide/accessibility-best-practices-for-your-project/) (Open Source Guides)
 - [Open Source Accessibility toolkit](https://github.com/open-source-accessibility/accessibility-toolkit)
 
-*Last reviewed: October 2026, WorldBinder 1.6.1.*
+*Last reviewed: October 2026, WorldBinder 1.6.2.*

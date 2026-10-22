@@ -19,7 +19,7 @@ Please report privately anything that could harm a WorldBinder user, their compu
 
 - **Untrusted input from servers or files**: a server, world, schematic, archive, recovery file or resource pack that makes WorldBinder crash the client in a way that can be triggered remotely, execute code, or read or write files outside the WorldBinder folders.
 - **Path handling**: export, archive or map export names that escape the intended folder (path traversal), overwrite unrelated files, or follow links unexpectedly.
-- **Resource pack parsing**: malicious blockstate, model or texture files (used for map colors since 1.6.1) that cause hangs, excessive memory use or crashes.
+- **Resource pack parsing**: malicious blockstate, model or texture files (used for map colors since 1.6.2) that cause hangs, excessive memory use or crashes.
 - **Data exposure**: WorldBinder writing or sending more data than documented, for example personal data, session tokens or server addresses ending up in exports, logs or files meant to be shared.
 - **Supply chain**: problems with the build, the published jar or dependencies.
 

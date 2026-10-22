@@ -66,6 +66,36 @@ public final class WorldBinderConfig {
     public boolean mapShowOtherEntities = false;
     public boolean mapLimitPanning = true;
 
+    // Live map 3D, block colors and waypoints (1.6.2)
+    public MapBlockColors mapBlockColors = MapBlockColors.AUTO;
+    public boolean map3d = false;
+    public double map3dYaw = 45.0D;
+    public double map3dPitch = 50.0D;
+    public int map3dHeightPercent = 100;
+    public boolean map3dShading = true;
+    public boolean mapShowWaypoints = true;
+    public boolean mapDeathWaypoint = true;
+    public java.util.List<MapWaypoint> mapWaypoints = new java.util.ArrayList<>();
+
+    /** A named map point, stored per world/server and dimension. */
+    public static final class MapWaypoint {
+        public String name = "";
+        public String world = "";
+        public String dimension = "";
+        public int x;
+        public int y;
+        public int z;
+        public int color = 0xFF4FD1C5;
+        public boolean death;
+        public long createdAt;
+    }
+
+    public enum MapBlockColors {
+        AUTO,
+        VANILLA,
+        TEXTURES
+    }
+
     // Chunk radar (1.6.0)
     public boolean radarRotate = false;
     public boolean radarShowOutsideCapture = false;
@@ -613,6 +643,16 @@ public final class WorldBinderConfig {
             mapZoom = 2.0D;
         }
         mapZoom = Math.max(0.25D, Math.min(16.0D, mapZoom));
+        if (mapBlockColors == null) {
+            mapBlockColors = MapBlockColors.AUTO;
+        }
+        map3dYaw = Double.isFinite(map3dYaw) ? ((map3dYaw % 360.0D) + 360.0D) % 360.0D : 45.0D;
+        map3dPitch = Double.isFinite(map3dPitch) ? Math.max(20.0D, Math.min(89.0D, map3dPitch)) : 50.0D;
+        map3dHeightPercent = Math.max(25, Math.min(300, map3dHeightPercent));
+        if (mapWaypoints == null) {
+            mapWaypoints = new java.util.ArrayList<>();
+        }
+        mapWaypoints.removeIf(java.util.Objects::isNull);
         return this;
     }
 }

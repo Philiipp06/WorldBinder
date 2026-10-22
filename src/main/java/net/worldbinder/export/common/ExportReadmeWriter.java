@@ -86,6 +86,6 @@ public final class ExportReadmeWriter {
                 entities,
                 keyText
         );
-        Files.writeString(worldFolder.resolve("README.md"), content);
+        Files.writeString(worldFolder.resolve("README.md"), content + ExportLegalNotice.markdown());
     }
 }

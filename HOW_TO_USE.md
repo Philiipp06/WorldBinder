@@ -1,4 +1,4 @@
-# WorldBinder 1.6.1 — How to Use
+# WorldBinder 1.6.2 — How to Use
 
 This guide explains the normal WorldBinder workflow for permitted world capture, recovery and export.
 
@@ -8,7 +8,7 @@ WorldBinder is a client-side Fabric mod. Use it only on worlds, servers, maps, b
 
 1. Install Minecraft 26.1, 26.1.1, 26.1.2, 26.2 or 26.3 with Fabric Loader 0.19.5 or newer.
 2. Install a Fabric API build for that Minecraft version (for example, 0.145.1+26.1 for 26.1 or 0.160.7+26.3 for 26.3).
-3. Place the same WorldBinder 1.6.1 jar into your `mods` folder on any of those versions.
+3. Place the same WorldBinder 1.6.2 jar into your `mods` folder on any of those versions.
 4. Start the game.
 5. Open Minecraft Controls and check the `WorldBinder` keybind category.
 
@@ -41,7 +41,7 @@ The Control Center provides access to:
 - F10 map
 - Queue Dashboard / Profiler
 
-WorldBinder 1.6.1 keeps the fixed virtual GUI canvas, so menus remain at a stable size across fullscreen, windowed mode and GUI scales. F9 uses the visible sidebar for navigation. To choose an export target, select **Minecraft version** in Capture, General settings or the F6 dialog. The picker groups every supported release by its official update (Update Aquatic, Village & Pillage, … Chase the Skies, Game Drops 2026) with color, emblem and release year. Hover a version to see its DataVersion, generation profile, which file formats it uses and whether the export is native or a downgrade; click it to use it. Search by version, update name or year. The Gamerules page only shows rules available for the selected target. The HUD Widget Editor continues to provide live placement, size and color controls.
+WorldBinder 1.6.2 keeps the fixed virtual GUI canvas, so menus remain at a stable size across fullscreen, windowed mode and GUI scales. F9 uses the visible sidebar for navigation. To choose an export target, select **Minecraft version** in Capture, General settings or the F6 dialog. The picker groups every supported release by its official update (Update Aquatic, Village & Pillage, … Chase the Skies, Game Drops 2026) with color, emblem and release year. Hover a version to see its DataVersion, generation profile, which file formats it uses and whether the export is native or a downgrade; click it to use it. Search by version, update name or year. The Gamerules page only shows rules available for the selected target. The HUD Widget Editor continues to provide live placement, size and color controls.
 
 Use **Tab** and **Shift+Tab** to move focus between controls. Focused buttons, fields and sliders have a visible glow; **Enter** or **Space** activates a focused button. **Ctrl+Tab** and **Ctrl+Shift+Tab** switch F9 sections or Settings tabs, **Ctrl+S** saves Settings without closing them. Hover any control to see a tooltip with a short explanation and, where available, its shortcut.
 
@@ -136,8 +136,8 @@ Use **F10** to open the live map. Captured chunks are drawn with real vanilla ma
 - **Explore** (or **E**) adds every chunk your client has loaded to the map without capturing; **Export** writes the map as one PNG or as 256×256 region tiles to `saves/WorldBinder/map_exports/`.
 - Layers can show hostile mobs, animals, dropped items, other entities and players as markers; hover a marker for details.
 - With **Stay in map area** enabled you cannot pan far away from known chunks.
-- **3D view:** press **V** or the **3D** button. Drag with the right mouse button to rotate and tilt, drag with the left button to move, use the wheel to zoom. The buttons at the bottom right rotate by 45°, tilt, cycle the height scale (50–300 %) and reset the view; `,` / `.` and Page Up / Page Down work on the keyboard.
-- **Export > 3D model (GLB/OBJ)** saves the known surface as a colored 3D model for Blender, the Windows 3D Viewer or web viewers; **Export > 3D render (PNG)** saves the current 3D view in high resolution.
+- **3D view:** press **V** or the **3D** button – the map tilts smoothly into 3D (and back). Bridges, roller coasters, trees and overhangs of loaded chunks keep the air beneath them; your marker lies on the ground at your position and turns into an outline when something covers it. Drag with the right mouse button to rotate and tilt, drag with the left button to move, use the wheel to zoom. The buttons at the bottom right rotate by 45°, tilt, cycle the height scale (50–300 %) and reset the view; `,` / `.` and Page Up / Page Down work on the keyboard.
+- **Export > 3D model (GLB/OBJ)** saves the known surface as a colored 3D model for Blender, the Windows 3D Viewer or web viewers; **Export > 3D render (PNG)** saves the current 3D view in high resolution, anti-aliased, with a transparent and a sky background. Every export folder contains a `map_info.txt` with the legal notice.
 - **Layers > Colors** chooses map colors: *Auto* shows custom server blocks (for example note block based blocks from a server resource pack) in their real texture color, *Vanilla* uses only the vanilla map palette, *Textures* uses texture colors for every block. Already captured chunks keep the colors they were recorded with; explored chunks are redrawn.
 - **Waypoints:** press **P**, Shift+right click or middle click to place a waypoint at the cursor; right click a waypoint to remove it. Your last death point appears automatically. Waypoints are saved per world/server and dimension and can be hidden in Layers.
 
