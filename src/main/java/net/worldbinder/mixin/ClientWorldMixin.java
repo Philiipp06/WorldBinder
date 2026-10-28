@@ -28,7 +28,7 @@ public abstract class ClientWorldMixin {
         }
     }
 
-    @Inject(method = "getMapState", at = @At("HEAD"), require = 0)
+    @Inject(method = "getMapData", at = @At("HEAD"))
     private void worldbinder$mapState(MapId id, CallbackInfoReturnable<MapItemSavedData> cir) {
         if (WorldBinderClient.capture() != null) {
             WorldBinderClient.capture().onMapStateObserved(id);

@@ -53,6 +53,18 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
         if (minecraft != null) rebuildWidgets();
     }
 
+    public void openArchives() {openSection(Section.ARCHIVES);}
+    public void openProject(Path path){
+        library.refresh();int index=library.scenes().indexOf(path);
+        if(index>=0){selectedArchiveIndex=index;archiveListOffset=index;}
+        openSection(library.isRecovery(path)?Section.RECOVERY:Section.ARCHIVES);
+    }
+    public void openCapture() {openSection(Section.CAPTURE);}
+    private void openSection(Section target) {
+        section=target;contentScroll=0;scrollTarget=-1;presetDropdownOpen=false;
+        if(minecraft!=null)rebuildWidgets();
+    }
+
     public void openLegalNotice() {
         legalNoticeFirst = true;
         section = Section.ABOUT;
@@ -159,7 +171,7 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
 
         Button close = WbButton.icon(WbButton.quiet(WbButton.create(left + panelWidth - 116, top + panelHeight - 32, 96, 22,
                 Lang.string("worldbinder.gui.close"), Component.translatable("worldbinder.tooltip.close"), b -> onClose())), WbIcon.CLOSE);
-        WbTooltips.hint(close, Component.literal("Esc"));
+        WbTooltips.hint(close, Lang.text("worldbinder.key.escape"));
         addRenderableWidget(close);
         Button interfaceSettings = WbButton.iconOnly(WbButton.quiet(WbButton.create(left + panelWidth - 144, top + panelHeight - 32, 22, 22,
                 Lang.string("worldbinder.config.tab.display"), Component.translatable("worldbinder.tooltip.open_interface"),
@@ -169,6 +181,10 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
                 Lang.string("worldbinder.config.tab.movement"), Component.translatable("worldbinder.tooltip.open_movement"),
                 b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, WorldBinderConfigScreen.movement(this)))), WbIcon.MOVEMENT);
         addRenderableWidget(movementSettings);
+        addRenderableWidget(WbButton.iconOnly(WbButton.quiet(WbButton.create(left+panelWidth-200,top+panelHeight-32,22,22,
+                Lang.text("worldbinder.recording_tools.title"),Lang.text("worldbinder.scanner.help"),b->net.worldbinder.compat.ClientCompat.setScreen(minecraft,new WorldBinderRecordingToolsScreen(this)))),WbIcon.SEARCH));
+        addRenderableWidget(WbButton.iconOnly(WbButton.quiet(WbButton.create(left+panelWidth-228,top+panelHeight-32,22,22,
+                Lang.text("worldbinder.network.projects"),Lang.text("worldbinder.network.projects_help"),b->net.worldbinder.compat.ClientCompat.setScreen(minecraft,new WorldBinderNetworkProjectsScreen(this)))),WbIcon.GLOBE));
         } finally {
             width = realWidth;
             height = realHeight;
@@ -206,7 +222,7 @@ public final class WorldBinderScreen extends WorldBinderScreenView {
             if (target == Section.RECOVERY && library.recoveryCount() > 0) {
                 WbButton.badge(widget, Integer.toString(library.recoveryCount()));
             }
-            WbTooltips.hint(widget, Component.literal("Ctrl + Tab"));
+            WbTooltips.hint(widget, Lang.text("worldbinder.shortcut.next_tab"));
             addRenderableWidget(widget);
             y += step;
         }
@@ -456,14 +472,18 @@ private void toolsWidgets(int x, int top, int width) {
         if (cols == 4) {
             addRenderableWidget(button(x + 18 + (buttonW + gap) * 2, y, buttonW, 23, Lang.string("worldbinder.gui.open_saves"), Component.translatable("worldbinder.tooltip.open_saves_folder"),
                     b -> net.worldbinder.util.PathOpener.open(net.worldbinder.io.WorldBinderPaths.WORLDS)));
-            addRenderableWidget(button(x + 18 + (buttonW + gap) * 3, y, buttonW, 23, Lang.string("worldbinder.gui.cancel"), Component.translatable("worldbinder.tooltip.cancel_capture"),
-                    b -> { capture.cancelActiveCapture(); rebuildWidgets(); }));
+            addRenderableWidget(captureCancelButton(x + 18 + (buttonW + gap) * 3,y,buttonW));
         } else {
             addRenderableWidget(button(x + 18, y + 29, buttonW, 23, Lang.string("worldbinder.gui.open_saves"), Component.translatable("worldbinder.tooltip.open_saves_folder"),
                     b -> net.worldbinder.util.PathOpener.open(net.worldbinder.io.WorldBinderPaths.WORLDS)));
-            addRenderableWidget(button(x + 18 + (buttonW + gap), y + 29, buttonW, 23, Lang.string("worldbinder.gui.cancel"), Component.translatable("worldbinder.tooltip.cancel_capture"),
-                    b -> { capture.cancelActiveCapture(); rebuildWidgets(); }));
+            addRenderableWidget(captureCancelButton(x + 18 + (buttonW + gap),y+29,buttonW));
         }
+    }
+
+    private Button captureCancelButton(int x,int y,int width) {
+        var result=button(x,y,width,23,Lang.string("worldbinder.gui.cancel"),Component.translatable("worldbinder.tooltip.cancel_capture"),
+                b->{capture.cancelActiveCapture();rebuildWidgets();});
+        result.active=result.active&&capture.isCapturing()&&!capture.isSaving();return result;
     }
 
     private String capturePresetLabel() {
@@ -550,7 +570,7 @@ private void toolsWidgets(int x, int top, int width) {
         boolean recovery = library.isRecovery(selected);
         if (placeSelectedButton != null) placeSelectedButton.active = hasSelection && !recovery && worldAvailable();
         if (openSelectedButton != null) openSelectedButton.active = hasSelection;
-        if (continueRecoveryButton != null) continueRecoveryButton.active = hasSelection && library.canFinalizeRecovery(selected) && !capture.isCapturing() && worldAvailable();
+        if (continueRecoveryButton != null) continueRecoveryButton.active = hasSelection && !capture.isCapturing() && worldAvailable();
         if (finalizeRecoveryButton != null) {
             boolean reexport = hasSelection && !recovery && library.canReexport(selected);
             finalizeRecoveryButton.active = hasSelection && (library.canFinalizeRecovery(selected) || reexport);
@@ -630,7 +650,7 @@ private void toolsWidgets(int x, int top, int width) {
             return;
         }
         setArchiveActionsActive(false);
-        OperationStatus.begin(Lang.string("worldbinder.status.recovery_title"), Lang.string("worldbinder.operation.finalizing_recovery"));
+        OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.recovery_title"), net.worldbinder.util.Lang.stored("worldbinder.operation.finalizing_recovery"));
         CompletableFuture.supplyAsync(() -> {
             try {
                 return library.finalizeRecovery(selected);
@@ -639,12 +659,12 @@ private void toolsWidgets(int x, int top, int width) {
             }
         }).whenComplete((finalized, throwable) -> runOnClient(() -> {
             if (throwable == null) {
-                OperationStatus.finish(Lang.string("worldbinder.status.recovery_finalized"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.recovery_finalized"));
                 Chat.info(Lang.string("worldbinder.chat.recovery_finalized", finalized.getFileName()));
                 selectedArchiveIndex = 0;
                 rebuildWidgets();
             } else {
-                OperationStatus.finish(Lang.string("worldbinder.status.recovery_finalize_failed"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.recovery_finalize_failed"));
                 Chat.error(Lang.string("worldbinder.chat.recovery_finalize_failed"));
                 WorldBinder.LOGGER.warn("Failed to finalize recovery", throwable);
                 setArchiveActionsActive(true);
@@ -654,21 +674,33 @@ private void toolsWidgets(int x, int top, int width) {
 
     private void reexportSelected(Path selected) {
         setArchiveActionsActive(false);
-        OperationStatus.begin(Lang.string("worldbinder.status.reexport_title"), Lang.string("worldbinder.operation.reexporting"));
+        CompletableFuture.supplyAsync(() -> {
+            try { return library.read(selected); } catch (Exception exception) { throw new RuntimeException(exception); }
+        }).whenComplete((scene, failure) -> runOnClient(() -> {
+            setArchiveActionsActive(true);
+            if (failure != null) { Chat.error(Lang.string("worldbinder.chat.reexport_failed")); return; }
+            net.worldbinder.compat.ClientCompat.setScreen(minecraft, new WorldBinderExportScreen(this, scene,
+                    Lang.string("worldbinder.export.review.archive", scene.chunkSnapshotCount()), () -> reexportReviewed(selected,scene)));
+        }));
+    }
+
+    private void reexportReviewed(Path selected, net.worldbinder.scene.WorldScene scene) {
+        setArchiveActionsActive(false);
+        OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.reexport_title"), net.worldbinder.util.Lang.stored("worldbinder.operation.reexporting"));
         CompletableFuture.supplyAsync(() -> {
             try {
-                return library.reexport(selected);
+                return library.reexport(selected, scene);
             } catch (Exception exception) {
                 throw new RuntimeException(exception);
             }
         }).whenComplete((exported, throwable) -> runOnClient(() -> {
             if (throwable == null) {
-                OperationStatus.finish(Lang.string("worldbinder.status.reexport_done"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.reexport_done"));
                 Chat.info(Lang.string("worldbinder.chat.reexport_done", exported.getFileName()));
                 selectedArchiveIndex = 0;
                 rebuildWidgets();
             } else {
-                OperationStatus.finish(Lang.string("worldbinder.status.reexport_failed"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.reexport_failed"));
                 Chat.error(Lang.string("worldbinder.chat.reexport_failed"));
                 WorldBinder.LOGGER.warn("Failed to export archive again", throwable);
                 setArchiveActionsActive(true);
@@ -678,7 +710,7 @@ private void toolsWidgets(int x, int top, int width) {
 
     private void continueSelectedRecovery() {
         Path selected = selectedArchive();
-        if (selected == null || !library.isRecovery(selected)) {
+        if (selected == null) {
             Chat.warn(Lang.string("worldbinder.chat.no_recovery_selected"));
             return;
         }
@@ -693,7 +725,7 @@ private void toolsWidgets(int x, int top, int width) {
             return;
         }
         setArchiveActionsActive(false);
-        OperationStatus.begin(Lang.string("worldbinder.status.storage_title"), Lang.string("worldbinder.operation.saving_archive_copy"));
+        OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.storage_title"), net.worldbinder.util.Lang.stored("worldbinder.operation.saving_archive_copy"));
         CompletableFuture.supplyAsync(() -> {
             try {
                 return library.saveAsArchive(selected);
@@ -702,12 +734,12 @@ private void toolsWidgets(int x, int top, int width) {
             }
         }).whenComplete((saved, throwable) -> runOnClient(() -> {
             if (throwable == null) {
-                OperationStatus.finish(Lang.string("worldbinder.status.archive_copy_saved"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.archive_copy_saved"));
                 Chat.info(Lang.string("worldbinder.chat.archive_copy_saved", saved.getFileName()));
                 selectedArchiveIndex = 0;
                 rebuildWidgets();
             } else {
-                OperationStatus.finish(Lang.string("worldbinder.status.archive_copy_failed"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.archive_copy_failed"));
                 Chat.error(Lang.string("worldbinder.chat.archive_copy_failed"));
                 WorldBinder.LOGGER.warn("Failed to save archive copy", throwable);
                 setArchiveActionsActive(true);
@@ -722,7 +754,7 @@ private void toolsWidgets(int x, int top, int width) {
             return;
         }
         setArchiveActionsActive(false);
-        OperationStatus.begin(Lang.string("worldbinder.status.title"), Lang.string("worldbinder.operation.validating_archive"));
+        OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.title"), net.worldbinder.util.Lang.stored("worldbinder.operation.validating_archive"));
         CompletableFuture.supplyAsync(() -> {
             try {
                 return library.validateArchive(selected);
@@ -731,11 +763,12 @@ private void toolsWidgets(int x, int top, int width) {
             }
         }).whenComplete((report, throwable) -> runOnClient(() -> {
             if (throwable == null) {
-                OperationStatus.finish(Lang.string("worldbinder.status.validation_complete"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.validation_complete"));
                 Chat.info(Lang.string("worldbinder.chat.validation_complete", net.worldbinder.validation.ExportValidator.shortLine(report)));
                 rebuildWidgets();
+                net.worldbinder.compat.ClientCompat.setScreen(minecraft,new WorldBinderReportScreen(this,report));
             } else {
-                OperationStatus.finish(Lang.string("worldbinder.status.validation_failed"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.validation_failed"));
                 Chat.error(Lang.string("worldbinder.chat.validation_failed"));
                 WorldBinder.LOGGER.warn("Failed to validate archive", throwable);
                 setArchiveActionsActive(true);
@@ -759,7 +792,7 @@ private void toolsWidgets(int x, int top, int width) {
                 return;
             }
             setArchiveActionsActive(false);
-            OperationStatus.begin(Lang.string("worldbinder.status.storage_title"), Lang.string("worldbinder.operation.deleting_archive"));
+            OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.storage_title"), net.worldbinder.util.Lang.stored("worldbinder.operation.deleting_archive"));
             CompletableFuture.runAsync(() -> {
                 try {
                     library.deleteArchive(selected);
@@ -770,13 +803,13 @@ private void toolsWidgets(int x, int top, int width) {
                 pendingDeletePath = null;
                 pendingDeleteMillis = 0L;
                 if (throwable == null) {
-                    OperationStatus.finish(Lang.string("worldbinder.status.archive_deleted"));
+                    OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.archive_deleted"));
                     Chat.info(Lang.string("worldbinder.chat.archive_deleted", selected.getFileName()));
                     selectedArchiveIndex = 0;
                     archiveListOffset = 0;
                     rebuildWidgets();
                 } else {
-                    OperationStatus.finish(Lang.string("worldbinder.status.archive_delete_failed"));
+                    OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.archive_delete_failed"));
                     Chat.error(Lang.string("worldbinder.chat.delete_failed"));
                     WorldBinder.LOGGER.warn("Failed to delete archive", throwable);
                     setArchiveActionsActive(true);
@@ -795,7 +828,7 @@ private void toolsWidgets(int x, int top, int width) {
             return;
         }
         setArchiveActionsActive(false);
-        OperationStatus.begin(Lang.string("worldbinder.status.title"), Lang.string("worldbinder.operation.generating_preview"));
+        OperationStatus.begin(net.worldbinder.util.Lang.stored("worldbinder.status.title"), net.worldbinder.util.Lang.stored("worldbinder.operation.generating_preview"));
         CompletableFuture.supplyAsync(() -> {
             try {
                 return library.exportPreviewThumbnail(selected);
@@ -804,12 +837,12 @@ private void toolsWidgets(int x, int top, int width) {
             }
         }).whenComplete((preview, throwable) -> runOnClient(() -> {
             if (throwable == null) {
-                OperationStatus.finish(Lang.string("worldbinder.status.preview_exported"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.preview_exported"));
                 Chat.info(Lang.string("worldbinder.chat.preview_exported", preview.toAbsolutePath()));
                 net.worldbinder.util.PathOpener.open(preview.getParent());
                 rebuildWidgets();
             } else {
-                OperationStatus.finish(Lang.string("worldbinder.status.preview_failed"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.preview_failed"));
                 Chat.error(Lang.string("worldbinder.chat.preview_failed"));
                 WorldBinder.LOGGER.warn("Failed to export archive preview", throwable);
                 setArchiveActionsActive(true);
@@ -910,7 +943,7 @@ private void toolsWidgets(int x, int top, int width) {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_TAB && event.hasControlDown()) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_TAB") && event.hasControlDown()) {
             Section[] sections = Section.values();
             int direction = event.hasShiftDown() ? -1 : 1;
             section = sections[Math.floorMod(section.ordinal() + direction, sections.length)];
@@ -922,7 +955,7 @@ private void toolsWidgets(int x, int top, int width) {
             rebuildWidgets();
             return true;
         }
-        if (event.key() == InputConstants.KEY_TAB || event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_TAB") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_UP") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_DOWN")) {
             WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);

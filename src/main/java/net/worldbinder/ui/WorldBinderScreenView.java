@@ -466,7 +466,7 @@ protected void drawArchiveList(GuiGraphicsExtractor context, int x, int top, int
         Path selectedPath = selectedArchiveForRows(scenes);
         boolean selectedRecovery = library.isRecovery(selectedPath);
         String selectedName = selectedPath == null ? Lang.string("worldbinder.common.none") : selectedPath.getFileName().toString();
-        String recoveryState = selectedRecovery ? Lang.string("worldbinder.archive.state_suffix", library.recoveryState(selectedPath)) : "";
+        String recoveryState = selectedRecovery ? Lang.string("worldbinder.archive.state_suffix", SceneLibrary.recoveryLabel(library.recoveryState(selectedPath))) : "";
         WbText.drawClipped(context, font, Lang.string("worldbinder.archive.selected_line", shorten(selectedName, 54), library.recoveryCount()) + recoveryState, x + 20, top + 104, width - 40, selectedRecovery ? WbTheme.WARN : WbTheme.TEXT_MUTED);
         WbText.drawClipped(context, font, Lang.string("worldbinder.archive.validation_line", selectedPath == null ? Lang.string("worldbinder.selection.no_complete") : library.validationLine(selectedPath)), x + 20, top + 120, width - 40, WbTheme.TEXT_DIM);
         if (selectedPath != null && selectedPath.equals(pendingDeletePath) && System.currentTimeMillis() - pendingDeleteMillis < 5000L) {
@@ -694,7 +694,7 @@ protected void drawLine(GuiGraphicsExtractor context, int x, int y, String label
     }
 
     protected String presetLine() {
-        String preset = WorldBinder.config().performancePreset == null ? "CUSTOM" : WorldBinder.config().performancePreset.name();
+        String preset = (WorldBinder.config().performancePreset == null ? WorldBinderConfig.PerformancePreset.CUSTOM : WorldBinder.config().performancePreset).label();
         return preset + " • " + WorldBinder.config().effectiveBlocksPerTick() + " " + Lang.string("worldbinder.config.blocks_per_tick");
     }
 

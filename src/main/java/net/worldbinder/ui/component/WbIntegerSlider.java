@@ -126,7 +126,7 @@ public final class WbIntegerSlider extends AbstractSliderButton {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_LEFT || event.key() == InputConstants.KEY_RIGHT) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_LEFT") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_RIGHT")) {
             WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);

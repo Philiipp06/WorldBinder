@@ -42,7 +42,11 @@ public final class MapExporter {
      */
     public static CompletableFuture<Result> export(Map<Long, ChunkSnapshot> captured, Mode mode, boolean hillshade,
                                                    LongToIntFunction statusColors) {
-        Map<Long, ChunkSnapshot> merged = MapData.mergedCopy(captured);
+        return export(captured,mode,hillshade,statusColors,true);
+    }
+    public static CompletableFuture<Result> export(Map<Long, ChunkSnapshot> captured, Mode mode, boolean hillshade,
+                                                   LongToIntFunction statusColors,boolean live) {
+        Map<Long, ChunkSnapshot> merged = live?MapData.mergedCopy(captured):new java.util.LinkedHashMap<>(captured);
         Map<Long, Integer> overlay = new java.util.HashMap<>();
         if (statusColors != null) {
             for (long key : merged.keySet()) {
@@ -64,7 +68,7 @@ public final class MapExporter {
     private static Result exportFull(Map<Long, ChunkSnapshot> merged, Map<Long, Integer> overlay, boolean hillshade, Path root) throws IOException {
         int[] bounds = boundsOf(merged);
         if (bounds == null) {
-            throw new IOException("No map data to export");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.no_map_data_to_export"));
         }
         int blocksX = (bounds[2] - bounds[0] + 1) * 16;
         int blocksZ = (bounds[3] - bounds[1] + 1) * 16;
@@ -121,7 +125,7 @@ public final class MapExporter {
             }
             image.writeToFile(file);
         }
-        writeInfo(root, bounds, step, merged.size(), "map.png" + (detail > 1 ? " (" + detail + " px per block)" : ""));
+        writeInfo(root, bounds, step, merged.size(), detail, false);
         return new Result(file, width, height, merged.size(), 1);
     }
 
@@ -156,7 +160,7 @@ public final class MapExporter {
             }
         }
         int[] bounds = boundsOf(merged);
-        writeInfo(root, bounds == null ? new int[4] : bounds, 1, merged.size(), "tiles/r.<regionX>.<regionZ>.png (256x256 px, 1 px = 1 block, region = 16x16 chunks)");
+        writeInfo(root, bounds == null ? new int[4] : bounds, 1, merged.size(), 1, true);
         return new Result(tiles, MapRegionTextures.REGION_BLOCKS, MapRegionTextures.REGION_BLOCKS, merged.size(), files);
     }
 
@@ -184,17 +188,8 @@ public final class MapExporter {
         return minX > maxX ? null : new int[] {minX, minZ, maxX, maxZ};
     }
 
-    private static void writeInfo(Path root, int[] bounds, int step, int chunks, String files) throws IOException {
-        try (Writer writer = Files.newBufferedWriter(root.resolve("map_info.txt"))) {
-            writer.write("WorldBinder live map export\n");
-            writer.write("World: " + worldName() + "\n");
-            writer.write("Chunks: " + chunks + "\n");
-            writer.write(String.format(Locale.ROOT, "Chunk bounds: x %d..%d, z %d..%d%n", bounds[0], bounds[2], bounds[1], bounds[3]));
-            writer.write(String.format(Locale.ROOT, "Block origin (top-left pixel): x %d, z %d%n", bounds[0] * 16, bounds[1] * 16));
-            writer.write("Blocks per pixel: " + step + "\n");
-            writer.write("Files: " + files + "\n");
-            writer.write(net.worldbinder.export.common.ExportLegalNotice.text());
-        }
+    private static void writeInfo(Path root, int[] bounds, int step, int chunks, int detail, boolean tiles) throws IOException {
+        Files.writeString(root.resolve("map_info.txt"), MapExportInfo.image2d(worldName(), bounds, step, chunks, detail, tiles));
     }
 
     /** New timestamped folder below {@code map_exports} (not created yet). */

@@ -1,6 +1,6 @@
 package net.worldbinder.compat;
 
-import net.fabricmc.loader.api.FabricLoader;
+
 import net.minecraft.network.protocol.Packet;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.config.WorldBinderConfig;
@@ -56,7 +56,7 @@ public final class ResourcePackCompatibility {
     }
 
     private static boolean viaFabricPlusPresent() {
-        if (!FabricLoader.getInstance().isModLoaded("viafabricplus")) {
+        if (!net.worldbinder.platform.Platform.get().modLoaded("viafabricplus")) {
             return false;
         }
         return true;

@@ -68,7 +68,7 @@ public final class MapMarkers {
         int halo = 9 + Math.round(pulse * 4);
         WbChrome.fillCircle(context, 0, 0, halo, WbTheme.withAlpha(accent, Math.round(0x34 * (1.0F - pulse))));
         WbChrome.fillCircle(context, 0, 0, 7, WbTheme.withAlpha(accent, 0x30));
-        context.pose().rotate((float) Math.toRadians(yaw + 180.0F));
+        context.pose().rotate((float) Math.toRadians(MarkerAngles.normalize(yaw) + 180.0F));
         if (cone) {
             int length = 30;
             for (int i = 2; i < length; i++) {

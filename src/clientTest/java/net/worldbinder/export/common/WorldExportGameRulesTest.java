@@ -28,9 +28,11 @@ public final class WorldExportGameRulesTest {
         check(GameRuleSettings.supports("26.1", "doWardenSpawning"), "26.1 exposes warden rule");
         check(!GameRuleSettings.supports("1.19.3", "doVinesSpread"), "1.19.3 hides future vine rule");
         check(GameRuleSettings.supports("1.19.4", "doVinesSpread"), "1.19.4 exposes vine rule");
+        check(GameRuleSettings.supports("26.3", "pvp") && !GameRuleSettings.supports("1.21.8", "pvp"), "26.x-only pvp rule");
+        check(GameRuleSettings.supports("1.20.5", "spawnChunkRadius") && !GameRuleSettings.supports("26.3", "spawnChunkRadius"), "Spawn chunk radius only before 26.x");
 
         WorldScene scene = new WorldScene();
-        scene.gameRulesNbt = "doDaylightCycle=false;keepInventory=true;randomTickSpeed=0;disableRaids=true;doFireTick=false;maxCommandChainLength=32000;maxEntityCramming=16;playersSleepingPercentage=50";
+        scene.gameRulesNbt = "pvp=false;spawnMonsters=false;freezeDamage=false;maxMinecartSpeed=20;doDaylightCycle=false;keepInventory=true;randomTickSpeed=0;disableRaids=true;doFireTick=false;maxCommandChainLength=32000;maxEntityCramming=16;playersSleepingPercentage=50";
         try {
             Path root = Path.of("game-rule-regression");
             Files.createDirectories(root);
@@ -54,6 +56,10 @@ public final class WorldExportGameRulesTest {
                         version + " entity cramming rule");
                 check(data.getInt("minecraft:players_sleeping_percentage").orElse(-1) == 50,
                         version + " sleeping percentage rule");
+                check(!data.getBoolean("minecraft:pvp").orElse(true) && !data.getBoolean("minecraft:spawn_monsters").orElse(true)
+                        && !data.getBoolean("minecraft:freeze_damage").orElse(true), version + " new 26.x rules");
+                check(data.getInt("minecraft:max_minecart_speed").orElse(-1) == 20, version + " experimental integer rule");
+                for (String key : data.keySet()) check(key.startsWith("minecraft:"), version + " only registry keys: " + key);
             }
         } catch (IOException exception) {
             throw new AssertionError("Game rule export regression", exception);

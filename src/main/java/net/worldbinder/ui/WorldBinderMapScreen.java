@@ -130,6 +130,11 @@ public final class WorldBinderMapScreen extends Screen {
     private Component footerMessage;
     private int footerAccent = WbTheme.OK;
     private boolean exporting;
+    private boolean selectingArea,areaDragging;
+    private int areaStartX,areaStartZ;
+    private long areaCoverageRevision=Long.MIN_VALUE,areaKnown=-1;
+    private net.worldbinder.selection.CaptureBounds areaCoverageBounds;
+    private java.util.concurrent.CompletableFuture<Long> areaCoverageFuture;
 
     private long nextDataRefreshMillis;
     private long cachedRevision = Long.MIN_VALUE;
@@ -139,6 +144,23 @@ public final class WorldBinderMapScreen extends Screen {
     private Set<Long> cachedQueued = Set.of();
     private Set<Long> cachedFailed = Set.of();
     private Map<Long, ChunkSnapshot> cachedSnapshots = Map.of();
+    private String viewDimension,lastScope="";
+    private final MapRegionTextures dimensionTextures=MapRegionTextures.independent();
+    private net.worldbinder.scene.WorldScene viewScope(){
+        var root=WorldBinderClient.capture().exportPreview();if(root==null)return null;
+        var scope=viewDimension==null?root:net.worldbinder.scene.ProjectDimensions.find(root,viewDimension);return scope==null?root:scope;
+    }
+    private boolean liveView(){var root=WorldBinderClient.capture().exportPreview();return root==null||viewScope()==root&&WorldBinderClient.capture().projectMatchesCurrentWorld();}
+    private int exploredCount(){return liveView()?MapExplorer.get().size():0;}
+    private int voxelCount(){return liveView()?MapVoxels.get().size():0;}
+    private boolean hasDimensions(){var root=WorldBinderClient.capture().exportPreview();return root!=null&&!root.dimensions.isEmpty();}
+    private String scopeDimension(){var scope=viewScope();return scope==null?net.worldbinder.capture.WorldIdentity.dimension(minecraft):net.worldbinder.scene.ProjectDimensions.canonical(scope.dimension);}
+    private WorldBinderRegionScreen regionScreen(){return new WorldBinderRegionScreen(this,scopeDimension());}
+    private void cycleDimension(){
+        var root=WorldBinderClient.capture().exportPreview();if(root==null)return;
+        var ids=net.worldbinder.scene.ProjectDimensions.all(root).stream().map(d->net.worldbinder.scene.ProjectDimensions.canonical(d.dimension)).sorted().toList();
+        viewDimension=ids.get((ids.indexOf(scopeDimension())+1)%ids.size());followPlayer=false;cameraInitialized=false;cachedRevision=Long.MIN_VALUE;rebuild();
+    }
     private LongFunction<ChunkSnapshot> lookup = key -> null;
     private int[] cachedBounds;
     private int statDone;
@@ -174,7 +196,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private int mapY() {
-        return TOOLBAR_Y + TOOLBAR_H + 10;
+        return TOOLBAR_Y + TOOLBAR_H + (hasDimensions()?34:10);
     }
 
     private int mapW() {
@@ -215,6 +237,7 @@ public final class WorldBinderMapScreen extends Screen {
         boolean wideLabels = width >= 880;
         boolean labels = width >= 700;
         int x = MARGIN;
+        if(hasDimensions()&&dropdown==Dropdown.NONE)addRenderableWidget(WbButton.create(MARGIN,TOOLBAR_Y+TOOLBAR_H+5,Math.min(310,width-180),20,Lang.text("worldbinder.dimensions.view",scopeDimension()),Lang.text("worldbinder.dimensions.view_help"),b->cycleDimension()));
 
         Button follow = toolbarButton(x, "worldbinder.map.follow", "worldbinder.map.tooltip.follow", WbIcon.FOLLOW, wideLabels, 72, b -> {
             followPlayer = !followPlayer;
@@ -226,7 +249,7 @@ public final class WorldBinderMapScreen extends Screen {
         x += follow.getWidth() + 4;
 
         Button center = toolbarButton(x, "worldbinder.map.player", "worldbinder.map.tooltip.player", WbIcon.TARGET, wideLabels, 72, b -> centerOnPlayer(true));
-        WbTooltips.hint(center, Component.literal("Space"));
+        WbTooltips.hint(center, Lang.text("worldbinder.key.space"));
         addRenderableWidget(center);
         x += center.getWidth() + 4;
 
@@ -288,7 +311,7 @@ public final class WorldBinderMapScreen extends Screen {
         int right = width - MARGIN;
         Button close = WbButton.icon(WbButton.quiet(WbButton.create(right - 68, TOOLBAR_Y, 68, TOOLBAR_H, Lang.text("worldbinder.gui.back"),
                 Lang.text("worldbinder.tooltip.config.back"), b -> onClose())), WbIcon.BACK);
-        WbTooltips.hint(close, Component.literal("Esc"));
+        WbTooltips.hint(close, Lang.text("worldbinder.key.escape"));
         addRenderableWidget(close);
         right -= 72;
         if (width >= 640) {
@@ -355,12 +378,12 @@ public final class WorldBinderMapScreen extends Screen {
         x += size + gap;
         Button flatter = WbButton.iconOnly(WbButton.create(x, y, size, size, Lang.text("worldbinder.map.3d.tilt_down"),
                 Lang.text("worldbinder.map.3d.tilt_down.tooltip"), b -> tilt3d(-10.0D)), WbIcon.TILT);
-        WbTooltips.hint(flatter, Component.literal("PgDn"));
+        WbTooltips.hint(flatter, Lang.text("worldbinder.key.page_down"));
         addRenderableWidget(flatter);
         x += size + gap;
         Button steeper = WbButton.iconOnly(WbButton.create(x, y, size, size, Lang.text("worldbinder.map.3d.tilt_up"),
                 Lang.text("worldbinder.map.3d.tilt_up.tooltip"), b -> tilt3d(10.0D)), WbIcon.CHEVRON_DOWN);
-        WbTooltips.hint(steeper, Component.literal("PgUp"));
+        WbTooltips.hint(steeper, Lang.text("worldbinder.key.page_up"));
         addRenderableWidget(steeper);
         x += size + gap;
         Button height = WbButton.iconOnly(WbButton.create(x, y, size, size, Lang.text("worldbinder.map.3d.height"),
@@ -379,7 +402,7 @@ public final class WorldBinderMapScreen extends Screen {
         return switch (dropdown) {
             case LAYERS -> new int[] {dropdownX, y, 380, 10 + 14 + 8 * DROPDOWN_ROW + 2};
             case FILTERS -> new int[] {dropdownX, y, 380, 10 + 14 + 6 * DROPDOWN_ROW + 2};
-            case EXPORT -> new int[] {dropdownX, y, 230, 10 + 6 * DROPDOWN_ROW + 6};
+            case EXPORT -> new int[] {dropdownX, y, 230, 10 + 8 * DROPDOWN_ROW + 6};
             case NONE -> new int[] {0, 0, 0, 0};
         };
     }
@@ -476,6 +499,8 @@ public final class WorldBinderMapScreen extends Screen {
         int top = TOOLBAR_Y + TOOLBAR_H + 4 + 5;
         int w = 218;
         int left = dropdownX + 6;
+        addRenderableWidget(WbButton.create(left,top+DROPDOWN_ROW*6+6,w,20,Lang.text("worldbinder.area.select_map"),Lang.text("worldbinder.area.drag_hint"),b->{selectingArea=true;dropdown=Dropdown.NONE;WorldBinder.config().map3d=false;rebuild();}));
+        addRenderableWidget(WbButton.create(left,top+DROPDOWN_ROW*7+6,w,20,Lang.text("worldbinder.area.title"),Lang.text("worldbinder.area.real_blocks"),b->net.worldbinder.compat.ClientCompat.setScreen(minecraft,regionScreen())));
         addRenderableWidget(WbButton.icon(WbButton.create(left, top, w, 20, Lang.text("worldbinder.map.export.full"),
                 Lang.text("worldbinder.map.export.full.tooltip"), b -> startExport(MapExporter.Mode.FULL)), WbIcon.MAP));
         addRenderableWidget(WbButton.icon(WbButton.create(left, top + DROPDOWN_ROW, w, 20, Lang.text("worldbinder.map.export.tiles"),
@@ -590,7 +615,7 @@ public final class WorldBinderMapScreen extends Screen {
         Minecraft mc = Minecraft.getInstance();
         if (!cameraInitialized) {
             cameraInitialized = true;
-            if (mc.player != null) {
+            if (liveView()&&mc.player != null) {
                 camX = targetCamX = mc.player.getX();
                 camZ = targetCamZ = mc.player.getZ();
             } else if (cachedBounds != null) {
@@ -598,7 +623,7 @@ public final class WorldBinderMapScreen extends Screen {
                 camZ = targetCamZ = (cachedBounds[1] + cachedBounds[3] + 1) * 8.0;
             }
         }
-        if (followPlayer && mc.player != null) {
+        if (liveView()&&followPlayer && mc.player != null) {
             targetCamX = mc.player.getX();
             targetCamZ = mc.player.getZ();
         } else {
@@ -635,13 +660,13 @@ public final class WorldBinderMapScreen extends Screen {
             minZ = cachedBounds[1] * 16.0;
             maxX = (cachedBounds[2] + 1) * 16.0;
             maxZ = (cachedBounds[3] + 1) * 16.0;
-        } else if (mc.player != null) {
+        } else if (liveView()&&mc.player != null) {
             minX = maxX = mc.player.getX();
             minZ = maxZ = mc.player.getZ();
         } else {
             return;
         }
-        if (mc.player != null) {
+        if (liveView()&&mc.player != null) {
             minX = Math.min(minX, mc.player.getX());
             maxX = Math.max(maxX, mc.player.getX());
             minZ = Math.min(minZ, mc.player.getZ());
@@ -653,6 +678,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void centerOnPlayer(boolean enableFollow) {
+        if(!liveView())return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
@@ -805,13 +831,13 @@ public final class WorldBinderMapScreen extends Screen {
         long dataSignature = cachedRevision * 31L + cachedExplorerRevision * 17L + BlockMapColors.revision() * 7L + MapVoxels.get().revision() * 13L;
         MapRenderer3D.Camera camera = camera3d();
         if (!view.hasFrame()) {
-            view.draw(context, cachedSnapshots, camera, mx, my, mw, mh, renderResolution, dataSignature, config.mapHillshade, true);
+            view.draw(context, cachedSnapshots, camera, mx, my, mw, mh, renderResolution, dataSignature, config.mapHillshade, true,liveView());
             return false;
         }
         context.fillGradient(mx, my, mx + mw, my + mh, 0xFF22303F, 0xFF0B1016);
         context.enableScissor(mx, my, mx + mw, my + mh);
         try {
-            view.draw(context, cachedSnapshots, camera, mx, my, mw, mh, renderResolution, dataSignature, config.mapHillshade, transitioning());
+            view.draw(context, cachedSnapshots, camera, mx, my, mw, mh, renderResolution, dataSignature, config.mapHillshade, transitioning(),liveView());
             hoverValid = false;
             if (insideMap(mouseX, mouseY)) {
                 int[] hit = view.hit(mouseX - mx, mouseY - my, mw, mh);
@@ -830,6 +856,7 @@ public final class WorldBinderMapScreen extends Screen {
             drawEntities3d(context, view, mouseX, mouseY, mx, my, mw, mh);
             drawWaypoints(context, mouseX, mouseY, true);
             drawLocalPlayer3d(context, view, mx, my, mw, mh);
+            drawAreaSelection(context,true);
             MapRenderer3D.Camera shown = view.shownCamera();
             drawCompass3d(context, mx + mw - 30, my + 8, shown == null ? config.map3dYaw : shown.yawDegrees());
             int pillY = my + 8;
@@ -837,9 +864,9 @@ public final class WorldBinderMapScreen extends Screen {
                     config.map3dHeightPercent), WbTheme.ACCENT_RIGHT, WbIcon.CUBE);
             pillY += 18;
             if (config.mapExploreMode) {
-                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.exploring", MapExplorer.get().size()), WbTheme.OK, WbIcon.GLOBE);
+                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.exploring", exploredCount()), WbTheme.OK, WbIcon.GLOBE);
             }
-            if (cachedSnapshots.isEmpty() && MapExplorer.get().size() == 0 && MapVoxels.get().size() == 0) {
+            if (cachedSnapshots.isEmpty() && exploredCount() == 0 && voxelCount() == 0) {
                 drawEmptyState(context, mx, my, mw, mh);
             }
         } finally {
@@ -875,6 +902,34 @@ public final class WorldBinderMapScreen extends Screen {
         }
     }
 
+    private void updateArea(double mouseX,double mouseY){
+        var manager=net.worldbinder.client.WorldBinderClient.selections();var previous=manager.getSelection();
+        int minY=previous.complete()?previous.min().getY():WorldBinder.config().effectiveCaptureMinY();
+        int maxY=previous.complete()?previous.max().getY():WorldBinder.config().effectiveCaptureMaxY();
+        manager.setSelection(new net.worldbinder.selection.Selection(new net.minecraft.core.BlockPos(areaStartX,minY,areaStartZ),new net.minecraft.core.BlockPos((int)Math.floor(blockAtScreenX(mouseX)),maxY,(int)Math.floor(blockAtScreenY(mouseY)))));
+    }
+    private void drawAreaSelection(GuiGraphicsExtractor graphics,boolean threeDimensional){
+        var selection=net.worldbinder.client.WorldBinderClient.selections().getSelection();if(!selection.complete())return;
+        var bounds=net.worldbinder.selection.CaptureBounds.of(selection);int color=0xFF62E7DE;
+        if(threeDimensional){
+            var view=Map3DView.shared();double[][] points=new double[8][];
+            for(int i=0;i<8;i++){double x=(i&1)==0?bounds.minX():(double)bounds.maxX()+1,y=(i&2)==0?bounds.minY():(double)bounds.maxY()+1,z=(i&4)==0?bounds.minZ():(double)bounds.maxZ()+1;points[i]=view.project(x,y,z,mapW(),mapH());}
+            for(int i=0;i<8;i++)for(int axis:new int[]{1,2,4})if((i&axis)==0&&points[i]!=null&&points[i|axis]!=null)drawLine(graphics,mapX()+points[i][0],mapY()+points[i][1],mapX()+points[i|axis][0],mapY()+points[i|axis][1],color);
+        }else{
+            int x0=(int)Math.round(screenXOfBlock(bounds.minX())),z0=(int)Math.round(screenYOfBlock(bounds.minZ()));
+            int x1=(int)Math.round(screenXOfBlock((double)bounds.maxX()+1)),z1=(int)Math.round(screenYOfBlock((double)bounds.maxZ()+1));
+            graphics.fill(x0,z0,x1,z1,0x224ED8CA);graphics.fill(x0,z0,x1,z0+2,color);graphics.fill(x0,z1-2,x1,z1,color);graphics.fill(x0,z0,x0+2,z1,color);graphics.fill(x1-2,z0,x1,z1,color);
+        }
+        var capture=net.worldbinder.client.WorldBinderClient.capture();long revision=capture.mapDataRevision();
+        if((!bounds.equals(areaCoverageBounds)||revision!=areaCoverageRevision)&&(areaCoverageFuture==null||areaCoverageFuture.isDone())){
+            areaCoverageBounds=bounds;areaCoverageRevision=revision;var source=capture.exportPreview();
+            if(source==null){areaKnown=0;areaCoverageFuture=null;}else{var frozen=new net.worldbinder.scene.WorldScene();frozen.chunkSnapshots=new java.util.LinkedHashMap<>(source.chunkSnapshots);areaCoverageFuture=java.util.concurrent.CompletableFuture.supplyAsync(()->net.worldbinder.selection.RecordedCoverage.knownVolume(frozen,bounds));}
+        }
+        if(areaCoverageFuture!=null&&areaCoverageFuture.isDone()){if(!areaCoverageFuture.isCompletedExceptionally())areaKnown=areaCoverageFuture.join();areaCoverageFuture=null;}
+        String label=Lang.string("worldbinder.area.size",bounds.width(),bounds.height(),bounds.length(),bounds.volume())+" · "+(areaKnown<0?Lang.string("worldbinder.filters.counting"):Lang.string("worldbinder.area.coverage",areaKnown,bounds.volume()));
+        WbText.drawClipped(graphics,font,Component.literal(label),mapX()+8,mapY()+mapH()-34,mapW()-16,color);
+    }
+
     private double heightAtBlock(int x, int z) {
         ChunkSnapshot snapshot = lookup.apply(ChunkPos.pack(Math.floorDiv(x, 16), Math.floorDiv(z, 16)));
         if (snapshot != null && snapshot.heights != null && snapshot.heights.length == 256) {
@@ -887,6 +942,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void drawEntities3d(GuiGraphicsExtractor context, Map3DView view, int mouseX, int mouseY, int mx, int my, int mw, int mh) {
+        if(!liveView())return;
         Minecraft mc = Minecraft.getInstance();
         hoveredEntity = null;
         nearbyEntities.clear();
@@ -920,7 +976,8 @@ public final class WorldBinderMapScreen extends Screen {
                 context.fill(fx - 2, fy, fx + 3, fy + 1, 0x60000000);
             }
             if (entity instanceof Player other) {
-                MapMarkers.drawPlayerArrow(context, bx, by, other.getViewYRot(partial) - viewYaw, 0.7F,
+                MapMarkers.drawPlayerArrow(context, bx, by, net.worldbinder.render.MarkerAngles.projected(
+                                net.worldbinder.render.MarkerAngles.look(other, partial), viewYaw, shown == null ? 90 : shown.pitchDegrees()), 0.7F,
                         hidden ? WbTheme.withAlpha(MapMarkers.Kind.PLAYER.color, 0x90) : MapMarkers.Kind.PLAYER.color, false);
                 String name = other.getName().getString();
                 int w = font.width(name) + 8;
@@ -946,6 +1003,7 @@ public final class WorldBinderMapScreen extends Screen {
      * (squashed by the view tilt). When terrain covers the player, a dimmed outline and a short beacon show where.
      */
     private void drawLocalPlayer3d(GuiGraphicsExtractor context, Map3DView view, int mx, int my, int mw, int mh) {
+        if(!liveView())return;
         Minecraft mc = Minecraft.getInstance();
         MapRenderer3D.Camera shown = view.shownCamera();
         if (mc.player == null || shown == null) return;
@@ -959,7 +1017,7 @@ public final class WorldBinderMapScreen extends Screen {
         float fy = (float) (my + foot[1]);
         boolean hidden = view.depthAt(foot[0], foot[1] - 1, mw, mh) < foot[2] - 0.6D;
         float tilt = (float) Math.max(0.35D, Math.sin(Math.toRadians(shown.pitchDegrees())));
-        float yaw = mc.player.getViewYRot(partial) - (float) shown.yawDegrees();
+        float yaw = net.worldbinder.render.MarkerAngles.normalize(net.worldbinder.render.MarkerAngles.look(mc.player,partial) - (float) shown.yawDegrees());
         if (hidden) {
             int color = WbTheme.withAlpha(WbTheme.ACCENT, 0xA0);
             context.fill(Math.round(fx), Math.round(fy) - 14, Math.round(fx) + 1, Math.round(fy), color);
@@ -1070,7 +1128,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (exporting) {
             return;
         }
-        if (cachedSnapshots.isEmpty() && MapExplorer.get().size() == 0) {
+        if (cachedSnapshots.isEmpty() && exploredCount() == 0) {
             footer(Component.translatable("worldbinder.map.export.empty"), WbTheme.WARN);
             WbSounds.warning();
             return;
@@ -1079,7 +1137,7 @@ public final class WorldBinderMapScreen extends Screen {
         dropdown = Dropdown.NONE;
         rebuild();
         MapRenderer3D.Camera camera = camera3d();
-        MapExporter3D.export(cachedSnapshots, mode, camera, mapW(), mapH(), WorldBinder.config().mapHillshade).whenComplete((result, error) ->
+        MapExporter3D.export(cachedSnapshots, mode, camera, mapW(), mapH(), WorldBinder.config().mapHillshade,liveView()).whenComplete((result, error) ->
                 Minecraft.getInstance().execute(() -> {
                     exporting = false;
                     if (error == null) {
@@ -1111,6 +1169,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void drawWaypoints(GuiGraphicsExtractor context, int mouseX, int mouseY, boolean view3d) {
+        if(!liveView())return;
         hoveredWaypoint = null;
         if (!WorldBinder.config().mapShowWaypoints) {
             return;
@@ -1165,7 +1224,7 @@ public final class WorldBinderMapScreen extends Screen {
         List<String> details = new ArrayList<>();
         details.add(Lang.string("worldbinder.map.tooltip.block_line", point.x, point.y, point.z));
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) {
+        if (liveView()&&mc.player != null) {
             double distance = Math.sqrt(mc.player.distanceToSqr(point.x + 0.5D, point.y, point.z + 0.5D));
             details.add(Lang.string("worldbinder.map.entity.distance", Math.round(distance)));
         }
@@ -1181,7 +1240,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (hoverValid) {
             x = hoverBlockX;
             z = hoverBlockZ;
-        } else if (mc.player != null) {
+        } else if (liveView()&&mc.player != null) {
             x = mc.player.getBlockX();
             z = mc.player.getBlockZ();
         } else {
@@ -1201,6 +1260,7 @@ public final class WorldBinderMapScreen extends Screen {
 
     /** Right click on the map: removes a hovered waypoint, Shift places one, otherwise queues a chunk rescan. */
     private void rightClickMap(double vx, double vy, boolean shift) {
+        if(!liveView()){footer(Lang.text("worldbinder.dimensions.read_only"),WbTheme.INFO);return;}
         if (hoveredWaypoint != null) {
             String label = MapWaypoints.label(hoveredWaypoint);
             MapWaypoints.remove(hoveredWaypoint);
@@ -1236,9 +1296,12 @@ public final class WorldBinderMapScreen extends Screen {
     // ------------------------------------------------------------------ data
 
     private void refreshData(SceneCaptureService capture) {
+        var scope=viewScope();var root=capture.exportPreview();
+        String scopeKey=(root==null?"":root.projectId)+"/"+scopeDimension()+"/"+liveView();
+        if(!scopeKey.equals(lastScope)){lastScope=scopeKey;cachedRevision=Long.MIN_VALUE;cachedExplorerRevision=Long.MIN_VALUE;dimensionTextures.clear();Map3DView.shared().reset();cameraInitialized=false;}
         long now = System.currentTimeMillis();
         long revision = capture.mapDataRevision();
-        long explorerRevision = MapExplorer.get().revision();
+        long explorerRevision = liveView()?MapExplorer.get().revision():0;
         if (revision == cachedRevision && explorerRevision == cachedExplorerRevision && now < nextDataRefreshMillis) {
             return;
         }
@@ -1251,14 +1314,18 @@ public final class WorldBinderMapScreen extends Screen {
         cachedQueued = capture.queuedChunksView();
         cachedFailed = capture.failedChunksView();
         cachedSnapshots = capture.chunkSnapshotsView();
-        lookup = MapData.lookup(cachedSnapshots);
+        if(scope!=null&&scope!=root){
+            var snapshots=new java.util.LinkedHashMap<Long,ChunkSnapshot>();scope.chunkSnapshots.values().forEach(d->snapshots.put(ChunkPos.pack(d.chunkX,d.chunkZ),d));
+            cachedSnapshots=snapshots;cachedDone=snapshots.entrySet().stream().filter(e->e.getValue().isDone()).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toSet());cachedQueued=java.util.Set.of();cachedPartial=java.util.Set.of();cachedFailed=snapshots.entrySet().stream().filter(e->e.getValue().effectiveStatus()==ChunkCaptureStatus.FAILED).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toSet());
+        }
+        lookup = liveView()?MapData.lookup(cachedSnapshots):cachedSnapshots::get;
         statDone = cachedDone.size();
         statPartial = cachedPartial.size();
         statQueued = cachedQueued.size();
         statFailed = cachedFailed.size();
         statKnown = Math.max(cachedSnapshots.size(), statDone + statPartial);
         if (dataChanged) {
-            cachedBounds = MapData.bounds(cachedSnapshots);
+            cachedBounds = MapData.bounds(cachedSnapshots,liveView());
             int withEntities = 0;
             int withBlockEntities = 0;
             for (ChunkSnapshot snapshot : cachedSnapshots.values()) {
@@ -1283,7 +1350,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private boolean explored(long key) {
-        return !cachedSnapshots.containsKey(key) && MapExplorer.get().snapshot(key) != null;
+        return liveView()&&!cachedSnapshots.containsKey(key) && MapExplorer.get().snapshot(key) != null;
     }
 
     private boolean passesFilter(long key, ChunkCaptureStatus status) {
@@ -1331,7 +1398,7 @@ public final class WorldBinderMapScreen extends Screen {
         return switch (filter) {
             case ENTITIES -> Integer.toString(statWithEntities);
             case BLOCK_ENTITIES -> Integer.toString(statWithBlockEntities);
-            case EXPLORED_ONLY -> MapExplorer.get().size() > 0 ? Integer.toString(MapExplorer.get().size()) : null;
+            case EXPLORED_ONLY -> exploredCount() > 0 ? Integer.toString(exploredCount()) : null;
             default -> null;
         };
     }
@@ -1481,6 +1548,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void drawMap(GuiGraphicsExtractor context, SceneCaptureService capture, int mouseX, int mouseY) {
+        if(liveView())MapData.demand();
         WorldBinderConfig config = WorldBinder.config();
         int mx = mapX();
         int my = mapY();
@@ -1504,7 +1572,7 @@ public final class WorldBinderMapScreen extends Screen {
         int minRegionZ = Math.floorDiv(minChunkZ, MapRegionTextures.REGION_CHUNKS);
         int maxRegionZ = Math.floorDiv(maxChunkZ, MapRegionTextures.REGION_CHUNKS);
 
-        MapRegionTextures textures = MapRegionTextures.shared();
+        MapRegionTextures textures = dimensionTextures;
         boolean terrain = effectiveMode() != WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
         long syncSignature = cachedRevision * 31L + cachedExplorerRevision * 17L + minChunkX * 7919L + minChunkZ * 104729L
                 + maxChunkX * 31L + maxChunkZ + (config.mapHillshade ? 1 : 0);
@@ -1549,6 +1617,7 @@ public final class WorldBinderMapScreen extends Screen {
             drawEntities(context, mouseX, mouseY);
             drawWaypoints(context, mouseX, mouseY, false);
             drawLocalPlayer(context);
+            drawAreaSelection(context,false);
             drawCompass(context, mx + mw - 26, my + 8);
             drawScaleBar(context, mx + 10, my + mh - 20);
             int pending = textures.pendingChunks();
@@ -1563,10 +1632,10 @@ public final class WorldBinderMapScreen extends Screen {
             }
             if (config.mapExploreMode) {
                 float pulse = WbMotion.pulse(2000L);
-                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.exploring", MapExplorer.get().size()),
+                WbChrome.drawPill(context, font, mx + 8, pillY, Lang.string("worldbinder.map.exploring", exploredCount()),
                         WbMotion.mix(WbTheme.OK, 0xFFFFFFFF, pulse * 0.2F), WbIcon.GLOBE);
             }
-            if (cachedSnapshots.isEmpty() && cachedDone.isEmpty() && cachedQueued.isEmpty() && MapExplorer.get().size() == 0) {
+            if (cachedSnapshots.isEmpty() && cachedDone.isEmpty() && cachedQueued.isEmpty() && exploredCount() == 0) {
                 drawEmptyState(context, mx, my, mw, mh);
             }
         } finally {
@@ -1661,6 +1730,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void drawEntities(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        if(!liveView())return;
         Minecraft mc = Minecraft.getInstance();
         hoveredEntity = null;
         nearbyEntities.clear();
@@ -1688,7 +1758,7 @@ public final class WorldBinderMapScreen extends Screen {
                 continue;
             }
             if (entity instanceof Player other) {
-                MapMarkers.drawPlayerArrow(context, sx, sy, other.getViewYRot(partial), 0.7F, MapMarkers.Kind.PLAYER.color, false);
+                MapMarkers.drawPlayerArrow(context, sx, sy, net.worldbinder.render.MarkerAngles.look(other,partial), 0.7F, MapMarkers.Kind.PLAYER.color, false);
                 if (zoom >= 1.0D) {
                     String name = other.getName().getString();
                     int w = font.width(name) + 8;
@@ -1714,6 +1784,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void drawLocalPlayer(GuiGraphicsExtractor context) {
+        if(!liveView())return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return;
@@ -1723,7 +1794,7 @@ public final class WorldBinderMapScreen extends Screen {
         double pz = mc.player.zo + (mc.player.getZ() - mc.player.zo) * partial;
         float sx = (float) screenXOfBlock(px);
         float sy = (float) screenYOfBlock(pz);
-        MapMarkers.drawPlayerArrow(context, sx, sy, mc.player.getViewYRot(partial), 1.0F, WbTheme.ACCENT, true);
+        MapMarkers.drawPlayerArrow(context, sx, sy, net.worldbinder.render.MarkerAngles.look(mc.player,partial), 1.0F, WbTheme.ACCENT, true);
     }
 
     private void drawCompass(GuiGraphicsExtractor context, int x, int y) {
@@ -1783,7 +1854,7 @@ public final class WorldBinderMapScreen extends Screen {
         double areaKm2 = statDone * 256.0D / 1_000_000.0D;
         WbText.drawClipped(context, font, Lang.string("worldbinder.map.area", String.format(Locale.ROOT, "%.2f", areaKm2), statKnown),
                 x + 10, y + cardH - 26, w - 20, WbTheme.TEXT_DIM);
-        String explored = Lang.string("worldbinder.map.explored_count", MapExplorer.get().size());
+        String explored = Lang.string("worldbinder.map.explored_count", exploredCount());
         WbIcon.GLOBE.draw(context, x + 10, y + cardH - 13, 1, WorldBinder.config().mapExploreMode ? WbTheme.OK : WbTheme.TEXT_DIM);
         WbText.drawClipped(context, font, explored, x + 21, y + cardH - 13, w - 31, WbTheme.TEXT_DIM);
 
@@ -1890,7 +1961,9 @@ public final class WorldBinderMapScreen extends Screen {
     private void drawFooter(GuiGraphicsExtractor context) {
         int y = height - 22;
         int x = MARGIN;
-        if (exporting) {
+        if(selectingArea){
+            WbText.drawClipped(context,font,Lang.text("worldbinder.area.drag_hint"),x,y,width-24,WbTheme.ACCENT);
+        }else if (exporting) {
             WbChrome.drawPill(context, font, x, y - 2, Lang.string("worldbinder.map.exporting"), WbTheme.ACCENT_RIGHT, WbIcon.DOWNLOAD);
         } else if (footerMessage != null && System.currentTimeMillis() - footerMessageMillis < 3200L) {
             WbChrome.drawPill(context, font, x, y - 2, WbText.ellipsize(font, footerMessage.getString(), width - 360), footerAccent, WbIcon.CHECK);
@@ -1950,7 +2023,7 @@ public final class WorldBinderMapScreen extends Screen {
         details.add(Lang.string("worldbinder.map.entity.kind", Lang.string("worldbinder.map.entity.kind." + kind.name().toLowerCase(Locale.ROOT)),
                 entity.getType().getDescription().getString()));
         details.add(Lang.string("worldbinder.map.tooltip.block_line", (int) Math.floor(entity.getX()), (int) Math.floor(entity.getY()), (int) Math.floor(entity.getZ())));
-        if (mc.player != null) {
+        if (liveView()&&mc.player != null) {
             details.add(Lang.string("worldbinder.map.entity.distance", Math.round(mc.player.distanceTo(entity))));
         }
         return details;
@@ -2059,7 +2132,7 @@ public final class WorldBinderMapScreen extends Screen {
             }
             if (insideMap(vx, vy)) {
                 long key = chunkUnderCursor(vx, vy);
-                if (virtualEvent.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+                if (virtualEvent.button() == net.worldbinder.compat.ClientCompat.mouseRight()) {
                     if (WorldBinder.config().map3d) {
                         // right drag rotates and tilts; a plain right click acts on release
                         rotating = true;
@@ -2070,11 +2143,12 @@ public final class WorldBinderMapScreen extends Screen {
                     rightClickMap(vx, vy, virtualEvent.hasShiftDown());
                     return true;
                 }
-                if (virtualEvent.button() == InputConstants.MOUSE_BUTTON_MIDDLE) {
+                if (virtualEvent.button() == net.worldbinder.compat.ClientCompat.mouseMiddle()) {
                     addWaypointAtHover();
                     return true;
                 }
-                if (virtualEvent.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+                if (virtualEvent.button() == net.worldbinder.compat.ClientCompat.mouseLeft()) {
+                    if(selectingArea){areaDragging=true;areaStartX=(int)Math.floor(blockAtScreenX(vx));areaStartZ=(int)Math.floor(blockAtScreenY(vy));updateArea(vx,vy);return true;}
                     dragging = true;
                     dragDistance = 0;
                     if (doubleClick && key != Long.MIN_VALUE) {
@@ -2092,6 +2166,7 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
+        if(areaDragging){var point=WbLayout.virtualMouseEvent(event,width,height);int realWidth=width,realHeight=height;var scale=WbLayout.uiScale(width,height);width=scale.virtualWidth();height=scale.virtualHeight();try{updateArea(point.x(),point.y());}finally{width=realWidth;height=realHeight;}return true;}
         WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
         if (rotating) {
             double dx = uiScale.toVirtualDelta(offsetX);
@@ -2131,6 +2206,11 @@ public final class WorldBinderMapScreen extends Screen {
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         MouseButtonEvent virtualEvent = WbLayout.virtualMouseEvent(event, width, height);
+        if(areaDragging){
+            int realWidth=width,realHeight=height;var scale=WbLayout.uiScale(width,height);width=scale.virtualWidth();height=scale.virtualHeight();
+            try{updateArea(virtualEvent.x(),virtualEvent.y());}finally{width=realWidth;height=realHeight;}
+            areaDragging=false;selectingArea=false;net.worldbinder.compat.ClientCompat.setScreen(minecraft,regionScreen());return true;
+        }
         if (rotating) {
             rotating = false;
             WorldBinder.config().save();
@@ -2177,7 +2257,7 @@ public final class WorldBinderMapScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (goField != null && getFocused() == goField) {
-            if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
+            if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_RETURN") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_NUMPADENTER")) {
                 jumpToField();
                 return true;
             }
@@ -2189,34 +2269,34 @@ public final class WorldBinderMapScreen extends Screen {
         }
         int key = event.key();
         double step = 48.0D / zoom;
-        if (key == InputConstants.KEY_W || key == InputConstants.KEY_UP) { pan(0, -step); return true; }
-        if (key == InputConstants.KEY_S || key == InputConstants.KEY_DOWN) { pan(0, step); return true; }
-        if (key == InputConstants.KEY_A || key == InputConstants.KEY_LEFT) { pan(-step, 0); return true; }
-        if (key == InputConstants.KEY_D || key == InputConstants.KEY_RIGHT) { pan(step, 0); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_W") || key == net.worldbinder.compat.ClientCompat.key("KEY_UP")) { pan(0, -step); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_S") || key == net.worldbinder.compat.ClientCompat.key("KEY_DOWN")) { pan(0, step); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_A") || key == net.worldbinder.compat.ClientCompat.key("KEY_LEFT")) { pan(-step, 0); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_D") || key == net.worldbinder.compat.ClientCompat.key("KEY_RIGHT")) { pan(step, 0); return true; }
         WbLayout.UiScale uiScale = WbLayout.uiScale(width, height);
         double cx = MARGIN + (uiScale.virtualWidth() - MARGIN * 2) / 2.0;
         double cy = uiScale.virtualHeight() / 2.0;
-        if (key == InputConstants.KEY_EQUALS || key == InputConstants.KEY_ADD) { zoomBy(1, cx, cy); return true; }
-        if (key == InputConstants.KEY_MINUS || key == 333 /* GLFW_KEY_KP_SUBTRACT */) { zoomBy(-1, cx, cy); return true; }
-        if (key == InputConstants.KEY_SPACE) { centerOnPlayer(true); return true; }
-        if (key == InputConstants.KEY_F) { followPlayer = !followPlayer; rebuild(); return true; }
-        if (key == InputConstants.KEY_G) { WorldBinder.config().mapShowGrid = !WorldBinder.config().mapShowGrid; WbSounds.toggle(WorldBinder.config().mapShowGrid); return true; }
-        if (key == InputConstants.KEY_H) { WorldBinder.config().mapShowSidebar = !WorldBinder.config().mapShowSidebar; rebuild(); return true; }
-        if (key == InputConstants.KEY_V) { toggle3d(); return true; }
-        if (key == InputConstants.KEY_P) { addWaypointAtHover(); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_EQUALS") || key == net.worldbinder.compat.ClientCompat.key("KEY_ADD")) { zoomBy(1, cx, cy); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_MINUS") || key == net.worldbinder.compat.ClientCompat.key("KEY_ADD") - 1 /* adjacent keypad subtract in supported GLFW/SDL key tables */) { zoomBy(-1, cx, cy); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_SPACE")) { centerOnPlayer(true); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_F")) { followPlayer = !followPlayer; rebuild(); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_G")) { WorldBinder.config().mapShowGrid = !WorldBinder.config().mapShowGrid; WbSounds.toggle(WorldBinder.config().mapShowGrid); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_H")) { WorldBinder.config().mapShowSidebar = !WorldBinder.config().mapShowSidebar; rebuild(); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_V")) { toggle3d(); return true; }
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_P")) { addWaypointAtHover(); return true; }
         if (WorldBinder.config().map3d) {
-            if (key == InputConstants.KEY_COMMA) { rotate3d(-15.0D); return true; }
-            if (key == InputConstants.KEY_PERIOD) { rotate3d(15.0D); return true; }
-            if (key == InputConstants.KEY_PAGEUP) { tilt3d(5.0D); return true; }
-            if (key == InputConstants.KEY_PAGEDOWN) { tilt3d(-5.0D); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_COMMA")) { rotate3d(-15.0D); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_PERIOD")) { rotate3d(15.0D); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_PAGEUP")) { tilt3d(5.0D); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_PAGEDOWN")) { tilt3d(-5.0D); return true; }
         }
-        if (key == InputConstants.KEY_E) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_E")) {
             WorldBinder.config().mapExploreMode = !WorldBinder.config().mapExploreMode;
             WbSounds.toggle(WorldBinder.config().mapExploreMode);
             rebuild();
             return true;
         }
-        if (key == InputConstants.KEY_TAB) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_TAB")) {
             WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);
@@ -2239,10 +2319,12 @@ public final class WorldBinderMapScreen extends Screen {
 
     @Override
     public void onClose() {
+        dimensionTextures.clear();
         WorldBinder.config().mapZoom = targetZoom;
         WorldBinder.config().save();
         net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
     }
+    @Override public void removed(){dimensionTextures.clear();lastSyncSignature=Long.MIN_VALUE;super.removed();}
 
     // ------------------------------------------------------------------ actions
 
@@ -2256,7 +2338,7 @@ public final class WorldBinderMapScreen extends Screen {
         if (exporting) {
             return;
         }
-        if (cachedSnapshots.isEmpty() && MapExplorer.get().size() == 0) {
+        if (cachedSnapshots.isEmpty() && exploredCount() == 0) {
             footer(Component.translatable("worldbinder.map.export.empty"), WbTheme.WARN);
             WbSounds.warning();
             return;
@@ -2265,7 +2347,7 @@ public final class WorldBinderMapScreen extends Screen {
         dropdown = Dropdown.NONE;
         rebuild();
         java.util.function.LongToIntFunction status = exportWithStatus ? key -> statusTint(statusOf(key), false) : null;
-        MapExporter.export(cachedSnapshots, mode, WorldBinder.config().mapHillshade, status).whenComplete((result, error) ->
+        MapExporter.export(cachedSnapshots, mode, WorldBinder.config().mapHillshade, status,liveView()).whenComplete((result, error) ->
                 Minecraft.getInstance().execute(() -> {
                     exporting = false;
                     if (error == null) {
@@ -2326,6 +2408,7 @@ public final class WorldBinderMapScreen extends Screen {
     }
 
     private void queueSelectedRescan() {
+        if(!liveView()){footer(Lang.text("worldbinder.dimensions.read_only"),WbTheme.INFO);return;}
         if (selectedChunk != Long.MIN_VALUE) {
             WorldBinderClient.capture().queueChunkForRescan(chunkX(selectedChunk), chunkZ(selectedChunk));
             footer(Component.translatable("worldbinder.map.rescan_queued", chunkX(selectedChunk), chunkZ(selectedChunk)), WbTheme.OK);
@@ -2341,7 +2424,7 @@ public final class WorldBinderMapScreen extends Screen {
         String height = heightAt(lookup.apply(selectedChunk), x, z);
         if (!height.equals("?")) {
             y = Integer.parseInt(height) + 1;
-        } else if (mc.player != null) {
+        } else if (liveView()&&mc.player != null) {
             y = mc.player.blockPosition().getY();
         }
         String coordinate = x + " " + y + " " + z;

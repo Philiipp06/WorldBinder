@@ -3,7 +3,7 @@
   "id": "worldbinder",
   "version": "${version}",
   "name": "WorldBinder",
-  "description": "WorldBinder 1.6.3 is a client-side Fabric tool for permitted world capture, a texture-based live map, 24 movement tools, a themeable animated interface, archive recovery, validation and target-version world export.",
+  "description": "${description}",
   "authors": [
     "Philiipp06"
   ],
@@ -17,7 +17,7 @@
   "environment": "client",
   "entrypoints": {
     "client": [
-      "net.worldbinder.client.WorldBinderClient"
+      "net.worldbinder.platform.FabricEntrypoint"
     ],
     "modmenu": [
       "net.worldbinder.integration.WorldBinderModMenu"
@@ -34,14 +34,5 @@
   },
   "mixins": [
     "worldbinder.mixins.json"
-  ],
-  "custom": {
-    "modmenu": {
-      "links": {
-        "Website": "https://discord.com/invite/V7h3vaXxDZ",
-        "Source": "https://github.com/Philiipp06/WorldBinder",
-        "Issues": "https://github.com/Philiipp06/WorldBinder/issues"
-      }
-    }
-  }
+  ]
 }

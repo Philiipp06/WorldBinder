@@ -115,24 +115,19 @@ public final class MapVoxels {
         int playerChunkX = client.player.blockPosition().getX() >> 4;
         int playerChunkZ = client.player.blockPosition().getZ() >> 4;
         int radius = Math.max(2, Math.min(32, client.options.getEffectiveRenderDistance()));
-        int side = radius * 2 + 1;
-        int total = side * side;
+        var received = net.worldbinder.compat.ReceivedChunks.loaded(client.level);
+        int total = received.size();if (total == 0) return;
         int samples = 0;
         for (int i = 0; i < CHECKS_PER_TICK && samples < SAMPLES_PER_TICK; i++) {
             int index = ringCursor++ % total;
-            int[] offset = spiral(index);
-            if (Math.abs(offset[0]) > radius || Math.abs(offset[1]) > radius) {
-                continue;
-            }
-            int cx = playerChunkX + offset[0];
-            int cz = playerChunkZ + offset[1];
+            LevelChunk chunk = received.get(index);
+            int cx = chunk.getPos().getMinBlockX() >> 4, cz = chunk.getPos().getMinBlockZ() >> 4;
             long key = ChunkPos.pack(cx, cz);
             Long last = sampledAt.get(key);
-            boolean nearby = Math.abs(offset[0]) <= 2 && Math.abs(offset[1]) <= 2;
+            boolean nearby = Math.abs(cx-playerChunkX) <= 2 && Math.abs(cz-playerChunkZ) <= 2;
             if (last != null && !(nearby && now - last > NEARBY_REFRESH_MILLIS)) {
                 continue;
             }
-            LevelChunk chunk = client.level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
             if (chunk == null) {
                 continue;
             }
@@ -148,6 +143,8 @@ public final class MapVoxels {
             trim(playerChunkX, playerChunkZ, radius * 3);
         }
     }
+
+    public void invalidate(int x, int z) { sampledAt.remove(ChunkPos.pack(x,z)); }
 
     static Columns sample(ClientLevel level, LevelChunk chunk, int cx, int cz, int playerY) {
         boolean ceiling = level.dimensionType().hasCeiling();

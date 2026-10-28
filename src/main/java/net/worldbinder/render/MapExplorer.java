@@ -32,6 +32,7 @@ public final class MapExplorer {
     private ClientLevel level;
     private long revision;
     private int ringCursor;
+    private long demandUntil;
     private int minChunkX = Integer.MAX_VALUE;
     private int minChunkZ = Integer.MAX_VALUE;
     private int maxChunkX = Integer.MIN_VALUE;
@@ -79,36 +80,33 @@ public final class MapExplorer {
     }
 
     public void tick(Minecraft client) {
-        if (!WorldBinder.config().mapExploreMode || client.level == null || client.player == null) {
+        if (client.level == null || client.player == null) {
             return;
         }
         if (client.level != level) {
             level = client.level;
             clear();
         }
+        boolean capturing = net.worldbinder.client.WorldBinderClient.capture() != null && net.worldbinder.client.WorldBinderClient.capture().isCapturing();
+        if (!WorldBinder.config().mapExploreMode && !capturing && System.currentTimeMillis() > demandUntil) return;
         int playerChunkX = client.player.blockPosition().getX() >> 4;
         int playerChunkZ = client.player.blockPosition().getZ() >> 4;
         int radius = Math.max(2, Math.min(32, client.options.getEffectiveRenderDistance()));
-        int side = radius * 2 + 1;
-        int total = side * side;
+        var received = net.worldbinder.compat.ReceivedChunks.loaded(client.level);
+        int total = received.size();if (total == 0) return;
         long now = System.currentTimeMillis();
         int samples = 0;
         for (int i = 0; i < CHECKS_PER_TICK && samples < SAMPLES_PER_TICK; i++) {
             int index = ringCursor++ % total;
-            int dx = spiralX(index);
-            int dz = spiralZ(index);
-            if (Math.abs(dx) > radius || Math.abs(dz) > radius) {
-                continue;
-            }
-            int cx = playerChunkX + dx;
-            int cz = playerChunkZ + dz;
+            LevelChunk chunk = received.get(index);
+            int cx = chunk.getPos().getMinBlockX() >> 4, cz = chunk.getPos().getMinBlockZ() >> 4;
+            int dx = cx - playerChunkX, dz = cz - playerChunkZ;
             long key = ChunkPos.pack(cx, cz);
             Long last = sampledAt.get(key);
             boolean nearby = Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
             if (last != null && !(nearby && now - last > NEARBY_REFRESH_MILLIS)) {
                 continue;
             }
-            LevelChunk chunk = client.level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
             if (chunk == null) {
                 continue;
             }
@@ -123,6 +121,9 @@ public final class MapExplorer {
             trim(playerChunkX, playerChunkZ, radius * 3);
         }
     }
+
+    public void demand() { demandUntil = System.currentTimeMillis() + 2_000; }
+    public void invalidate(int x, int z) { sampledAt.remove(ChunkPos.pack(x,z)); }
 
     private void sample(ClientLevel level, LevelChunk chunk, int cx, int cz, int playerY) {
         ChunkSnapshot snapshot = new ChunkSnapshot(cx, cz);

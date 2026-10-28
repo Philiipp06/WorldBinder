@@ -1,0 +1,13 @@
+{
+  "id": 44,
+  "version": "4.3.0",
+  "channel": "STABLE",
+  "source": "https://fill.papermc.io/v3/projects/velocity/versions/4.3.0/builds/44",
+  "downloads": {
+    "server:default": {
+      "name": "velocity-4.3.0-44.jar",
+      "checksums": { "sha256": "85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f" },
+      "url": "https://fill-data.papermc.io/v1/objects/85be73b90f295acd8d5d45a00ad10bac791d4b72b7554172612a89565ebaaa8f/velocity-4.3.0-44.jar"
+    }
+  }
+}

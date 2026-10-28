@@ -1,6 +1,7 @@
 pluginManagement {
     repositories {
         maven("https://maven.fabricmc.net/")
+        maven("https://maven.neoforged.net/releases")
         gradlePluginPortal()
         mavenCentral()
     }
@@ -15,3 +16,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WorldBinder"
+
+include("neoforge")

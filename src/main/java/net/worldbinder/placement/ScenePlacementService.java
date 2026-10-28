@@ -43,7 +43,7 @@ public final class ScenePlacementService {
             WorldScene scene = library.read(path);
             BlockPos target = client.player.blockPosition();
             queuePlacement(scene, target);
-            OperationStatus.begin("WorldBinder", net.worldbinder.util.Lang.string("worldbinder.status.placing", scene.name));
+            OperationStatus.begin("WorldBinder", net.worldbinder.util.Lang.stored("worldbinder.status.placing", scene.name));
             Chat.infoKey("worldbinder.chat.placement_queued", scene.name, target.getX() + " " + target.getY() + " " + target.getZ());
         } catch (IOException exception) {
             WorldBinder.LOGGER.error("Failed to read archive", exception);
@@ -68,9 +68,9 @@ public final class ScenePlacementService {
         }
         if (queuedTotal > 0) {
             int done = queuedTotal - commandQueue.size();
-            OperationStatus.update(net.worldbinder.util.Lang.string("worldbinder.status.placed_commands", done, queuedTotal), done / (double) queuedTotal);
+            OperationStatus.update(net.worldbinder.util.Lang.stored("worldbinder.status.placed_commands", done, queuedTotal), done / (double) queuedTotal);
             if (commandQueue.isEmpty()) {
-                OperationStatus.finish(net.worldbinder.util.Lang.string("worldbinder.status.placement_complete"));
+                OperationStatus.finish(net.worldbinder.util.Lang.stored("worldbinder.status.placement_complete"));
                 queuedTotal = 0;
             }
         }

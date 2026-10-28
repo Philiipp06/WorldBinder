@@ -33,7 +33,7 @@ public final class ServerResourcePackLocator {
         return findLatestLikelyPack();
     }
 
-    private static Optional<Path> findActiveServerPack() {
+    public static Optional<Path> findActiveServerPack() {
         Set<String> selectedIds = selectedPackIds();
         for (String id : selectedIds) {
             Optional<Path> byServerId = findByServerPackId(id);

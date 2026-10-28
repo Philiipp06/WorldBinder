@@ -13,7 +13,7 @@ public final class StorageProfiler {
     private static volatile long lastJobDuration;
     private static volatile int completedJobs;
     private static volatile int failedJobs;
-    private static volatile String lastDetail = "Idle";
+    private static volatile String lastDetail = net.worldbinder.util.Lang.stored("worldbinder.storage.stage.idle");
 
     private StorageProfiler() {}
 
@@ -22,7 +22,7 @@ public final class StorageProfiler {
         currentStage = StorageStage.SNAPSHOT;
         stageStartedAt = System.currentTimeMillis();
         jobStartedAt = stageStartedAt;
-        lastDetail = "Preparing export";
+        lastDetail = net.worldbinder.util.Lang.stored("worldbinder.storage.detail.preparing_export");
     }
 
     public static synchronized void stage(StorageStage stage, String detail) {
@@ -30,7 +30,7 @@ public final class StorageProfiler {
         STAGE_TIME.merge(currentStage, Math.max(0L, now - stageStartedAt), Long::sum);
         currentStage = stage == null ? StorageStage.IDLE : stage;
         stageStartedAt = now;
-        lastDetail = detail == null ? currentStage.label() : detail;
+        lastDetail = detail == null ? net.worldbinder.util.Lang.stored("worldbinder.storage.stage." + currentStage.name().toLowerCase(java.util.Locale.ROOT)) : detail;
     }
 
     public static synchronized void finish(boolean failed) {
@@ -46,14 +46,15 @@ public final class StorageProfiler {
         synchronized (StorageProfiler.class) {
             Map<StorageStage, Long> copy = new EnumMap<>(STAGE_TIME);
             long live = Math.max(0L, System.currentTimeMillis() - stageStartedAt);
-            copy.merge(currentStage, live, Long::sum);
+            if(currentStage!=StorageStage.IDLE&&currentStage!=StorageStage.FINISHED&&currentStage!=StorageStage.FAILED&&currentStage!=StorageStage.REVIEW)
+                copy.merge(currentStage, live, Long::sum);
             return copy;
         }
     }
 
     public static StorageStage currentStage() { return currentStage; }
-    public static String lastDetail() { return lastDetail; }
-    public static long elapsedMillis() { return jobStartedAt == 0L ? 0L : System.currentTimeMillis() - jobStartedAt; }
+    public static String lastDetail() { return net.worldbinder.util.Lang.resolve(lastDetail); }
+    public static long elapsedMillis() { return jobStartedAt == 0L ? 0L : currentStage==StorageStage.FINISHED||currentStage==StorageStage.FAILED?lastJobDuration:System.currentTimeMillis() - jobStartedAt; }
     public static long lastJobDuration() { return lastJobDuration; }
     public static int completedJobs() { return completedJobs; }
     public static int failedJobs() { return failedJobs; }

@@ -41,11 +41,11 @@ public final class OperationStatus {
     }
 
     public static String title() {
-        return title;
+        return net.worldbinder.util.Lang.resolve(title);
     }
 
     public static String detail() {
-        return detail == null || detail.isBlank() ? net.worldbinder.util.Lang.string("worldbinder.storage.detail.ready") : detail;
+        return detail == null || detail.isBlank() ? net.worldbinder.util.Lang.string("worldbinder.storage.detail.ready") : net.worldbinder.util.Lang.resolve(detail);
     }
 
     public static double progress() {

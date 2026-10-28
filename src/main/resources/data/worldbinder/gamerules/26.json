@@ -1,0 +1,1957 @@
+{
+ "source": "net.minecraft.world.level.gamerules.GameRules of the official Minecraft jars",
+ "versions": {
+  "26.1": {
+   "dataVersion": 4786,
+   "rules": [
+    {
+     "id": "advance_time",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "advance_weather",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "allow_entering_nether_using_portals",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_block_output",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "drowning_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "elytra_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "ender_pearls_vanish_on_death",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "entity_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fall_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_spread_radius_around_player",
+     "category": "updates",
+     "type": "int",
+     "default": 128,
+     "min": -1,
+     "max": 2147483647
+    },
+    {
+     "id": "forgive_dead_players",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "freeze_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "global_sound_events",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "immediate_respawn",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "keep_inventory",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "lava_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "limited_crafting",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "locator_bar",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "log_admin_commands",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "max_block_modifications",
+     "category": "misc",
+     "type": "int",
+     "default": 32768,
+     "min": 1,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_forks",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_sequence_length",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_entity_cramming",
+     "category": "mobs",
+     "type": "int",
+     "default": 24,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_minecart_speed",
+     "category": "misc",
+     "type": "int",
+     "default": 8,
+     "min": 1,
+     "max": 1000,
+     "experimental": true
+    },
+    {
+     "id": "max_snow_accumulation_height",
+     "category": "updates",
+     "type": "int",
+     "default": 1,
+     "min": 0,
+     "max": 8
+    },
+    {
+     "id": "mob_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_griefing",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "natural_health_regeneration",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "player_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "players_nether_portal_creative_delay",
+     "category": "player",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_nether_portal_default_delay",
+     "category": "player",
+     "type": "int",
+     "default": 80,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_sleeping_percentage",
+     "category": "player",
+     "type": "int",
+     "default": 100,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "projectiles_can_break_blocks",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "pvp",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "raids",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "random_tick_speed",
+     "category": "updates",
+     "type": "int",
+     "default": 3,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "reduced_debug_info",
+     "category": "misc",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "respawn_radius",
+     "category": "player",
+     "type": "int",
+     "default": 10,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "send_command_feedback",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_advancement_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_death_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_mobs",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_monsters",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_patrols",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_phantoms",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wandering_traders",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wardens",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawner_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spectators_generate_chunks",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spread_vines",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explodes",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "universal_anger",
+     "category": "mobs",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "water_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    }
+   ]
+  },
+  "26.1.1": {
+   "dataVersion": 4788,
+   "rules": [
+    {
+     "id": "advance_time",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "advance_weather",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "allow_entering_nether_using_portals",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_block_output",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "drowning_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "elytra_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "ender_pearls_vanish_on_death",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "entity_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fall_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_spread_radius_around_player",
+     "category": "updates",
+     "type": "int",
+     "default": 128,
+     "min": -1,
+     "max": 2147483647
+    },
+    {
+     "id": "forgive_dead_players",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "freeze_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "global_sound_events",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "immediate_respawn",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "keep_inventory",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "lava_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "limited_crafting",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "locator_bar",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "log_admin_commands",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "max_block_modifications",
+     "category": "misc",
+     "type": "int",
+     "default": 32768,
+     "min": 1,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_forks",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_sequence_length",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_entity_cramming",
+     "category": "mobs",
+     "type": "int",
+     "default": 24,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_minecart_speed",
+     "category": "misc",
+     "type": "int",
+     "default": 8,
+     "min": 1,
+     "max": 1000,
+     "experimental": true
+    },
+    {
+     "id": "max_snow_accumulation_height",
+     "category": "updates",
+     "type": "int",
+     "default": 1,
+     "min": 0,
+     "max": 8
+    },
+    {
+     "id": "mob_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_griefing",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "natural_health_regeneration",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "player_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "players_nether_portal_creative_delay",
+     "category": "player",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_nether_portal_default_delay",
+     "category": "player",
+     "type": "int",
+     "default": 80,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_sleeping_percentage",
+     "category": "player",
+     "type": "int",
+     "default": 100,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "projectiles_can_break_blocks",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "pvp",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "raids",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "random_tick_speed",
+     "category": "updates",
+     "type": "int",
+     "default": 3,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "reduced_debug_info",
+     "category": "misc",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "respawn_radius",
+     "category": "player",
+     "type": "int",
+     "default": 10,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "send_command_feedback",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_advancement_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_death_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_mobs",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_monsters",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_patrols",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_phantoms",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wandering_traders",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wardens",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawner_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spectators_generate_chunks",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spread_vines",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explodes",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "universal_anger",
+     "category": "mobs",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "water_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    }
+   ]
+  },
+  "26.1.2": {
+   "dataVersion": 4790,
+   "rules": [
+    {
+     "id": "advance_time",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "advance_weather",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "allow_entering_nether_using_portals",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_block_output",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "drowning_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "elytra_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "ender_pearls_vanish_on_death",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "entity_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fall_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_spread_radius_around_player",
+     "category": "updates",
+     "type": "int",
+     "default": 128,
+     "min": -1,
+     "max": 2147483647
+    },
+    {
+     "id": "forgive_dead_players",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "freeze_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "global_sound_events",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "immediate_respawn",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "keep_inventory",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "lava_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "limited_crafting",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "locator_bar",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "log_admin_commands",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "max_block_modifications",
+     "category": "misc",
+     "type": "int",
+     "default": 32768,
+     "min": 1,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_forks",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_sequence_length",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_entity_cramming",
+     "category": "mobs",
+     "type": "int",
+     "default": 24,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_minecart_speed",
+     "category": "misc",
+     "type": "int",
+     "default": 8,
+     "min": 1,
+     "max": 1000,
+     "experimental": true
+    },
+    {
+     "id": "max_snow_accumulation_height",
+     "category": "updates",
+     "type": "int",
+     "default": 1,
+     "min": 0,
+     "max": 8
+    },
+    {
+     "id": "mob_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_griefing",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "natural_health_regeneration",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "player_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "players_nether_portal_creative_delay",
+     "category": "player",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_nether_portal_default_delay",
+     "category": "player",
+     "type": "int",
+     "default": 80,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_sleeping_percentage",
+     "category": "player",
+     "type": "int",
+     "default": 100,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "projectiles_can_break_blocks",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "pvp",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "raids",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "random_tick_speed",
+     "category": "updates",
+     "type": "int",
+     "default": 3,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "reduced_debug_info",
+     "category": "misc",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "respawn_radius",
+     "category": "player",
+     "type": "int",
+     "default": 10,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "send_command_feedback",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_advancement_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_death_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_mobs",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_monsters",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_patrols",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_phantoms",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wandering_traders",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wardens",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawner_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spectators_generate_chunks",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spread_vines",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explodes",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "universal_anger",
+     "category": "mobs",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "water_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    }
+   ]
+  },
+  "26.2": {
+   "dataVersion": 4903,
+   "rules": [
+    {
+     "id": "advance_time",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "advance_weather",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "allow_entering_nether_using_portals",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_block_output",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "drowning_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "elytra_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "ender_pearls_vanish_on_death",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "entity_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fall_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_spread_radius_around_player",
+     "category": "updates",
+     "type": "int",
+     "default": 128,
+     "min": -1,
+     "max": 2147483647
+    },
+    {
+     "id": "forgive_dead_players",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "freeze_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "global_sound_events",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "immediate_respawn",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "keep_inventory",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "lava_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "limited_crafting",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "locator_bar",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "log_admin_commands",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "max_block_modifications",
+     "category": "misc",
+     "type": "int",
+     "default": 32768,
+     "min": 1,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_forks",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_sequence_length",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_entity_cramming",
+     "category": "mobs",
+     "type": "int",
+     "default": 24,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_minecart_speed",
+     "category": "misc",
+     "type": "int",
+     "default": 8,
+     "min": 1,
+     "max": 1000,
+     "experimental": true
+    },
+    {
+     "id": "max_snow_accumulation_height",
+     "category": "updates",
+     "type": "int",
+     "default": 1,
+     "min": 0,
+     "max": 8
+    },
+    {
+     "id": "mob_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_griefing",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "natural_health_regeneration",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "player_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "players_nether_portal_creative_delay",
+     "category": "player",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_nether_portal_default_delay",
+     "category": "player",
+     "type": "int",
+     "default": 80,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_sleeping_percentage",
+     "category": "player",
+     "type": "int",
+     "default": 100,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "projectiles_can_break_blocks",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "pvp",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "raids",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "random_tick_speed",
+     "category": "updates",
+     "type": "int",
+     "default": 3,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "reduced_debug_info",
+     "category": "misc",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "respawn_radius",
+     "category": "player",
+     "type": "int",
+     "default": 10,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "send_command_feedback",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_advancement_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_death_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_mobs",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_monsters",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_patrols",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_phantoms",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wandering_traders",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wardens",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawner_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spectators_generate_chunks",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spread_vines",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explodes",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "universal_anger",
+     "category": "mobs",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "water_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    }
+   ]
+  },
+  "26.3": {
+   "dataVersion": 5023,
+   "rules": [
+    {
+     "id": "advance_time",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "advance_weather",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "allow_entering_nether_using_portals",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "block_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_block_output",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "command_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "drowning_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "elytra_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "ender_pearls_vanish_on_death",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "entity_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fall_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "fire_spread_radius_around_player",
+     "category": "updates",
+     "type": "int",
+     "default": 128,
+     "min": -1,
+     "max": 2147483647
+    },
+    {
+     "id": "forgive_dead_players",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "freeze_damage",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "global_sound_events",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "immediate_respawn",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "keep_inventory",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "lava_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "limited_crafting",
+     "category": "player",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "locator_bar",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "log_admin_commands",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "max_block_modifications",
+     "category": "misc",
+     "type": "int",
+     "default": 32768,
+     "min": 1,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_forks",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_command_sequence_length",
+     "category": "misc",
+     "type": "int",
+     "default": 65536,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_entity_cramming",
+     "category": "mobs",
+     "type": "int",
+     "default": 24,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "max_minecart_speed",
+     "category": "misc",
+     "type": "int",
+     "default": 8,
+     "min": 1,
+     "max": 1000,
+     "experimental": true
+    },
+    {
+     "id": "max_snow_accumulation_height",
+     "category": "updates",
+     "type": "int",
+     "default": 1,
+     "min": 0,
+     "max": 8
+    },
+    {
+     "id": "mob_drops",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "mob_griefing",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "natural_health_regeneration",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "player_movement_check",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "players_nether_portal_creative_delay",
+     "category": "player",
+     "type": "int",
+     "default": 0,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_nether_portal_default_delay",
+     "category": "player",
+     "type": "int",
+     "default": 80,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "players_sleeping_percentage",
+     "category": "player",
+     "type": "int",
+     "default": 100,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "projectiles_can_break_blocks",
+     "category": "drops",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "pvp",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "raids",
+     "category": "mobs",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "random_tick_speed",
+     "category": "updates",
+     "type": "int",
+     "default": 3,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "reduced_debug_info",
+     "category": "misc",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "respawn_radius",
+     "category": "player",
+     "type": "int",
+     "default": 10,
+     "min": 0,
+     "max": 2147483647
+    },
+    {
+     "id": "send_command_feedback",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_advancement_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "show_death_messages",
+     "category": "chat",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_mobs",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_monsters",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_patrols",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_phantoms",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wandering_traders",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawn_wardens",
+     "category": "spawning",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spawner_blocks_work",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spectators_generate_chunks",
+     "category": "player",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "spread_vines",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explodes",
+     "category": "misc",
+     "type": "bool",
+     "default": true
+    },
+    {
+     "id": "tnt_explosion_drop_decay",
+     "category": "drops",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "universal_anger",
+     "category": "mobs",
+     "type": "bool",
+     "default": false
+    },
+    {
+     "id": "water_source_conversion",
+     "category": "updates",
+     "type": "bool",
+     "default": true
+    }
+   ]
+  }
+ },
+ "provenance": [
+  {
+   "minecraft": "26.1",
+   "dataVersion": 4786,
+   "rules": 59,
+   "jarSHA256": "af6bebb5fefdfebdeb34f78ed1b87ca916a1bf6c6c0445f86d2fd1020a26e1d8"
+  },
+  {
+   "minecraft": "26.1.1",
+   "dataVersion": 4788,
+   "rules": 59,
+   "jarSHA256": "d9a7d794ee02b1761c8d893312f3106e1a26432564694f0de58c779872d64195"
+  },
+  {
+   "minecraft": "26.1.2",
+   "dataVersion": 4790,
+   "rules": 59,
+   "jarSHA256": "1b751bad2f0ba9bc630e5c8a31a2899a2a863660882a614ec297002a00c8e9a6"
+  },
+  {
+   "minecraft": "26.2",
+   "dataVersion": 4903,
+   "rules": 59,
+   "jarSHA256": "a8e72d431324caa717f6bbfe13dbb8ab1d302aa5147a66da1c4e308417b6aa5d"
+  },
+  {
+   "minecraft": "26.3",
+   "dataVersion": 5023,
+   "rules": 59,
+   "jarSHA256": "b8f7643852f8c75f95affac1c394b98e09248be094f434c8bfbb963beaf2275e"
+  }
+ ]
+}

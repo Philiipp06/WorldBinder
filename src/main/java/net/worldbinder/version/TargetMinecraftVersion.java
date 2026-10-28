@@ -9,14 +9,14 @@ public final class TargetMinecraftVersion {
     public static final String CURRENT = "26.3";
 
     public enum GenerationProfile {
-        OCEAN_1_13("1.13 ocean generation"),
-        VILLAGE_1_14("1.14 village generation"),
-        NETHER_1_16("1.16 nether generation"),
-        CAVES_1_18("1.18 caves and cliffs generation"),
-        WILD_1_19("1.19 wild generation"),
-        TRAILS_1_20("1.20 trails and tales generation"),
-        TRIALS_1_21("1.21 trial chambers generation"),
-        CURRENT_26("26.x current generation");
+        OCEAN_1_13("worldbinder.generation_profile.ocean_1_13"),
+        VILLAGE_1_14("worldbinder.generation_profile.village_1_14"),
+        NETHER_1_16("worldbinder.generation_profile.nether_1_16"),
+        CAVES_1_18("worldbinder.generation_profile.caves_1_18"),
+        WILD_1_19("worldbinder.generation_profile.wild_1_19"),
+        TRAILS_1_20("worldbinder.generation_profile.trails_1_20"),
+        TRIALS_1_21("worldbinder.generation_profile.trials_1_21"),
+        CURRENT_26("worldbinder.generation_profile.current_26");
 
         private final String label;
 
@@ -24,8 +24,12 @@ public final class TargetMinecraftVersion {
             this.label = label;
         }
 
+        public String label(String language) {
+            return net.worldbinder.util.Lang.in(language, label);
+        }
+
         public String label() {
-            return label;
+            return net.worldbinder.util.Lang.string(label);
         }
     }
 

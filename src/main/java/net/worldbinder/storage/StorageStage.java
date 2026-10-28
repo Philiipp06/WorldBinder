@@ -5,6 +5,7 @@ import net.worldbinder.util.Lang;
 public enum StorageStage {
     IDLE("worldbinder.storage.stage.idle"),
     SNAPSHOT("worldbinder.storage.stage.snapshot"),
+    REVIEW("worldbinder.storage.stage.review"),
     VALIDATE("worldbinder.storage.stage.validate"),
     METADATA("worldbinder.storage.stage.metadata"),
     VANILLA_WORLD("worldbinder.storage.stage.vanilla_world"),

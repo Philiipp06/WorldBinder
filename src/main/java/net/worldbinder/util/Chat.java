@@ -17,7 +17,7 @@ public final class Chat {
     }
 
     public static void infoKey(String key, Object... args) {
-        notifyInfo(Component.translatable(key, args));
+        notifyInfo(Lang.text(key, args));
     }
 
     public static void warn(String message) {
@@ -25,7 +25,7 @@ public final class Chat {
     }
 
     public static void warnKey(String key, Object... args) {
-        notifyWarn(Component.translatable(key, args));
+        notifyWarn(Lang.text(key, args));
     }
 
     public static void error(String message) {
@@ -33,13 +33,18 @@ public final class Chat {
     }
 
     public static void errorKey(String key, Object... args) {
-        notifyError(Component.translatable(key, args));
+        notifyError(Lang.text(key, args));
     }
 
     public static void savedArchive(String type, String name, int blocks, int blockEntities, int entities, Path path) {
-        Component text = Component.translatable(
+        Component typeLabel = switch (type == null ? "" : type) {
+            case "world" -> Lang.text("worldbinder.archive.type.world");
+            case "scene" -> Lang.text("worldbinder.archive.type.scene");
+            default -> Lang.text("worldbinder.archive.type.other", type == null ? "?" : type);
+        };
+        Component text = Lang.text(
                 "worldbinder.chat.saved_archive.clean",
-                type,
+                typeLabel,
                 name,
                 blocks,
                 blockEntities,

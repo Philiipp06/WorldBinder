@@ -8,6 +8,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.worldbinder.WorldBinder;
+import net.worldbinder.config.GameRuleCatalog;
 import net.worldbinder.config.GameRuleSettings;
 import net.worldbinder.config.WorldBinderConfig;
 import net.worldbinder.input.MovementKeys;
@@ -33,12 +34,14 @@ import java.util.Map;
 public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
     private static final String SAFE_RULES = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;"
             + "doInsomnia=false;doPatrolSpawning=false;doTraderSpawning=false;doWardenSpawning=false;"
-            + "doFireTick=false;mobGriefing=false;disableRaids=true;keepInventory=true;randomTickSpeed=0";
+            + "doFireTick=false;mobGriefing=false;disableRaids=true;keepInventory=true;randomTickSpeed=0;"
+            + "spawnMonsters=false;tntExplodes=false;projectilesCanBreakBlocks=false;spawnerBlocksWork=false";
     private static final String SHOWCASE_RULES = "doDaylightCycle=false;doWeatherCycle=false;doMobSpawning=false;"
             + "doInsomnia=false;doPatrolSpawning=false;doTraderSpawning=false;doWardenSpawning=false;"
             + "doFireTick=false;mobGriefing=false;doTileDrops=false;doEntityDrops=false;randomTickSpeed=0";
     private static final long CONFIRM_WINDOW_MILLIS = 4000L;
     private static int rememberedMovementGroup;
+    private static CapturePage rememberedCapturePage = CapturePage.CONTAINERS;
 
     private long discardArmedMillis;
     private long resetArmedMillis;
@@ -79,6 +82,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         super(parent, tab, safetyPage, scrollOffset,
                 draft == null ? copyConfig(WorldBinder.config()) : draft);
         movementGroup = Math.max(0, Math.min(MOVEMENT_OPTIONS_GROUP, rememberedMovementGroup));
+        capturePage = rememberedCapturePage;
     }
 
     private static WorldBinderConfig copyConfig(WorldBinderConfig source) {
@@ -132,6 +136,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         if (tab == Tab.GENERAL) initGeneral(config, formX, contentY, formW);
         if (tab == Tab.PERFORMANCE) initPerformance(config, formX, contentY, formW);
         if (tab == Tab.HUD) initHud(config, formX, contentY, formW);
+        if (tab == Tab.CAPTURE) initCapture(config, formX, contentY, formW);
         if (tab == Tab.SAFETY) initSafety(config, formX, contentY, formW);
         if (tab == Tab.MOVEMENT) initMovement(config, formX, contentY, formW);
         if (tab == Tab.DISPLAY) initDisplay(config, formX, contentY, formW);
@@ -150,14 +155,14 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                         net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent);
                     }
                 })), WbIcon.SAVE);
-        WbTooltips.hint(save, Component.literal("Ctrl + S"));
+        WbTooltips.hint(save, Lang.text("worldbinder.shortcut.save"));
         addRenderableWidget(save);
         boolean discardArmed = System.currentTimeMillis() - discardArmedMillis < CONFIRM_WINDOW_MILLIS;
         Button cancel = button(left + panelWidth - buttonW - 16, bottomY, buttonW, 22,
                 discardArmed ? "worldbinder.config.discard_confirm" : "worldbinder.config.cancel",
                 "worldbinder.tooltip.config.back", button -> requestClose());
         addRenderableWidget(discardArmed ? WbButton.danger(cancel) : WbButton.icon(WbButton.quiet(cancel), WbIcon.CLOSE));
-        WbTooltips.hint(cancel, Component.literal("Esc"));
+        WbTooltips.hint(cancel, Lang.text("worldbinder.key.escape"));
 
         boolean resetArmed = System.currentTimeMillis() - resetArmedMillis < CONFIRM_WINDOW_MILLIS;
         int resetW = footerResetWidth();
@@ -185,12 +190,14 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                 if (target == Tab.MOVEMENT && draft.movement != null && draft.movement.enabledCount() > 0) {
                     WbButton.badge(navigation, Integer.toString(draft.movement.enabledCount()));
                 }
-                WbTooltips.hint(navigation, Component.literal("Ctrl + Tab"));
+                WbTooltips.hint(navigation, Lang.text("worldbinder.shortcut.next_tab"));
                 addRenderableWidget(navigation);
                 index++;
             }
             if (tab == Tab.SAFETY) {
                 addSafetyNavigation(top, panelWidth);
+            } else if (tab == Tab.CAPTURE) {
+                addCaptureNavigation(top, panelWidth);
             } else if (tab == Tab.MOVEMENT) {
                 addMovementNavigation(top, panelWidth);
             }
@@ -222,6 +229,16 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             int buttonW = (panelWidth - 36 - gap * (subCols - 1)) / subCols;
             for (int i = 0; i < groups; i++) {
                 addMovementGroupButton(tabX + (i % subCols) * (buttonW + gap), subY + (i / subCols) * 24, buttonW, i);
+            }
+            return;
+        }
+        if (tab == Tab.CAPTURE) {
+            int captureCols = 3;
+            int captureW = Math.max(90, (panelWidth - 36 - gap * (captureCols - 1)) / captureCols);
+            int captureIndex = 0;
+            for (CapturePage target : CapturePage.values()) {
+                addCapturePageButton(tabX + (captureIndex % captureCols) * (captureW + gap), subY + (captureIndex / captureCols) * 24, captureW, 20, target);
+                captureIndex++;
             }
             return;
         }
@@ -259,6 +276,33 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             addRenderableWidget(WbButton.icon(WbButton.tab(navigation, WbTheme.WARN, safetyPage == target), safetyIcon(target)));
             index++;
         }
+    }
+
+    private void addCaptureNavigation(int top, int panelWidth) {
+        int x = contentAreaX(WbLayout.left(width, panelWidth), panelWidth);
+        int contentWidth = contentAreaWidth(panelWidth);
+        int gap = 6;
+        int cols = CapturePage.values().length;
+        int buttonW = (contentWidth - gap * (cols - 1)) / cols;
+        int index = 0;
+        for (CapturePage target : CapturePage.values()) {
+            addCapturePageButton(x + index * (buttonW + gap), top + 59, buttonW, 22, target);
+            index++;
+        }
+    }
+
+    private void addCapturePageButton(int x, int y, int w, int h, CapturePage target) {
+        Button navigation = WbButton.create(x, y, w, h, Component.translatable(captureLabelKey(target)),
+                Component.translatable(captureLabelKey(target) + ".tooltip"), button -> {
+                    if (applyFieldsToDraft()) {
+                        capturePage = target;
+                        rememberedCapturePage = target;
+                        scrollOffset = 0;
+                        pageChangedMillis = System.currentTimeMillis();
+                        rebuildConfigWidgets();
+                    }
+                });
+        addRenderableWidget(WbButton.icon(WbButton.tab(navigation, WbTheme.ACCENT_RIGHT, capturePage == target), captureIcon(target)));
     }
 
     private void addMovementNavigation(int top, int panelWidth) {
@@ -340,7 +384,12 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                 toggleSpec("worldbinder.config.capture_air", "worldbinder.tooltip.config.air", () -> config.captureAir, v -> config.captureAir = v),
                 toggleSpec("worldbinder.config.server_resource_pack", "worldbinder.tooltip.config.server_resource_pack", () -> config.includeServerResourcePack, v -> config.includeServerResourcePack = v),
                 toggleSpec("worldbinder.config.gamerules", "worldbinder.tooltip.config.gamerules", () -> config.exportGameRules, v -> config.exportGameRules = v),
-                toggleSpec("worldbinder.config.append_timestamp", "worldbinder.tooltip.config.append_timestamp", () -> config.appendTimestampToArchiveName, v -> config.appendTimestampToArchiveName = v));
+                toggleSpec("worldbinder.config.append_timestamp", "worldbinder.tooltip.config.append_timestamp", () -> config.appendTimestampToArchiveName, v -> config.appendTimestampToArchiveName = v),
+                toggleSpec("worldbinder.config.auto_capture", "worldbinder.capture_profile.help", () -> config.autoCaptureOnJoin, v -> {
+                    if(v&&config.showLegalStartReminder)net.worldbinder.compat.ClientCompat.setScreen(minecraft,new WorldBinderLegalStartScreen(this,()->{config.autoCaptureOnJoin=true;rebuildConfigWidgets();},Lang.string("worldbinder.capture_profile.enable_auto")));
+                    else config.autoCaptureOnJoin=v;
+                }),
+                toggleSpec("worldbinder.config.multi_dimension", "worldbinder.network.help", () -> config.captureDefaults.multiDimension, v -> config.captureDefaults.multiDimension=v));
     }
 
     // ------------------------------------------------------------------ Performance
@@ -705,6 +754,57 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return WbTooltips.register(slider, Component.translatable(tooltipKey));
     }
 
+    // ------------------------------------------------------------------ Capture
+
+    private void initCapture(WorldBinderConfig config, int x, int y, int w) {
+        int top = y + 28;
+        if (capturePage == CapturePage.CONTAINERS) {
+            section(x, top, w, 156, WbTheme.ACCENT_RIGHT, WbIcon.CHEST, "worldbinder.config.capture.containers.title", "worldbinder.config.capture.containers.subtitle");
+            addToggleGrid(x + 10, top + 34, w - 20, 3,
+                    toggleSpec("worldbinder.config.capture.containers.enabled", "worldbinder.tooltip.config.capture.containers.enabled", () -> config.containerHighlight, v -> config.containerHighlight = v),
+                    toggleSpec("worldbinder.config.capture.containers.partial", "worldbinder.tooltip.config.capture.containers.partial", () -> config.containerHighlightPartial, v -> config.containerHighlightPartial = v),
+                    toggleSpec("worldbinder.config.capture.containers.verified", "worldbinder.tooltip.config.capture.containers.verified", () -> config.containerHighlightVerified, v -> config.containerHighlightVerified = v),
+                    toggleSpec("worldbinder.config.capture.containers.walls", "worldbinder.tooltip.config.capture.containers.walls", () -> config.containerHighlightThroughWalls, v -> config.containerHighlightThroughWalls = v),
+                    toggleSpec("worldbinder.config.capture.containers.labels", "worldbinder.tooltip.config.capture.containers.labels", () -> config.containerHighlightLabels, v -> config.containerHighlightLabels = v),
+                    toggleSpec("worldbinder.scanner.skip_label", "worldbinder.tooltip.config.capture.scanner_skip", () -> config.scannerSkipVerified, v -> config.scannerSkipVerified = v));
+            int rows = w - 20 < 300 ? 6 : w - 20 < 430 ? 3 : 2;
+            int sliderY = top + 34 + rows * 30 + 4;
+            addContentWidget(slider(x + 10, sliderY, Math.min(w - 20, 360), 4, 64, config.containerHighlightRadius, WbTheme.ACCENT_RIGHT,
+                    value -> config.containerHighlightRadius = value,
+                    value -> Component.translatable("worldbinder.config.capture.containers.radius", value),
+                    "worldbinder.tooltip.config.capture.containers.radius"));
+            int legendY = top + 166;
+            section(x, legendY, w, 86, WbTheme.ACCENT_DARK, WbIcon.INFO, "worldbinder.config.capture.legend.title", null);
+            textLine(x + 14, legendY + 30, w - 28, "■ " + Lang.string("worldbinder.config.capture.legend.unopened"), net.worldbinder.render.ContainerHighlight.UNOPENED_COLOR);
+            textLine(x + 14, legendY + 44, w - 28, "■ " + Lang.string("worldbinder.config.capture.legend.partial"), net.worldbinder.render.ContainerHighlight.PARTIAL_COLOR);
+            textLine(x + 14, legendY + 58, w - 28, "■ " + Lang.string("worldbinder.config.capture.legend.verified"), net.worldbinder.render.ContainerHighlight.VERIFIED_COLOR);
+        } else if (capturePage == CapturePage.OVERLAY) {
+            section(x, top, w, 120, WbTheme.ACCENT, WbIcon.GRID, "worldbinder.config.capture.overlay.title", "worldbinder.config.capture.overlay.subtitle");
+            addContentWidget(toggle(x + 10, top + 34, Math.min(w - 20, 300), 22, "worldbinder.config.capture.overlay.enabled",
+                    "worldbinder.tooltip.config.capture.overlay.enabled", () -> config.worldChunkOverlay, v -> config.worldChunkOverlay = v));
+            addContentWidget(slider(x + 10, top + 64, Math.min(w - 20, 360), 1, 8, config.worldChunkOverlayRadius, WbTheme.ACCENT,
+                    value -> config.worldChunkOverlayRadius = value,
+                    value -> Component.translatable("worldbinder.overlay.radius", value),
+                    "worldbinder.tooltip.config.capture.overlay.radius"));
+            textBlock(x + 14, top + 132, w - 28, 3, Lang.string("worldbinder.overlay.legend"), WbTheme.TEXT_DIM);
+        } else {
+            section(x, top, w, 126, WbTheme.INFO, WbIcon.LIST, "worldbinder.config.capture.lists.title", "worldbinder.config.capture.lists.subtitle");
+            addContentWidget(toggle(x + 10, top + 34, Math.min(w - 20, 360), 22, "worldbinder.config.capture.lists.record",
+                    "worldbinder.tooltip.config.capture.lists.record", () -> config.recordPlayerList, v -> config.recordPlayerList = v));
+            textBlock(x + 14, top + 66, w - 28, 3, Lang.string("worldbinder.config.capture.lists.privacy"), WbTheme.WARN);
+            section(x, top + 136, w, 92, WbTheme.ACCENT_DARK, WbIcon.TREE, "worldbinder.config.capture.lists.files.title", null);
+            textBlock(x + 14, top + 166, w - 28, 4, Lang.string("worldbinder.config.capture.lists.files"), WbTheme.TEXT_DIM);
+        }
+    }
+
+    private int captureHeight(int w) {
+        return switch (capturePage) {
+            case CONTAINERS -> 28 + 166 + 96;
+            case OVERLAY -> 28 + 132 + 50;
+            case LISTS -> 28 + 136 + 104;
+        };
+    }
+
     // ------------------------------------------------------------------ Safety
 
     private void initSafety(WorldBinderConfig config, int x, int y, int w) {
@@ -761,25 +861,54 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         return Component.translatable("worldbinder.config.reload_display." + effective.name().toLowerCase(Locale.ROOT));
     }
 
-    private void initGameRules(WorldBinderConfig config, int x, int y, int w) {
-        int categoryCols = w < 420 ? 2 : 4;
-        int presetW = Math.max(72, (w - 16) / 3);
-        addIfVisible(WbButton.icon(WbButton.tab(button(x, y + 54, presetW, 22, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe",
-                b -> applyGameRulePreset(SAFE_RULES)), WbTheme.INFO, false), WbIcon.SHIELD), y + 54, 22);
-        addIfVisible(WbButton.icon(WbButton.tab(button(x + presetW + 8, y + 54, presetW, 22, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla",
-                b -> applyGameRulePreset(null)), WbTheme.ACCENT, false), WbIcon.GLOBE), y + 54, 22);
-        addIfVisible(WbButton.icon(WbButton.tab(button(x + (presetW + 8) * 2, y + 54, presetW, 22, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase",
-                b -> applyGameRulePreset(SHOWCASE_RULES)), WbTheme.WARN, false), WbIcon.EYE), y + 54, 22);
+    private static boolean gameRuleChangedOnly;
 
-        int categoryY = y + 86;
+    private void initGameRules(WorldBinderConfig config, int x, int y, int w) {
+        String target = config.targetMinecraftVersion;
+        int presetCols = w < 420 ? 2 : 4;
+        int presetGap = 8;
+        int presetW = Math.max(72, (w - presetGap * (presetCols - 1)) / presetCols);
+        int presetY = y + 54;
+        Button[] presets = {
+                WbButton.icon(WbButton.tab(button(0, 0, presetW, 22, "worldbinder.config.rules.peaceful", "worldbinder.tooltip.rules.safe",
+                        b -> applyGameRulePreset(SAFE_RULES)), WbTheme.INFO, false), WbIcon.SHIELD),
+                WbButton.icon(WbButton.tab(button(0, 0, presetW, 22, "worldbinder.config.rules.vanilla", "worldbinder.tooltip.rules.vanilla",
+                        b -> applyVanillaGameRules(target)), WbTheme.ACCENT, false), WbIcon.GLOBE),
+                WbButton.icon(WbButton.tab(button(0, 0, presetW, 22, "worldbinder.config.rules.static", "worldbinder.tooltip.rules.showcase",
+                        b -> applyGameRulePreset(SHOWCASE_RULES)), WbTheme.WARN, false), WbIcon.EYE),
+                WbButton.icon(WbButton.toggle(WbButton.create(0, 0, presetW, 22,
+                        Lang.text("worldbinder.gamerules.changed_only", gameRules.changedCount(target)),
+                        Lang.text("worldbinder.gamerules.changed_only.tooltip"), b -> {
+                            if (applyFieldsToDraft()) {
+                                gameRuleChangedOnly = !gameRuleChangedOnly;
+                                scrollOffset = 0;
+                                rebuildConfigWidgets();
+                            }
+                        }), WbTheme.WARN, gameRuleChangedOnly), WbIcon.FILTER)
+        };
+        for (int i = 0; i < presets.length; i++) {
+            int by = presetY + (i / presetCols) * 26;
+            presets[i].setX(x + (i % presetCols) * (presetW + presetGap));
+            presets[i].setY(by);
+            addIfVisible(presets[i], by, 22);
+        }
+
+        int categoryY = presetY + ((presets.length + presetCols - 1) / presetCols) * 26 + 6;
+        int categories = GameRuleSettings.categories();
+        int categoryCols = gameRuleCategoryColumns(w);
         int categoryGap = 6;
         int categoryW = (w - categoryGap * (categoryCols - 1)) / categoryCols;
-        for (int index = 0; index < 4; index++) {
+        gameRuleCategory = Math.max(0, Math.min(categories - 1, gameRuleCategory));
+        for (int index = 0; index < categories; index++) {
             final int selected = index;
-            String key = "worldbinder.gamerules.category." + index;
+            GameRuleCatalog.Category category = GameRuleCatalog.Category.values()[index];
+            String key = GameRuleCatalog.categoryKey(category);
+            String[] rules = GameRuleSettings.rules(target, index);
+            int changed = 0;
+            for (String rule : rules) if (!gameRules.isDefault(target, rule)) changed++;
             Button categoryButton = WbButton.create(x + (index % categoryCols) * (categoryW + categoryGap),
                     categoryY + (index / categoryCols) * 26, categoryW, 22, Component.translatable(key),
-                    Component.translatable(key), b -> {
+                    Component.translatable(key + ".tooltip", rules.length, changed), b -> {
                         if (applyFieldsToDraft()) {
                             gameRuleCategory = selected;
                             scrollOffset = 0;
@@ -787,34 +916,160 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                             rebuildConfigWidgets();
                         }
                     });
-            addIfVisible(WbButton.tab(categoryButton, WbTheme.WARN, gameRuleCategory == index),
-                    categoryY + (index / categoryCols) * 26, 22);
+            WbButton.icon(WbButton.tab(categoryButton, gameRuleCategoryAccent(category), gameRuleCategory == index), gameRuleCategoryIcon(category));
+            if (categoryW >= 92) WbButton.badge(categoryButton, changed > 0 ? changed + "/" + rules.length : Integer.toString(rules.length));
+            addIfVisible(categoryButton, categoryY + (index / categoryCols) * 26, 22);
         }
 
-        int sliderY = categoryY + (categoryCols == 2 ? 62 : 36);
-        addIfVisible(new WbIntegerSlider(font, x, sliderY, Math.min(w, 360), 22, 0, 64, gameRules.randomTickSpeed(),
-                WbTheme.WARN, gameRules::setRandomTickSpeed,
-                value -> Component.translatable("worldbinder.config.random_tick_speed", value)), sliderY, 22);
-
-        int gridY = sliderY + 38;
+        int gridY = categoryY + ((categories + categoryCols - 1) / categoryCols) * 26 + 14;
         int cols = w < 420 ? 1 : 2;
         int gap = 8;
         int rowH = 22;
-        int buttonW = Math.max(68, (w - gap * (cols - 1)) / cols);
-        String[] rules = GameRuleSettings.rules(config.targetMinecraftVersion, gameRuleCategory);
+        int resetW = 22;
+        int cellW = Math.max(96, (w - gap * (cols - 1)) / cols);
+        String[] rules = visibleGameRules(target);
         for (int i = 0; i < rules.length; i++) {
             String rule = rules[i];
             int col = i % cols;
             int row = i / cols;
+            int bx = x + col * (cellW + gap);
             int by = gridY + row * (rowH + 6);
-            addIfVisible(gameRuleButton(x + col * (buttonW + gap), by, buttonW, rule), by, rowH);
+            boolean changed = !gameRules.isDefault(target, rule);
+            int controlW = cellW - resetW - 4;
+            addIfVisible(gameRuleControl(bx, by, controlW, rule, target), by, rowH);
+            Button reset = WbButton.iconOnly(WbButton.create(bx + controlW + 4, by, resetW, rowH,
+                    Lang.text("worldbinder.gamerules.reset_rule", Lang.text(GameRuleSettings.labelKey(rule))),
+                    Lang.text("worldbinder.gamerules.reset_rule.tooltip", defaultLabel(target, rule)), b -> {
+                        gameRules.reset(target, rule);
+                        draft.gameRulesOverride = gameRules.serializeAndMarkClean();
+                        WbSounds.click();
+                        rebuildConfigWidgets();
+                    }), WbIcon.RESET);
+            reset.active = changed;
+            addIfVisible(reset, by, rowH);
         }
+        if (rules.length == 0) {
+            decorations.add(new Deco(DecoKind.WRAPPED, x, gridY + 4, w, 2, WbTheme.TEXT_DIM,
+                    Lang.string(gameRuleChangedOnly ? "worldbinder.gamerules.none_changed" : "worldbinder.gamerules.none_available", target),
+                    null, null, null));
+        }
+    }
+
+    private String[] visibleGameRules(String target) {
+        String[] rules = GameRuleSettings.rules(target, gameRuleCategory);
+        if (!gameRuleChangedOnly) return rules;
+        return java.util.Arrays.stream(rules).filter(rule -> !gameRules.isDefault(target, rule)).toArray(String[]::new);
+    }
+
+    private int gameRuleCategoryColumns(int w) {
+        return w < 420 ? 2 : w < 640 ? 4 : GameRuleSettings.categories();
+    }
+
+    private AbstractWidget gameRuleControl(int x, int y, int w, String rule, String target) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        Component tooltip = gameRuleTooltip(rule, target);
+        if (entry.bool()) {
+            Button button = gameRuleButton(x, y, w, rule);
+            WbTooltips.register(button, tooltip);
+            if (!gameRules.isDefault(target, rule)) WbButton.badge(button, "●");
+            return button;
+        }
+        Component label = Lang.text(GameRuleSettings.labelKey(rule));
+        if (entry.steps() != null) {
+            Button button = WbButton.create(x, y, w, 22,
+                    Lang.text("worldbinder.gamerules.int_value", label, gameRules.intValue(rule)), tooltip, b -> {
+                        int[] steps = entry.steps();
+                        int current = gameRules.intValue(rule);
+                        int next = steps[0];
+                        for (int step : steps) {
+                            if (step > current) {
+                                next = step;
+                                break;
+                            }
+                        }
+                        gameRules.setInt(rule, next);
+                        b.setMessage(fit(Lang.text("worldbinder.gamerules.int_value", label, gameRules.intValue(rule)), b.getWidth()));
+                    });
+            return WbButton.icon(WbButton.dropdown(button, WbTheme.WARN, false), WbIcon.SETTINGS);
+        }
+        int min = GameRuleCatalog.minimum(target, entry);
+        int max = Math.max(min + 1, GameRuleCatalog.maximum(target, entry));
+        WbIntegerSlider slider = new WbIntegerSlider(font, x, y, w, 22, min, max,
+                Math.max(min, Math.min(max, gameRules.intValue(rule))), WbTheme.WARN,
+                value -> gameRules.setInt(rule, value),
+                value -> Lang.text("worldbinder.gamerules.int_value", label, value));
+        return WbTooltips.register(slider, tooltip);
+    }
+
+    /** Description, vanilla default, the key written for the target and the first version that knows the rule. */
+    private Component gameRuleTooltip(String rule, String target) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        net.minecraft.network.chat.MutableComponent body = Component.empty()
+                .append(Lang.text(GameRuleSettings.labelKey(rule))).append("\n")
+                .append(Lang.text(GameRuleSettings.tooltipKey(rule))).append("\n\n")
+                .append(Lang.text("worldbinder.gamerules.meta.default", defaultLabel(target, rule))).append("\n")
+                .append(Lang.text("worldbinder.gamerules.meta.key", GameRuleCatalog.exportKey(target, entry))).append("\n")
+                .append(Lang.text("worldbinder.gamerules.meta.since", GameRuleCatalog.sinceLabel(entry)));
+        if (GameRuleCatalog.experimental(target, entry)) {
+            body.append("\n").append(Lang.text("worldbinder.gamerules.meta.experimental"));
+        }
+        if (entry.inverted() && GameRuleCatalog.registryFormat(target)) {
+            body.append("\n").append(Lang.text("worldbinder.gamerules.meta.inverted"));
+        }
+        return body;
+    }
+
+    private Component defaultLabel(String target, String rule) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        String value = GameRuleCatalog.defaultValue(target, entry);
+        if (entry.bool()) return Lang.text(Boolean.parseBoolean(value) ? "worldbinder.common.on" : "worldbinder.common.off");
+        return Component.literal(value);
+    }
+
+    private static int gameRuleCategoryAccent(GameRuleCatalog.Category category) {
+        return switch (category) {
+            case WORLD -> WbTheme.ACCENT;
+            case MOBS -> WbTheme.ERROR;
+            case SPAWNING -> WbTheme.OK;
+            case PLAYER -> WbTheme.INFO;
+            case DROPS -> WbTheme.ACCENT_RIGHT;
+            case CHAT -> WbTheme.ACCENT_DARK;
+            case MISC -> WbTheme.WARN;
+        };
+    }
+
+    private static WbIcon gameRuleCategoryIcon(GameRuleCatalog.Category category) {
+        return switch (category) {
+            case WORLD -> WbIcon.SUN;
+            case MOBS -> WbIcon.SPIDER;
+            case SPAWNING -> WbIcon.EGG;
+            case PLAYER -> WbIcon.PLAYER;
+            case DROPS -> WbIcon.BUNDLE;
+            case CHAT -> WbIcon.CHAT;
+            case MISC -> WbIcon.SETTINGS;
+        };
+    }
+
+    private void applyVanillaGameRules(String target) {
+        for (String rule : GameRuleSettings.rules()) {
+            gameRules.reset(target, rule);
+        }
+        draft.gameRulesOverride = gameRules.serializeAndMarkClean();
+        rebuildConfigWidgets();
     }
 
     private void applyGameRulePreset(String rules) {
         gameRules.load(rules);
         draft.gameRulesOverride = gameRules.serializeAndMarkClean();
         rebuildConfigWidgets();
+    }
+
+    private int gameRulesHeight(int w) {
+        int presetRows = w < 420 ? 2 : 1;
+        int categoryRows = (GameRuleSettings.categories() + gameRuleCategoryColumns(w) - 1) / gameRuleCategoryColumns(w);
+        int cols = w < 420 ? 1 : 2;
+        int rows = Math.max(1, (visibleGameRules(draft.targetMinecraftVersion).length + cols - 1) / cols);
+        return 82 + presetRows * 26 + 6 + categoryRows * 26 + 14 + rows * 28 + 12;
     }
 
     // ------------------------------------------------------------------ helpers
@@ -930,11 +1185,14 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
 
     private Button gameRuleButton(int x, int y, int w, String rule) {
         boolean enabled = gameRules.value(rule);
-        String label = Lang.string("gamerule." + rule);
-        Button button = WbButton.create(x, y, w, 22, Component.literal(label + ": " + Lang.string(enabled ? "worldbinder.common.on" : "worldbinder.common.off")),
-                Component.translatable("worldbinder.gamerules.rule_tooltip", Component.literal(rule)), b -> {
+        Component label = Lang.text(GameRuleSettings.labelKey(rule));
+        Component tooltip = label;
+        Button button = WbButton.create(x, y, w, 22,
+                Lang.text("worldbinder.config.toggle_value", label, Lang.text(enabled ? "worldbinder.common.on" : "worldbinder.common.off")),
+                tooltip, b -> {
             boolean next = gameRules.toggle(rule);
-            b.setMessage(fit(Component.literal(label + ": " + Lang.string(next ? "worldbinder.common.on" : "worldbinder.common.off")), b.getWidth()));
+            b.setMessage(fit(Lang.text("worldbinder.config.toggle_value", label,
+                    Lang.text(next ? "worldbinder.common.on" : "worldbinder.common.off")), b.getWidth()));
             WbButton.selected(b, next);
         });
         return WbButton.toggle(button, WbTheme.WARN, enabled);
@@ -1053,6 +1311,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
         WorldBinderConfig c = draft;
         switch (tab) {
             case GENERAL -> {
+                c.autoCaptureOnJoin=defaults.autoCaptureOnJoin;c.captureDefaults=defaults.captureDefaults.copy();
                 c.defaultArchiveName = defaults.defaultArchiveName;
                 c.targetMinecraftVersion = defaults.targetMinecraftVersion;
                 c.roamingRadiusChunks = defaults.roamingRadiusChunks;
@@ -1089,6 +1348,18 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
                 c.mapShowPlayers = defaults.mapShowPlayers;
                 c.mapShowSidebar = defaults.mapShowSidebar;
                 c.mapSmoothCamera = defaults.mapSmoothCamera;
+            }
+            case CAPTURE -> {
+                c.containerHighlight = defaults.containerHighlight;
+                c.containerHighlightRadius = defaults.containerHighlightRadius;
+                c.containerHighlightPartial = defaults.containerHighlightPartial;
+                c.containerHighlightVerified = defaults.containerHighlightVerified;
+                c.containerHighlightThroughWalls = defaults.containerHighlightThroughWalls;
+                c.containerHighlightLabels = defaults.containerHighlightLabels;
+                c.scannerSkipVerified = defaults.scannerSkipVerified;
+                c.worldChunkOverlay = defaults.worldChunkOverlay;
+                c.worldChunkOverlayRadius = defaults.worldChunkOverlayRadius;
+                c.recordPlayerList = defaults.recordPlayerList;
             }
             case SAFETY -> {
                 c.recoveryAutosaveSeconds = defaults.recoveryAutosaveSeconds;
@@ -1250,14 +1521,14 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_TAB && event.hasControlDown()) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_TAB") && event.hasControlDown()) {
             Tab[] tabs = Tab.values();
             int direction = event.hasShiftDown() ? -1 : 1;
             Tab next = tabs[Math.floorMod(tab.ordinal() + direction, tabs.length)];
             openSection(next, next == Tab.SAFETY ? safetyPage : SafetyPage.CORE);
             return true;
         }
-        if (event.key() == InputConstants.KEY_S && event.hasControlDown()) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_S") && event.hasControlDown()) {
             if (saveConfig()) {
                 WbSounds.success();
                 statusMessage = Component.translatable("worldbinder.config.saved_toast");
@@ -1266,7 +1537,7 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
             }
             return true;
         }
-        if (event.key() == InputConstants.KEY_TAB || event.key() == InputConstants.KEY_UP || event.key() == InputConstants.KEY_DOWN) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_TAB") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_UP") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_DOWN")) {
             WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);
@@ -1325,16 +1596,13 @@ public final class WorldBinderConfigScreen extends WorldBinderConfigScreenView {
 
     @Override
     protected int contentHeight(int w) {
-        if (tab == Tab.GENERAL) return 308;
+        if (tab == Tab.GENERAL) return 338;
         if (tab == Tab.PERFORMANCE) return (w < 420 ? 96 + 5 * 52 : 78 + 3 * 52) + 38;
         if (tab == Tab.HUD) return (w < 430 ? 244 : 196) + hudMapSectionHeight(w) + 132;
         if (tab == Tab.MOVEMENT) return movementGroupHeight(w);
         if (tab == Tab.DISPLAY) return displayHeight(w);
-        if (tab == Tab.SAFETY && safetyPage == SafetyPage.GAMERULES) {
-            int cols = w < 420 ? 1 : 2;
-            int rows = (GameRuleSettings.rules(draft.targetMinecraftVersion, gameRuleCategory).length + cols - 1) / cols;
-            return (w < 420 ? 198 : 172) + rows * 28;
-        }
+        if (tab == Tab.CAPTURE) return captureHeight(w);
+        if (tab == Tab.SAFETY && safetyPage == SafetyPage.GAMERULES) return gameRulesHeight(w);
         if (tab == Tab.SAFETY && safetyPage == SafetyPage.CORE) return 180;
         if (tab == Tab.SAFETY && safetyPage == SafetyPage.RESOURCE_PACK) return 198;
         if (tab == Tab.SAFETY) return 144;

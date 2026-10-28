@@ -28,6 +28,8 @@ final class CaptureRegressionTest {
             WorldBinderClient.capture().captureWorldArchive(name);
             check(WorldBinderClient.capture().isCapturing(), "Selection capture started");
         });
+        context.waitFor(client -> net.worldbinder.compat.ClientCompat.screen(client) instanceof net.worldbinder.ui.WorldBinderExportScreen);
+        context.clickScreenButton("Save and export");
         context.waitFor(client -> !WorldBinderClient.capture().isCapturing() && !WorldBinderClient.capture().isSaving());
         context.runOnClient(client -> {
             try {

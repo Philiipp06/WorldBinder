@@ -7,8 +7,22 @@ import net.worldbinder.util.Chat;
 public final class SelectionManager {
     private BlockPos first;
     private BlockPos second;
+    private String world;
+    private String dimension;
+
+    public void setSelection(Selection selection) {
+        bindCurrent();first=selection.first().immutable();second=selection.second().immutable();
+    }
+    private void bindCurrent() {
+        var client=Minecraft.getInstance();
+        if(client==null||client.level==null)return;
+        String nextWorld=net.worldbinder.capture.WorldIdentity.current(client),nextDimension=net.worldbinder.capture.WorldIdentity.dimension(client);
+        if(!java.util.Objects.equals(world,nextWorld)||!java.util.Objects.equals(dimension,nextDimension)){first=null;second=null;}
+        world=nextWorld;dimension=nextDimension;
+    }
 
     public void setFirstFromCrosshair() {
+        bindCurrent();
         BlockPos pos = getPlayerFeetPosition();
         if (pos == null) {
             Chat.warnKey("worldbinder.chat.no_player_position");
@@ -19,6 +33,7 @@ public final class SelectionManager {
     }
 
     public void setSecondFromCrosshair() {
+        bindCurrent();
         BlockPos pos = getPlayerFeetPosition();
         if (pos == null) {
             Chat.warnKey("worldbinder.chat.no_player_position");
@@ -29,6 +44,7 @@ public final class SelectionManager {
     }
 
     public Selection getSelection() {
+        bindCurrent();
         return new Selection(first, second);
     }
 
@@ -41,6 +57,7 @@ public final class SelectionManager {
     }
 
     public boolean hasCompleteSelection() {
+        bindCurrent();
         return first != null && second != null;
     }
 

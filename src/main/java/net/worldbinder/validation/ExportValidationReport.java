@@ -7,10 +7,21 @@ public final class ExportValidationReport {
     public String exportName = "unknown";
     public String folder = "";
     public String status = "UNKNOWN";
+    public boolean filesValid;
+    public String completeness = "UNKNOWN";
+    public List<Finding> errors = new ArrayList<>();
+    public int unknownContainers;
+    public int missingMapImages;
+    public int partialMapImages;
+    public int missingBiomeSections;
+    public int missingLightSections;
+    public int relightChunks;
     public int score;
     public int chunks;
     public int expectedChunks;
     public int missingChunks;
+    public long unknownSelectionBlocks;
+    public long excludedBlocks,excludedBlockEntities,excludedEntities;
     public int blocks;
     public int blockEntities;
     public int entities;
@@ -38,14 +49,11 @@ public final class ExportValidationReport {
     public boolean entityDataMissing;
     public int regionWriteErrors;
     public int lowQualitySnapshots;
-    public List<String> warnings = new ArrayList<>();
-    public List<String> passed = new ArrayList<>();
+    public List<Finding> warnings = new ArrayList<>();
+    public List<Finding> passed = new ArrayList<>();
 
     public String grade() {
-        if (score >= 92) return "Excellent";
-        if (score >= 80) return "Good";
-        if (score >= 65) return "Usable";
-        if (score >= 45) return "Partial";
-        return "Needs review";
+        return net.worldbinder.util.Lang.string(gradeKey());
     }
+    public String gradeKey(){return "worldbinder.quality."+(score>=92?"excellent":score>=80?"good":score>=65?"usable":score>=45?"partial":"review");}
 }

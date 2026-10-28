@@ -27,7 +27,9 @@ final class CaptureEntityStore {
 
     void cacheHot(Entity entity, BlockPos origin, WorldScene scene,
                   Map<Long, ChunkSnapshot> snapshots, boolean inputPaused) {
-        if (entity == null || origin == null || scene == null || inputPaused
+        if (entity == null || origin == null || scene == null || inputPaused || scene.captureSettings.excludes(entity)
+                || scene.selectionBounds!=null&&!scene.selectionBounds.contains(entity.getX(),entity.getY(),entity.getZ())
+                || scene.selectionBounds==null&&(entity.getY()<WorldBinder.config().effectiveCaptureMinY()||entity.getY()>=(double)WorldBinder.config().effectiveCaptureMaxY()+1)
                 || !WorldBinder.config().captureEntities
                 || !WorldBinder.config().includeEntityPlayers && entity instanceof Player) {
             return;
@@ -51,7 +53,8 @@ final class CaptureEntityStore {
         if (newlyCached) {
             snapshot.markEntity();
         }
-        scene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
+        if (snapshot.isDone() || !scene.chunkSnapshots.containsKey(chunkX + "," + chunkZ))
+            scene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
     }
 
     void captureNearby(Minecraft client, boolean wide, boolean roamingCapture,
@@ -75,13 +78,14 @@ final class CaptureEntityStore {
             radiusBlocks = Math.max(radiusBlocks, Math.max(scene.sizeX, scene.sizeZ) + 32);
         }
         Vec3 center = client.player.position();
-        List<Entity> entities = client.level.getEntitiesOfClass(Entity.class,
-                new AABB(center.x - radiusBlocks, WorldBinder.config().effectiveCaptureMinY(),
-                        center.z - radiusBlocks, center.x + radiusBlocks,
-                        WorldBinder.config().effectiveCaptureMaxY(), center.z + radiusBlocks),
-                entity -> CapturedEntityFactory.isExportCandidate(entity)
-                        && (WorldBinder.config().includeEntityPlayers || !(entity instanceof Player)));
-        for (Entity entity : entities) {
+        // The received entity index is finite even when a selection spans millions of chunks.
+        // Test anchor positions against inclusive bounds, independently of roaming Y settings.
+        for (Entity entity : client.level.entitiesForRendering()) {
+            if(scene.captureSettings.excludes(entity))continue;
+            if(!CapturedEntityFactory.isExportCandidate(entity)||!WorldBinder.config().includeEntityPlayers&&entity instanceof Player)continue;
+            if(scene.selectionBounds!=null){if(!scene.selectionBounds.contains(entity.getX(),entity.getY(),entity.getZ()))continue;}
+            else if(Math.abs(entity.getX()-center.x)>radiusBlocks||Math.abs(entity.getZ()-center.z)>radiusBlocks
+                    ||entity.getY()<WorldBinder.config().effectiveCaptureMinY()||entity.getY()>=(double)WorldBinder.config().effectiveCaptureMaxY()+1)continue;
             if (capturedIds.add(entity.getId()) || roamingCapture) {
                 if (roamingCapture) {
                     cacheHot(entity, origin, scene, snapshots, false);

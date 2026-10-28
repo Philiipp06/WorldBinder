@@ -33,7 +33,7 @@ public final class Map3DView {
     });
 
     private record Result(MapRenderer3D.Frame frame, MapRenderer3D.Camera camera, long cameraSignature, long dataSignature,
-                          int minHeight, int maxHeight, long renderNanos) {
+                          int minHeight, int maxHeight, long renderNanos,long epoch) {
     }
 
     private NativeImage image;
@@ -46,6 +46,7 @@ public final class Map3DView {
     private long shownAtNanos;
     private volatile Result finished;
     private boolean busy;
+    private long epoch;
     private long submittedCameraSignature = Long.MIN_VALUE;
     private long submittedDataSignature = Long.MIN_VALUE;
     private MapRenderer3D.Camera lastRequested;
@@ -84,6 +85,7 @@ public final class Map3DView {
 
     /** Drops the shown frame (used when the view is closed, so reopening never flashes an old image). */
     public void reset() {
+        epoch++;
         invalidate();
         shownFrame = null;
         shownCamera = null;
@@ -98,6 +100,10 @@ public final class Map3DView {
      */
     public void draw(GuiGraphicsExtractor context, Map<Long, ChunkSnapshot> captured, MapRenderer3D.Camera requested,
                      int x, int y, int guiWidth, int guiHeight, double resolution, long dataSignature, boolean shading, boolean fast) {
+        draw(context,captured,requested,x,y,guiWidth,guiHeight,resolution,dataSignature,shading,fast,true);
+    }
+    public void draw(GuiGraphicsExtractor context, Map<Long, ChunkSnapshot> captured, MapRenderer3D.Camera requested,
+                     int x, int y, int guiWidth, int guiHeight, double resolution, long dataSignature, boolean shading, boolean fast,boolean live) {
         long now = System.nanoTime();
         if (lastRequested == null || !similar(lastRequested, requested)) {
             lastMotionNanos = now;
@@ -114,26 +120,27 @@ public final class Map3DView {
         if (result != null) {
             finished = null;
             busy = false;
-            show(result);
+            if(result.epoch()==epoch)show(result);
         }
         boolean cameraChanged = cameraSignature != shownCameraSignature;
         boolean dataChanged = dataSignature != shownDataSignature && now - shownAtNanos > DATA_REFRESH_NANOS;
         boolean alreadySubmitted = cameraSignature == submittedCameraSignature && (dataSignature == submittedDataSignature || !dataChanged);
         if (!busy && (cameraChanged || dataChanged) && !alreadySubmitted) {
-            submit(captured, scaled, w, h, cameraSignature, dataSignature, shading);
+            submit(captured, scaled, w, h, cameraSignature, dataSignature, shading,live);
         }
-        if (textureId != null) {
+        if (textureId != null&&shownFrame!=null) {
             context.blit(textureId, x, y, x + guiWidth, y + guiHeight, 0.0F, 1.0F, 0.0F, 1.0F);
         }
     }
 
     private void submit(Map<Long, ChunkSnapshot> captured, MapRenderer3D.Camera camera, int w, int h, long cameraSignature,
-                        long dataSignature, boolean shading) {
+                        long dataSignature, boolean shading,boolean live) {
         busy = true;
         submittedCameraSignature = cameraSignature;
         submittedDataSignature = dataSignature;
-        Map<Long, ChunkSnapshot> snapshots = MapData.mergedCopy(captured);
-        Map<Long, MapVoxels.Columns> voxels = MapVoxels.get().copy();
+        Map<Long, ChunkSnapshot> snapshots = live?MapData.mergedCopy(captured):new java.util.LinkedHashMap<>(captured);
+        Map<Long, MapVoxels.Columns> voxels = live?MapVoxels.get().copy():Map.of();
+        long submittedEpoch=epoch;
         try {
             worker.execute(() -> {
                 long start = System.nanoTime();
@@ -142,10 +149,10 @@ public final class Map3DView {
                     MapRenderer3D.Frame frame = new MapRenderer3D.Frame(w, h, true);
                     MapRenderer3D.render(MapRenderer3D.source(voxels, snapshots::get), MapRenderer3D.source(voxels, snapshots::get),
                             camera, frame, range[0], range[1], shading);
-                    finished = new Result(frame, camera, cameraSignature, dataSignature, range[0], range[1], System.nanoTime() - start);
+                    finished = new Result(frame, camera, cameraSignature, dataSignature, range[0], range[1], System.nanoTime() - start,submittedEpoch);
                 } catch (RuntimeException exception) {
                     WorldBinder.LOGGER.warn("3D map rendering failed", exception);
-                    finished = new Result(null, camera, cameraSignature, dataSignature, 0, 128, System.nanoTime() - start);
+                    finished = new Result(null, camera, cameraSignature, dataSignature, 0, 128, System.nanoTime() - start,submittedEpoch);
                 }
             });
         } catch (RuntimeException exception) {

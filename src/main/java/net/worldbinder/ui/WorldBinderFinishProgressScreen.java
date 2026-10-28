@@ -23,6 +23,8 @@ public final class WorldBinderFinishProgressScreen extends Screen {
         this.capture = capture;
     }
 
+    public Screen returnScreen() { return parent; }
+
     @Override
     protected void init() {
         int realWidth = width;

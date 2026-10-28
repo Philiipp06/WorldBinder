@@ -27,7 +27,6 @@ import net.worldbinder.scene.EntityRecord;
 import net.worldbinder.scene.WorldScene;
 import net.worldbinder.storage.StorageProgress;
 import net.worldbinder.storage.StorageStage;
-import net.worldbinder.util.BlockStateStrings;
 import net.worldbinder.util.Lang;
 import net.worldbinder.version.TargetMinecraftVersion;
 
@@ -46,7 +45,6 @@ import java.util.TreeMap;
 public final class WorldExportEngine {
     private static final int SECTION_SIZE = 16 * 16 * 16;
     private static final int BIOME_SECTION_SIZE = 4 * 4 * 4;
-    private static final int LIGHT_ARRAY_SIZE = 2048;
     private static final String DEFAULT_BIOME = "minecraft:plains";
 
     private WorldExportEngine() {
@@ -57,33 +55,91 @@ public final class WorldExportEngine {
     }
 
     public static VanillaWorldExporter.ExportResult export(WorldScene scene, Path worldFolder, StorageProgress progress) throws IOException {
+        scene=DimensionExportView.prepare(ExportFiltering.apply(scene));
         Files.createDirectories(worldFolder);
         VersionProfile profile = VersionRegistry.resolve(targetVersion(scene));
         WorldExportModule module = WorldExportModules.forProfile(profile);
-        ExportContext context = new ExportContext(scene, worldFolder, profile);
         if (profile.writesGameRulesFile() || profile.writesWorldGenSettingsFile()) {
             Files.createDirectories(worldFolder.resolve("data").resolve("minecraft"));
         }
 
-        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, Lang.string("worldbinder.export.progress.collecting_chunks"), 0.20D);
-        Map<ChunkKey, ChunkBuilder> chunks = collectChunks(scene);
-        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, Lang.string("worldbinder.export.progress.writing_level"), 0.26D);
+        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, Lang.stored("worldbinder.export.progress.collecting_chunks"), 0.20D);
+        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, Lang.stored("worldbinder.export.progress.writing_level"), 0.26D);
         WorldExportMetadataWriter.write(scene, worldFolder, profile);
         ExportSavedDataWriter.writeReleaseFiles(worldFolder, profile);
 
+        int totalChunks=0,totalBlocks=0,totalBlockEntities=0,totalEntities=0;
+        for(var scope:net.worldbinder.scene.ProjectDimensions.all(scene)){
+        scope.targetMinecraftVersion=scene.targetMinecraftVersion;scope.exportSettings=scene.exportSettings;
+        ExportContext context=new ExportContext(scope,worldFolder,profile);
+        Map<ChunkKey, ChunkBuilder> chunks=collectChunks(scope);
+        totalChunks+=(int)chunks.values().stream().filter(ChunkBuilder::hasBlockSections).count();totalBlocks+=scope.blockCount();totalBlockEntities+=scope.blockEntityCount();totalEntities+=scope.entityCount();
         List<ExportLayoutSpec> layouts = module.layouts(context);
         int layoutIndex = 0;
+        ExportLayoutSpec writtenLayout = null;
         for (ExportLayoutSpec layout : layouts) {
             layoutIndex++;
-            writeLayout(scene, chunks, layout, progress, layoutIndex, layouts.size());
+            if(writtenLayout!=null && canMirror(writtenLayout,layout))
+                mirrorLayout(scope,writtenLayout,layout,progress,layoutIndex,layouts.size());
+            else {
+                writeLayout(scope, chunks, layout, progress, layoutIndex, layouts.size());
+                writtenLayout=layout;
+            }
         }
 
-        ExportReadmeWriter.write(scene, worldFolder, chunks.size());
-        return new VanillaWorldExporter.ExportResult(worldFolder, chunks.size(), scene.blockCount(), scene.blockEntityCount(), scene.entityCount());
+        }
+        ExportReadmeWriter.write(scene, worldFolder, totalChunks);
+        return new VanillaWorldExporter.ExportResult(worldFolder,totalChunks,totalBlocks,totalBlockEntities,totalEntities);
     }
 
     public static Path overworldFolder(Path worldFolder) {
         return worldFolder;
+    }
+    public static int dimensionMinY(WorldScene scene,int version){
+        if(version<2860)return 0;
+        if(scene.dimensionMinY!=Integer.MIN_VALUE)return scene.dimensionMinY;
+        return "minecraft:the_nether".equals(scene.dimension)||"minecraft:the_end".equals(scene.dimension)?0:-64;
+    }
+    public static int heightmapBits(WorldScene scene,int version){
+        int height=version<2860?256:scene.dimensionHeight>0?scene.dimensionHeight:"minecraft:the_nether".equals(scene.dimension)||"minecraft:the_end".equals(scene.dimension)?256:384;
+        return 32-Integer.numberOfLeadingZeros(height);
+    }
+    public static String chunkStatus(int version){return version<1952?"fullchunk":version<2860?"full":"minecraft:full";}
+
+    private static boolean canMirror(ExportLayoutSpec source,ExportLayoutSpec target) {
+        return source.writeEntities()==target.writeEntities() && source.writePoi()==target.writePoi()
+                && source.embedEntitiesInChunks()==target.embedEntitiesInChunks()
+                && (source.entityFolder()==null)==(target.entityFolder()==null)
+                && (source.poiFolder()==null)==(target.poiFolder()==null);
+    }
+
+    /** The compatibility layouts contain identical chunk coordinates and payloads. Encode/compress only once. */
+    private static void mirrorLayout(WorldScene scene,ExportLayoutSpec source,ExportLayoutSpec target,
+                                      StorageProgress progress,int index,int count) throws IOException {
+        Files.createDirectories(target.dimensionFolder());
+        if(isModernDimensionMirror(target.dimensionFolder()))
+            ExportSavedDataWriter.writeDimensionSavedData(target.dimensionFolder(),targetVersion(scene).effectiveDataVersion());
+        Map<Path,Path> copies=new LinkedHashMap<>();
+        copyPlan(source.regionFolder(),target.regionFolder(),copies);
+        if(target.writeEntities())copyPlan(source.entityFolder(),target.entityFolder(),copies);
+        if(target.writePoi())copyPlan(source.poiFolder(),target.poiFolder(),copies);
+        int copied=0;
+        for(var entry:copies.entrySet()) {
+            Files.copy(entry.getKey(),entry.getValue());copied++;
+            if(progress!=null&&(copied%8==0||copied==copies.size())) {
+                double ratio=copied/(double)Math.max(1,copies.size());
+                progress.update(StorageStage.VANILLA_WORLD,Lang.stored("worldbinder.export.progress.mirror",target.label(),copied,copies.size()),
+                        .30D+((index-1+ratio)/Math.max(1,count))*.36D);
+            }
+        }
+    }
+
+    private static void copyPlan(Path source,Path target,Map<Path,Path> copies) throws IOException {
+        if(source==null||target==null)return;
+        Files.createDirectories(target);
+        try(var files=Files.list(source)) {
+            for(Path file:files.filter(Files::isRegularFile).toList()) copies.put(file,target.resolve(file.getFileName()));
+        }
     }
 
     private static void writeLayout(WorldScene scene, Map<ChunkKey, ChunkBuilder> chunks, ExportLayoutSpec layout,
@@ -116,21 +172,25 @@ public final class WorldExportEngine {
 
             int written = 0;
             int total = Math.max(1, chunks.size());
+            int version = targetVersion(scene).effectiveDataVersion();
+            Map<String,String> states = new HashMap<>();
             for (ChunkBuilder chunk : chunks.values()) {
-                regionWriter.write(chunk.pos(), chunk.toChunkNbt(scene, layout.embedEntitiesInChunks()));
+                chunk.prepare(scene, version, states);
+                if(chunk.hasBlockSections())regionWriter.write(chunk.pos(), chunk.toChunkNbt(scene, layout.embedEntitiesInChunks()));
                 if (entityWriter != null) {
                     entityWriter.write(chunk.pos(), chunk.toEntitiesNbt(scene));
                 }
-                if (poiWriter != null) {
+                if (poiWriter != null&&chunk.hasBlockSections()) {
                     poiWriter.write(chunk.pos(), chunk.toPoiNbt(scene));
                 }
+                chunk.release();
                 written++;
                 if (progress != null && (written == total || written % 16 == 0)) {
                     double ratio = written / (double) total;
                     double base = 0.30D + ((layoutIndex - 1) / (double) Math.max(1, layoutCount)) * 0.36D;
                     double span = 0.36D / Math.max(1, layoutCount);
                     progress.update(StorageStage.VANILLA_WORLD,
-                            Lang.string("worldbinder.export.progress.writing_chunks", written, total, layout.label()),
+                            Lang.stored("worldbinder.export.progress.writing_chunks", written, total, layout.label()),
                             base + ratio * span);
                 }
             }
@@ -158,19 +218,21 @@ public final class WorldExportEngine {
 
     private static Map<ChunkKey, ChunkBuilder> collectChunks(WorldScene scene) {
         Map<ChunkKey, ChunkBuilder> chunks = new TreeMap<>();
+        int version = targetVersion(scene).effectiveDataVersion();
+        if (scene.chunkSnapshots != null) for (var snapshot : scene.chunkSnapshots.values()) {
+            if (snapshot == null || (!snapshot.isDone() && !snapshot.verifiedEmpty)) continue;
+            ChunkBuilder builder = chunks.computeIfAbsent(new ChunkKey(snapshot.chunkX, snapshot.chunkZ), ChunkBuilder::new);
+            builder.snapshot = snapshot;
+        }
         if (scene.blocks != null) {
-            targetVersionHolder.set(targetVersion(scene));
-            try {
                 for (BlockRecord record : scene.blocks) {
                     int absX = scene.originX + record.x;
                     int absY = scene.originY + record.y;
                     int absZ = scene.originZ + record.z;
+                    if (version < 2860 && (absY < 0 || absY > 255)) continue;
                     ChunkKey key = new ChunkKey(Math.floorDiv(absX, 16), Math.floorDiv(absZ, 16));
-                    chunks.computeIfAbsent(key, ChunkBuilder::new).addBlock(absX, absY, absZ, record);
+                    chunks.computeIfAbsent(key, ChunkBuilder::new).records.add(record);
                 }
-            } finally {
-                targetVersionHolder.remove();
-            }
         }
         if (scene.entities != null) {
             for (EntityRecord record : scene.entities) {
@@ -182,12 +244,11 @@ public final class WorldExportEngine {
                 int chunkX = Math.floorDiv((int) Math.floor(absX), 16);
                 int chunkZ = Math.floorDiv((int) Math.floor(absZ), 16);
                 ChunkKey key = new ChunkKey(chunkX, chunkZ);
-                ChunkBuilder builder = chunks.get(key);
-                if (builder != null && builder.hasBlockSections()) {
-                    builder.addEntity(record);
-                }
+                chunks.computeIfAbsent(key,ChunkBuilder::new).addEntity(record);
             }
         }
+        var relight = ExportLightPolicy.invalidatedChunks(scene);
+        chunks.values().forEach(chunk -> chunk.lightInvalidated = relight.contains(net.worldbinder.scene.ProjectData.chunkKey(chunk.key.x, chunk.key.z)));
         return chunks;
     }
 
@@ -195,48 +256,6 @@ public final class WorldExportEngine {
         String target = scene == null ? null : scene.targetMinecraftVersion;
         return TargetMinecraftVersion.resolve(target);
     }
-
-    private static String exportState(String state) {
-        if (state == null || state.isBlank()) {
-            return "minecraft:air";
-        }
-        TargetMinecraftVersion.Entry target = targetVersionHolder.get();
-        String downgraded = target == null ? state : downgradeBlockState(state, target);
-        return normalizeBlockStateForExport(downgraded);
-    }
-
-    private static String normalizeBlockStateForExport(String state) {
-        if (state == null || state.isBlank()) {
-            return "minecraft:air";
-        }
-        try {
-            net.minecraft.world.level.block.state.BlockState parsed = BlockStateStrings.parse(state);
-            return parsed == null ? state : BlockStateStrings.toCommandString(parsed);
-        } catch (Throwable ignored) {
-            int propertyStart = state.indexOf('[');
-            return propertyStart > 0 ? state.substring(0, propertyStart) : "minecraft:air";
-        }
-    }
-
-    private static String downgradeBlockState(String state, TargetMinecraftVersion.Entry target) {
-        String name = parseState(state).name();
-        int dataVersion = target.effectiveDataVersion();
-        if (dataVersion < 3463 && (name.contains("cherry") || name.contains("bamboo_block") || name.contains("pink_petals") || name.contains("decorated_pot") || name.contains("suspicious_gravel"))) {
-            return "minecraft:oak_planks";
-        }
-        if (dataVersion < 3105 && (name.contains("mangrove") || name.contains("mud") || name.contains("sculk") || name.contains("frog") || name.contains("ochre_froglight") || name.contains("verdant_froglight") || name.contains("pearlescent_froglight"))) {
-            return "minecraft:dirt";
-        }
-        if (dataVersion < 2724 && (name.contains("deepslate") || name.contains("tuff") || name.contains("calcite") || name.contains("amethyst") || name.contains("copper") || name.contains("dripstone") || name.contains("azalea") || name.contains("moss") || name.contains("candle"))) {
-            return name.contains("ore") ? "minecraft:stone" : "minecraft:cobblestone";
-        }
-        if (dataVersion < 2566 && (name.contains("crimson") || name.contains("warped") || name.contains("basalt") || name.contains("blackstone") || name.contains("soul_soil") || name.contains("netherite") || name.contains("ancient_debris") || name.contains("shroomlight"))) {
-            return "minecraft:netherrack";
-        }
-        return state;
-    }
-
-    private static final ThreadLocal<TargetMinecraftVersion.Entry> targetVersionHolder = new ThreadLocal<>();
 
     private record ChunkKey(int x, int z) implements Comparable<ChunkKey> {
         @Override
@@ -248,9 +267,12 @@ public final class WorldExportEngine {
 
     private static final class ChunkBuilder {
         private final ChunkKey key;
+        private net.worldbinder.scene.ChunkSnapshot snapshot;
+        private boolean lightInvalidated;
         private final Map<Integer, SectionBuilder> sections = new TreeMap<>();
         private final List<CompoundTag> blockEntities = new ArrayList<>();
         private final List<EntityRecord> entities = new ArrayList<>();
+        private final List<BlockRecord> records = new ArrayList<>();
         private final int[] heightmap = new int[16 * 16];
 
         private ChunkBuilder(ChunkKey key) {
@@ -265,34 +287,51 @@ public final class WorldExportEngine {
         }
 
         private boolean hasBlockSections() {
-            return !sections.isEmpty();
+            return snapshot != null || !records.isEmpty();
         }
 
-        private void addSyntheticBlock(int absX, int absY, int absZ, String state) {
+        private void prepare(WorldScene scene, int version, Map<String,String> mappedStates) {
+            if (snapshot != null && snapshot.sections != null) for (var entry : snapshot.sections.entrySet()) {
+                if (version < 2860 && (entry.getKey() < 0 || entry.getKey() > 15)) continue;
+                sections.computeIfAbsent(entry.getKey(), SectionBuilder::new).original = entry.getValue();
+            }
+            for (BlockRecord record : records) {
+                String mapped = mappedStates.computeIfAbsent(record.state, raw -> ExportCompatibility.state(scene, raw, version));
+                addBlock(scene, scene.originX+record.x, scene.originY+record.y, scene.originZ+record.z, record, mapped, version);
+            }
+            ensureChunkHasAtLeastOneSection();
+        }
+
+        private void release() {
+            // Keep only references to recorded blocks between layouts; section arrays belong to one chunk.
+            sections.clear(); blockEntities.clear(); java.util.Arrays.fill(heightmap, 0);
+        }
+
+        private void addBlock(WorldScene scene, int absX, int absY, int absZ, BlockRecord record, String mapped, int version) {
             int sectionY = Math.floorDiv(absY, 16);
             int localX = Math.floorMod(absX, 16);
             int localY = Math.floorMod(absY, 16);
             int localZ = Math.floorMod(absZ, 16);
-            sections.computeIfAbsent(sectionY, SectionBuilder::new).set(localX, localY, localZ, exportState(state));
+            sections.computeIfAbsent(sectionY, SectionBuilder::new).set(localX, localY, localZ, mapped);
             int hmIndex = localZ * 16 + localX;
-            heightmap[hmIndex] = Math.max(heightmap[hmIndex], Math.max(0, absY + 65));
-        }
-
-        private void addBlock(int absX, int absY, int absZ, BlockRecord record) {
-            int sectionY = Math.floorDiv(absY, 16);
-            int localX = Math.floorMod(absX, 16);
-            int localY = Math.floorMod(absY, 16);
-            int localZ = Math.floorMod(absZ, 16);
-            sections.computeIfAbsent(sectionY, SectionBuilder::new).set(localX, localY, localZ, exportState(record.state));
-            int hmIndex = localZ * 16 + localX;
-            heightmap[hmIndex] = Math.max(heightmap[hmIndex], Math.max(0, absY + 65));
-            if (record.hasBlockEntity && record.blockEntityNbt != null && !record.blockEntityNbt.isBlank()) {
-                CompoundTag blockEntity = parseCompound(record.blockEntityNbt);
+            if (!mapped.equals("minecraft:air") && !mapped.equals("minecraft:cave_air") && !mapped.equals("minecraft:void_air")) {
+                int offset = 1-dimensionMinY(scene,version);
+                heightmap[hmIndex] = Math.max(heightmap[hmIndex], Math.max(0, absY + offset));
+            }
+            if (record.hasBlockEntity && record.blockEntityNbt != null && !record.blockEntityNbt.isBlank()
+                    && BlockEntityDataConverter.compatible(ExportCompatibility.id(record.state),ExportCompatibility.id(mapped),version)) {
+                CompoundTag blockEntity = BlockEntityDataConverter.convert(parseCompound(record.blockEntityNbt),version);
                 if (blockEntity != null) {
                     blockEntity.putInt("x", absX);
                     blockEntity.putInt("y", absY);
                     blockEntity.putInt("z", absZ);
                     blockEntity.putBoolean("keepPacked", false);
+                    var captured = scene.containers.get(net.worldbinder.scene.ContainerRecord.blockKey(absX, absY, absZ));
+                    if (captured != null && captured.type.equals(ExportCompatibility.id(record.state))) {
+                        blockEntity.put("Items", ItemDataConverter.items(captured, version,blockEntity.getList("Items").orElseGet(ListTag::new)));
+                        blockEntity.remove("LootTable"); blockEntity.remove("LootTableSeed");
+                    }
+                    ItemDataConverter.inventoryLists(blockEntity, version);
                     blockEntities.add(blockEntity);
                 }
             }
@@ -300,12 +339,11 @@ public final class WorldExportEngine {
 
         private void addEntity(EntityRecord record) {
             entities.add(record);
-            ensureChunkHasAtLeastOneSection();
         }
 
         private void ensureChunkHasAtLeastOneSection() {
             if (sections.isEmpty()) {
-                sections.put(-4, new SectionBuilder(-4));
+                sections.put(0, new SectionBuilder(0));
             }
         }
 
@@ -313,15 +351,15 @@ public final class WorldExportEngine {
             CompoundTag chunk = new CompoundTag();
             chunk.putInt("DataVersion", targetVersion(scene).effectiveDataVersion());
             chunk.putInt("xPos", key.x);
-            chunk.putInt("yPos", -4);
+            chunk.putInt("yPos",Math.floorDiv(dimensionMinY(scene,targetVersion(scene).effectiveDataVersion()),16));
             chunk.putInt("zPos", key.z);
             chunk.putLong("LastUpdate", 0L);
             chunk.putLong("InhabitedTime", 0L);
-            chunk.putString("Status", "minecraft:full");
-            chunk.putBoolean("isLightOn", true);
+            chunk.putString("Status", chunkStatus(targetVersion(scene).effectiveDataVersion()));
+            chunk.putBoolean("isLightOn", !lightInvalidated && snapshot != null && !snapshot.lightEstimated);
             chunk.put("sections", sectionsNbt(targetVersion(scene).effectiveDataVersion()));
             chunk.put("block_entities", blockEntitiesNbt());
-            chunk.put("Heightmaps", heightmapsNbt());
+            chunk.put("Heightmaps", heightmapsNbt(scene,targetVersion(scene).effectiveDataVersion()));
             chunk.put("block_ticks", new ListTag());
             chunk.put("fluid_ticks", new ListTag());
             chunk.put("PostProcessing", new ListTag());
@@ -329,13 +367,42 @@ public final class WorldExportEngine {
             if (includeEntities) {
                 chunk.put("Entities", entityListNbt(scene));
             }
+            int version = targetVersion(scene).effectiveDataVersion();
+            if (version < 2860) {
+                if(version<1952)chunk.putBoolean("LightPopulated",!lightInvalidated&&snapshot!=null&&!snapshot.lightEstimated);
+                chunk.put("Sections", chunk.get("sections")); chunk.remove("sections");
+                chunk.put("TileEntities", chunk.get("block_entities")); chunk.remove("block_entities");
+                chunk.put("TileTicks", chunk.get("block_ticks")); chunk.remove("block_ticks");
+                chunk.put("LiquidTicks", chunk.get("fluid_ticks")); chunk.remove("fluid_ticks");
+                chunk.put("Structures", chunk.get("structures")); chunk.remove("structures");
+                chunk.putIntArray("Biomes", legacyBiomes(version));
+                chunk.remove("DataVersion"); chunk.remove("yPos");
+                CompoundTag root = new CompoundTag(); root.putInt("DataVersion", version); root.put("Level", chunk); return root;
+            }
             return chunk;
+        }
+
+        private int[] legacyBiomes(int version) {
+            int[] values = new int[version < 2225 ? 256 : 1024];
+            java.util.Arrays.fill(values, 1);
+            for (var entry : sections.entrySet()) {
+                var original = entry.getValue().original;
+                if (original == null || !original.hasBiomes()) continue;
+                int sectionY = entry.getKey();
+                if (version >= 2225) for (int i = 0; i < 64; i++) {
+                    int index = sectionY * 64 + i;
+                    if (index >= 0 && index < values.length) values[index] = LegacyBiomes.numeric(original.biomes[i], version);
+                }
+                else for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++)
+                    values[z * 16 + x] = LegacyBiomes.numeric(original.biomes[(3 << 4) | ((z >> 2) << 2) | (x >> 2)], version);
+            }
+            return values;
         }
 
         private ListTag sectionsNbt(int dataVersion) {
             ListTag list = new ListTag();
             for (SectionBuilder section : sections.values()) {
-                list.add(section.toNbt(dataVersion));
+                if (dataVersion >= 2860 || section.sectionY >= 0 && section.sectionY <= 15) list.add(section.toNbt(dataVersion, !lightInvalidated));
             }
             return list;
         }
@@ -348,8 +415,9 @@ public final class WorldExportEngine {
             return list;
         }
 
-        private CompoundTag heightmapsNbt() {
-            long[] packed = packValues(heightmap, 9);
+        private CompoundTag heightmapsNbt(WorldScene scene,int version) {
+            int bits=heightmapBits(scene,version);
+            long[] packed = version < 2529 ? packContiguous(heightmap,bits) : packValues(heightmap,bits);
             CompoundTag heightmaps = new CompoundTag();
             heightmaps.putLongArray("MOTION_BLOCKING", packed);
             heightmaps.putLongArray("WORLD_SURFACE", packed);
@@ -391,6 +459,7 @@ public final class WorldExportEngine {
     private static final class SectionBuilder {
         private final int sectionY;
         private final String[] states = new String[SECTION_SIZE];
+        private net.worldbinder.scene.ChunkSectionData original;
 
         private SectionBuilder(int sectionY) {
             this.sectionY = sectionY;
@@ -400,13 +469,25 @@ public final class WorldExportEngine {
             states[index(x, y, z)] = state == null || state.isBlank() ? "minecraft:air" : state;
         }
 
-        private CompoundTag toNbt(int dataVersion) {
+        private CompoundTag toNbt(int dataVersion, boolean retainLight) {
             CompoundTag section = new CompoundTag();
             section.putByte("Y", (byte) sectionY);
-            section.put("block_states", blockStatesNbt(dataVersion));
-            section.put("biomes", biomesNbt());
-            section.putByteArray("SkyLight", filledLight((byte) 0xFF));
-            section.putByteArray("BlockLight", filledLight((byte) 0x00));
+            CompoundTag blockStates = blockStatesNbt(dataVersion);
+            if (dataVersion < 2860) {
+                section.put("Palette", blockStates.get("palette"));
+                section.putLongArray("BlockStates", blockStates.getLongArray("data").orElse(new long[256]));
+            } else {
+                section.put("block_states", blockStates);
+                section.put("biomes", biomesNbt(dataVersion));
+            }
+            if (retainLight && original != null && original.hasSkyLight()) section.putByteArray("SkyLight", original.skyLight.clone());
+            if (retainLight && original != null && original.hasBlockLight()) section.putByteArray("BlockLight", original.blockLight.clone());
+            // The pre-1.14 reader unconditionally constructs 2048-byte nibble arrays. Absent arrays crash it.
+            // Request relighting without stale source light; the 1.13 full-chunk reader may leave it dark (reported in compatibility review).
+            if(dataVersion<1952){
+                if(!section.contains("BlockLight"))section.putByteArray("BlockLight",new byte[2048]);
+                if(!section.contains("SkyLight"))section.putByteArray("SkyLight",new byte[2048]);
+            }
             return section;
         }
 
@@ -432,16 +513,24 @@ public final class WorldExportEngine {
             blockStates.put("palette", palette);
             if (paletteIndex.size() > 1) {
                 int bits = Math.max(4, bitsFor(paletteIndex.size() - 1));
-                blockStates.putLongArray("data", packValues(values, bits));
+                blockStates.putLongArray("data", dataVersion < 2529 ? packContiguous(values, bits) : packValues(values, bits));
             }
             return blockStates;
         }
 
-        private CompoundTag biomesNbt() {
+        private CompoundTag biomesNbt(int version) {
             CompoundTag biomes = new CompoundTag();
             ListTag palette = new ListTag();
-            palette.add(StringTag.valueOf(DEFAULT_BIOME));
+            Map<String, Integer> indices = new LinkedHashMap<>();
+            int[] values = new int[64];
+            String[] originalBiomes = original != null && original.hasBiomes() ? original.biomes : null;
+            for (int i = 0; i < values.length; i++) {
+                String biome = originalBiomes == null ? DEFAULT_BIOME : ExportCompatibility.biome(originalBiomes[i], version);
+                values[i] = indices.computeIfAbsent(biome, k -> indices.size());
+            }
+            for (String biome : indices.keySet()) palette.add(StringTag.valueOf(biome));
             biomes.put("palette", palette);
+            if (indices.size() > 1) biomes.putLongArray("data", packValues(values, bitsFor(indices.size() - 1)));
             return biomes;
         }
 
@@ -460,6 +549,7 @@ public final class WorldExportEngine {
 
     /** Block state palette entry in the format of the target data version. */
     public static Tag paletteEntry(String state, int dataVersion) {
+        TargetBlockRegistry.requireReadable(state,dataVersion);
         if (dataVersion < ID_PROPERTIES_STATE_FORMAT) {
             return blockStateNbt(state);
         }
@@ -521,18 +611,23 @@ public final class WorldExportEngine {
             return null;
         }
         try {
-            return TagParser.parseCompoundFully(snbt);
+            return TagParser.parseCompoundFully(snbt).copy();
         } catch (CommandSyntaxException exception) {
             WorldBinder.LOGGER.warn("Failed to parse captured SNBT: {}", snbt, exception);
             return null;
         }
     }
 
-    private static CompoundTag normalizedEntityNbt(WorldScene scene, EntityRecord entity) {
+    public static CompoundTag normalizedEntityNbt(WorldScene scene, EntityRecord entity) {
         CompoundTag nbt = parseCompound(entity.fullNbt);
         if (nbt == null) {
             nbt = new CompoundTag();
         }
+        if(entity.uuid!=null){try{
+            java.util.UUID uuid=java.util.UUID.fromString(entity.uuid);long most=uuid.getMostSignificantBits(),least=uuid.getLeastSignificantBits();
+            nbt.putIntArray("UUID",new int[]{(int)(most>>32),(int)most,(int)(least>>32),(int)least});
+            if(targetVersion(scene).effectiveDataVersion()<2566){nbt.putLong("UUIDMost",most);nbt.putLong("UUIDLeast",least);}
+        }catch(IllegalArgumentException ignored){}}
 
         // EntityRecord stores coordinates relative to the capture origin so scenes can be moved.
         // Vanilla entity region files need absolute world coordinates inside the exported save.
@@ -556,94 +651,21 @@ public final class WorldExportEngine {
         nbt.putBoolean("NoGravity", entity.noGravity);
         nbt.putBoolean("Glowing", entity.glowing);
         nbt.putBoolean("Invisible", entity.invisible);
-        normalizeEntityForTarget(nbt, targetVersion(scene));
+        var contents = scene.containers.get(net.worldbinder.scene.ContainerRecord.entityKey(entity.uuid));
+        if (contents != null && contents.type.equals(entity.type)) {
+            nbt.put("Items", ItemDataConverter.items(contents, targetVersion(scene).effectiveDataVersion(),nbt.getList("Items").orElseGet(ListTag::new)));
+            nbt.remove("LootTable"); nbt.remove("LootTableSeed");
+        }
+        ItemDataConverter.inventoryLists(nbt, targetVersion(scene).effectiveDataVersion());
+        if (targetVersion(scene).effectiveDataVersion() < 4325 && nbt.getIntArray("block_pos").isPresent()) {
+            int[] anchor = nbt.getIntArray("block_pos").orElseThrow();
+            if (anchor.length == 3) { nbt.putInt("TileX",anchor[0]); nbt.putInt("TileY",anchor[1]); nbt.putInt("TileZ",anchor[2]); }
+        }
         return nbt;
     }
 
-    private static void normalizeEntityForTarget(CompoundTag nbt, TargetMinecraftVersion.Entry target) {
-        if (target.effectiveDataVersion() < 3837) {
-            downgradeModernItemStack(nbt, "item");
-            downgradeModernItemStack(nbt, "Item");
-            downgradeItemStackList(nbt, "HandItems");
-            downgradeItemStackList(nbt, "ArmorItems");
-        }
-    }
-
-    private static void downgradeItemStackList(CompoundTag holder, String key) {
-        if (!(holder.get(key) instanceof ListTag list)) {
-            return;
-        }
-        for (int i = 0; i < list.size(); i++) {
-            if (list.get(i) instanceof CompoundTag item) {
-                CompoundTag wrapper = new CompoundTag();
-                wrapper.put("value", item);
-                downgradeModernItemStack(wrapper, "value");
-            }
-        }
-    }
-
-    private static void downgradeModernItemStack(CompoundTag holder, String key) {
-        if (!(holder.get(key) instanceof CompoundTag item)) {
-            return;
-        }
-        String id = item.getString("id").orElse("minecraft:air");
-        item.putString("id", id);
-        item.putByte("Count", (byte) readIntTag(item, "count", 1));
-        item.remove("count");
-
-        if (item.get("components") instanceof CompoundTag components) {
-            CompoundTag tag = item.get("tag") instanceof CompoundTag existingTag ? existingTag : new CompoundTag();
-            int damage = readIntTag(components, "minecraft:damage", Integer.MIN_VALUE);
-            if (damage != Integer.MIN_VALUE) {
-                tag.putInt("Damage", damage);
-            }
-            int customModelData = readIntTag(components, "minecraft:custom_model_data", Integer.MIN_VALUE);
-            if (customModelData != Integer.MIN_VALUE) {
-                tag.putInt("CustomModelData", customModelData);
-            }
-            String customName = readStringTag(components, "minecraft:custom_name");
-            if (customName != null && !customName.isBlank()) {
-                CompoundTag display = tag.get("display") instanceof CompoundTag existingDisplay ? existingDisplay : new CompoundTag();
-                display.putString("Name", customName);
-                tag.put("display", display);
-            }
-            if (!tag.keySet().isEmpty()) {
-                item.put("tag", tag);
-            }
-            item.remove("components");
-        }
-    }
-
-    private static int readIntTag(CompoundTag tag, String key, int fallback) {
-        if (tag == null || tag.get(key) == null) {
-            return fallback;
-        }
-        try {
-            String raw = tag.get(key).toString().replace("\"", "");
-            int suffix = raw.endsWith("b") || raw.endsWith("s") || raw.endsWith("l") || raw.endsWith("f") || raw.endsWith("d") ? 1 : 0;
-            return Integer.parseInt(suffix == 1 ? raw.substring(0, raw.length() - 1) : raw);
-        } catch (Exception ignored) {
-            return fallback;
-        }
-    }
-
-    private static String readStringTag(CompoundTag tag, String key) {
-        return tag == null ? null : tag.getString(key).orElse(null);
-    }
-
     private static String exportEntityType(WorldScene scene, String type) {
-        String id = type == null || type.isBlank() ? "minecraft:marker" : type;
-        int dataVersion = targetVersion(scene).effectiveDataVersion();
-        if (dataVersion < 3337 && (id.equals("minecraft:block_display") || id.equals("minecraft:item_display") || id.equals("minecraft:text_display") || id.equals("minecraft:interaction"))) {
-            return "minecraft:armor_stand";
-        }
-        if (dataVersion < 3463 && (id.equals("minecraft:camel") || id.equals("minecraft:sniffer"))) {
-            return "minecraft:pig";
-        }
-        if (dataVersion < 3953 && (id.equals("minecraft:bogged") || id.equals("minecraft:breeze") || id.equals("minecraft:wind_charge") || id.equals("minecraft:ominous_item_spawner"))) {
-            return "minecraft:marker";
-        }
-        return id;
+        return ExportCompatibility.entityType(type,targetVersion(scene).effectiveDataVersion());
     }
 
     private static int bitsFor(int maxValue) {
@@ -662,12 +684,14 @@ public final class WorldExportEngine {
         return packed;
     }
 
-    private static byte[] filledLight(byte value) {
-        byte[] light = new byte[LIGHT_ARRAY_SIZE];
-        for (int i = 0; i < light.length; i++) {
-            light[i] = value;
+    private static long[] packContiguous(int[] values, int bits) {
+        long[] packed = new long[(values.length * bits + 63) / 64];
+        for (int i = 0; i < values.length; i++) {
+            int offset = i * bits, index = offset >>> 6, shift = offset & 63;
+            packed[index] |= (long) values[i] << shift;
+            if (shift + bits > 64) packed[index + 1] |= (long) values[i] >>> (64 - shift);
         }
-        return light;
+        return packed;
     }
 
     private static final class RegionWriter implements AutoCloseable {

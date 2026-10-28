@@ -47,6 +47,7 @@ public final class MapRegionTextures {
     public static MapRegionTextures shared() {
         return SHARED;
     }
+    public static MapRegionTextures independent(){return new MapRegionTextures();}
 
     private MapRegionTextures() {
     }

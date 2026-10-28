@@ -1,0 +1,304 @@
+[
+  {
+    "file": "src/main/java/net/worldbinder/capture/AuxiliaryCapture.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Dimension"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/capture/CapturedEntityFactory.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Pos"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/capture/ContainerCapture.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Slot"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/capture/SceneCaptureService.java",
+    "reason": "Worker thread name for diagnostics.",
+    "values": [
+      "WorldBinder IO"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/compat/ResourcePackCompatibility.java",
+    "reason": "Reflection member type name in the Minecraft packet API.",
+    "values": [
+      "Action"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/ExportCompatibility.java",
+    "reason": "Internal impact aggregation key; displayed sources and replacements are localized separately.",
+    "values": [
+      "block entity:"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/ExportSavedDataWriter.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Objectives",
+      "Teams"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/ItemDataConverter.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Count",
+      "Damage",
+      "Name",
+      "Lore",
+      "Unbreakable",
+      "Enchantments",
+      "Potion",
+      "Slot",
+      "Items",
+      "Charged",
+      "Inventory",
+      "Item"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/WorldExportEngine.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Items",
+      "Status",
+      "Heightmaps",
+      "Entities",
+      "Sections",
+      "Structures",
+      "Biomes",
+      "Level",
+      "References",
+      "Position",
+      "Palette",
+      "Name",
+      "Properties",
+      "Pos",
+      "Rotation",
+      "Glowing",
+      "Invisible"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/WorldExportMetadataWriter.java",
+    "reason": "Minecraft NBT field names and the historical deterministic seed input; translating these would change saved data.",
+    "values": [
+      "Time",
+      "Difficulty",
+      "Player",
+      "Version",
+      "Data",
+      "Name",
+      "Snapshot",
+      "Series",
+      "Enabled",
+      "Disabled",
+      "Dimension",
+      "Inventory",
+      "Slot",
+      "Pos",
+      "Rotation",
+      "Health",
+      "WorldBinder Export"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/SpongeSchematicExporter.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Pos",
+      "Items",
+      "Data",
+      "Version",
+      "Width",
+      "Height",
+      "Length",
+      "Offset",
+      "Name",
+      "Author",
+      "Date",
+      "Metadata",
+      "Palette",
+      "Blocks",
+      "Entities",
+      "Biomes",
+      "Schematic",
+      "Passengers"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/render/Map3DView.java",
+    "reason": "GPU resource labels and worker thread name; not UI text.",
+    "values": [
+      "WorldBinder 3D map",
+      "worldbinder live map 3d"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/render/MapExporter3D.java",
+    "reason": "OBJ object identifier and glTF schema/template, including generator identity. Human comments and copyright use language keys.",
+    "values": [
+      "o WorldBinder_map\n"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/render/MapExporter3D.java",
+    "reason": "OBJ object identifier and glTF schema/template, including generator identity. Human comments and copyright use language keys.",
+    "sha256": "ade3e130b1e52c30bc8a65c9e174cdac7fd575bb759f8127b0f39218c7bfa1ce"
+  },
+  {
+    "file": "src/main/java/net/worldbinder/render/MapRegionTextures.java",
+    "reason": "GPU texture resource label, not UI text.",
+    "values": [
+      "worldbinder live map region"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/render/MapStatusOverlay.java",
+    "reason": "GPU texture resource label, not UI text.",
+    "values": [
+      "worldbinder live map status"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/scene/ProjectData.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Items"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/scene/SceneLibrary.java",
+    "reason": "JSON manifest format syntax; human-readable findings are stored separately as language keys.",
+    "values": [
+      "  \"format\": \"worldbinder-recovery-v1\",\n",
+      "  \"format\": \"worldbinder-vanilla-world-v1\",\n",
+      "  \"regionFiles\": true,\n",
+      "  \"entityRegionFiles\": true,\n",
+      "  \"poiRegionFiles\": true,\n",
+      "  \"validation\": true,\n",
+      "  \"preview\": true",
+      "  \"format\": \"worldbinder-validation-v1\",\n"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/storage/BlockRecordChunkCache.java",
+    "reason": "Worker thread name for diagnostics.",
+    "values": [
+      "WorldBinder Chunk Cache"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/storage/StorageFlow.java",
+    "reason": "Worker thread name for diagnostics.",
+    "values": [
+      "WorldBinder StorageFlow"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/ui/WorldBinderExportScreen.java",
+    "reason": "Worker thread name for diagnostics.",
+    "values": [
+      "WorldBinder export analysis"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/util/Lang.java",
+    "reason": "Bootstrap error when the language bundle itself is absent; no translation can be loaded.",
+    "values": [
+      "Missing bundled language "
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/validation/PlayerReadback.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Data",
+      "Player",
+      "Health",
+      "Pos",
+      "Rotation",
+      "Inventory",
+      "Slot"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/validation/WorldReadback.java",
+    "reason": "Minecraft/Sponge NBT schema field names, not human-readable labels.",
+    "values": [
+      "Data",
+      "Position",
+      "Entities",
+      "Level",
+      "Sections",
+      "Palette",
+      "Items",
+      "Heightmaps",
+      "Biomes",
+      "Name",
+      "Pos",
+      "Rotation",
+      "Status"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/scene/ContainerMerging.java",
+    "reason": "Vanilla item NBT slot field, not player-facing text.",
+    "values": [
+      "Slot"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/replay/ReplayPlayback.java",
+    "reason": "Upstream product names and internal adapter diagnostics are logged only; the player sees the localized unsupported-integration finding.",
+    "values": [
+      "Flashback",
+      "Flashback seek guard unavailable",
+      "ReplayMod seek guard unavailable"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/BlockEntityDataConverter.java",
+    "reason": "Official legacy NBT field names for sign text, color and weighted spawner entities.",
+    "values": [
+      "Text",
+      "Color",
+      "Entity",
+      "Weight"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/export/common/TargetBlockRegistry.java",
+    "reason": "Official block palette NBT field names, not user-visible labels.",
+    "values": [
+      "Name",
+      "Properties"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/config/GameRuleCatalog.java",
+    "reason": "Bootstrap errors for broken bundled game-rule facts or a duplicate catalog entry; no player-facing state exists yet.",
+    "values": [
+      "Duplicate game rule ",
+      "Missing bundled game-rule facts"
+    ]
+  },
+  {
+    "file": "src/main/java/net/worldbinder/config/GameRuleSettings.java",
+    "reason": "Startup consistency check between the language-audited rule list and the catalog.",
+    "values": [
+      "Game-rule list differs from the catalog"
+    ]
+  }
+]

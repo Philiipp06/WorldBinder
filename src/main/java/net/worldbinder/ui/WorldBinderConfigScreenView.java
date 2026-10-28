@@ -32,7 +32,8 @@ abstract class WorldBinderConfigScreenView extends Screen {
     protected static final int SETTINGS_SIDEBAR_WIDTH = 178;
     protected static final int MOVEMENT_OPTIONS_GROUP = MovementTool.Category.values().length;
 
-    protected enum Tab { GENERAL, PERFORMANCE, HUD, SAFETY, MOVEMENT, DISPLAY }
+    protected enum Tab { GENERAL, PERFORMANCE, HUD, CAPTURE, SAFETY, MOVEMENT, DISPLAY }
+    protected enum CapturePage { CONTAINERS, OVERLAY, LISTS }
     protected enum SafetyPage { CORE, EXPORT, RESOURCE_PACK, GAMERULES }
 
     /** Decorations recorded while the widgets are laid out, so drawing and widgets share one layout. */
@@ -72,6 +73,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
     protected int maxScroll;
     protected int movementGroup;
     protected int gameRuleCategory;
+    protected CapturePage capturePage = CapturePage.CONTAINERS;
     protected Component validationError;
     protected Component statusMessage;
     protected long statusMessageMillis;
@@ -145,7 +147,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
     }
 
     protected boolean hasSubNavigation() {
-        return tab == Tab.SAFETY || tab == Tab.MOVEMENT;
+        return tab == Tab.SAFETY || tab == Tab.MOVEMENT || tab == Tab.CAPTURE;
     }
 
     protected int contentBaseY(int top, int panelWidth) {
@@ -306,10 +308,10 @@ abstract class WorldBinderConfigScreenView extends Screen {
             pillW = footerPill(context, x, footerY + 3, maxWidth, Lang.string("worldbinder.config.saved_state"), WbTheme.OK, WbIcon.CHECK);
         }
         int hintX = x + pillW + 10;
-        int hintW = 30 + font.width("Ctrl") + font.width("S") + font.width(Lang.string("worldbinder.config.shortcut_save"));
+        int hintW = 30 + font.width(Lang.string("worldbinder.key.control")) + font.width("S") + font.width(Lang.string("worldbinder.config.shortcut_save"));
         if (hintX + hintW < limit) {
             int kx = hintX;
-            kx += WbChrome.drawKeycap(context, font, kx, footerY + 4, "Ctrl") + 2;
+            kx += WbChrome.drawKeycap(context, font, kx, footerY + 4, Lang.string("worldbinder.key.control")) + 2;
             kx += WbChrome.drawKeycap(context, font, kx, footerY + 4, "S") + 4;
             context.text(font, Lang.string("worldbinder.config.shortcut_save"), kx, footerY + 6, WbTheme.TEXT_DIM, false);
         }
@@ -349,6 +351,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case GENERAL -> "worldbinder.config.general_export";
             case PERFORMANCE -> "worldbinder.config.performance_presets";
             case HUD -> "worldbinder.config.hud_title";
+            case CAPTURE -> captureLabelKey(capturePage);
             case SAFETY -> safetyTitle();
             case MOVEMENT -> movementGroup >= MOVEMENT_OPTIONS_GROUP ? "worldbinder.config.movement.group.options"
                     : MovementTool.Category.values()[movementGroup].titleKey;
@@ -361,6 +364,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case GENERAL -> WbTheme.ACCENT;
             case PERFORMANCE -> WbTheme.ACCENT_RIGHT;
             case HUD -> WbTheme.INFO;
+            case CAPTURE -> WbTheme.ACCENT_RIGHT;
             case SAFETY -> WbTheme.WARN;
             case MOVEMENT -> WbTheme.OK;
             case DISPLAY -> WbTheme.ACCENT_DARK;
@@ -372,6 +376,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case GENERAL -> WbIcon.GLOBE;
             case PERFORMANCE -> WbIcon.PERFORMANCE;
             case HUD -> WbIcon.HUD;
+            case CAPTURE -> WbIcon.CONTAINER;
             case SAFETY -> WbIcon.SHIELD;
             case MOVEMENT -> WbIcon.MOVEMENT;
             case DISPLAY -> WbIcon.PALETTE;
@@ -383,6 +388,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case GENERAL -> "worldbinder.config.tab.general";
             case PERFORMANCE -> "worldbinder.config.tab.performance";
             case HUD -> "worldbinder.config.tab.hud";
+            case CAPTURE -> "worldbinder.config.tab.capture";
             case SAFETY -> "worldbinder.config.tab.safety";
             case MOVEMENT -> "worldbinder.config.tab.movement";
             case DISPLAY -> "worldbinder.config.tab.display";
@@ -399,6 +405,22 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case EXPORT -> "worldbinder.config.safety.page.export";
             case RESOURCE_PACK -> "worldbinder.config.safety.page.pack";
             case GAMERULES -> "worldbinder.config.safety.page.gamerules";
+        };
+    }
+
+    protected String captureLabelKey(CapturePage value) {
+        return switch (value) {
+            case CONTAINERS -> "worldbinder.config.capture.page.containers";
+            case OVERLAY -> "worldbinder.config.capture.page.overlay";
+            case LISTS -> "worldbinder.config.capture.page.lists";
+        };
+    }
+
+    protected WbIcon captureIcon(CapturePage value) {
+        return switch (value) {
+            case CONTAINERS -> WbIcon.CHEST;
+            case OVERLAY -> WbIcon.GRID;
+            case LISTS -> WbIcon.LIST;
         };
     }
 
@@ -523,7 +545,8 @@ abstract class WorldBinderConfigScreenView extends Screen {
         } else if (tab == Tab.SAFETY && safetyPage == SafetyPage.GAMERULES) {
             drawSectionSurface(c, x + 4, y + 22, innerW, 42, WbTheme.WARN);
             if (isTextInContentArea(y + 32)) {
-                WbText.drawClipped(c, font, Lang.string("worldbinder.gamerules.target", draft.targetMinecraftVersion),
+                WbText.drawClipped(c, font, Lang.string("worldbinder.gamerules.target_summary", draft.targetMinecraftVersion,
+                        GameRuleSettings.rules(draft.targetMinecraftVersion).length, gameRules.changedCount(draft.targetMinecraftVersion)),
                         x + 16, y + 32, w - 32, WbTheme.TEXT_MUTED);
             }
         } else if (tab == Tab.SAFETY && safetyPage == SafetyPage.CORE) {
@@ -711,6 +734,7 @@ abstract class WorldBinderConfigScreenView extends Screen {
             case GENERAL -> "worldbinder.config.navigation.general";
             case PERFORMANCE -> "worldbinder.config.navigation.performance";
             case HUD -> "worldbinder.config.navigation.hud";
+            case CAPTURE -> "worldbinder.config.navigation.capture";
             case SAFETY -> "worldbinder.config.navigation.safety";
             case MOVEMENT -> "worldbinder.config.navigation.movement";
             case DISPLAY -> "worldbinder.config.navigation.display";

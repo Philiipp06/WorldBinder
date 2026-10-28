@@ -11,7 +11,7 @@ public final class WorldBinder {
     public static final String MOD_ID = "worldbinder";
     public static final String MOD_NAME = "WorldBinder";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_NAME);
-    public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    public static final Gson GSON = net.worldbinder.scene.ArchiveArrays.configure(new GsonBuilder()).setPrettyPrinting().disableHtmlEscaping().create();
 
     private static volatile WorldBinderConfig config;
 

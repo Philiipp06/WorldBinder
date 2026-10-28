@@ -1,7 +1,5 @@
 package net.worldbinder.input;
 
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -20,10 +18,11 @@ import net.worldbinder.storage.StorageFlow;
 import net.worldbinder.storage.StorageStage;
 
 public final class WorldBinderKeybinds {
+    private static java.util.function.Consumer<Minecraft> captureKeys=client->{};
+    public static void replayPausedKeys(Minecraft client){captureKeys.accept(client);}
     private static final KeyMapping.Category WORLD_BINDER_CATEGORY = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WorldBinder.MOD_ID, WorldBinder.MOD_ID));
 
-    private static boolean storagePopupOpenedForCurrentJob;
-    private static StorageStage lastStorageStage = StorageStage.IDLE;
+    private static long storagePopupJob = -1L;
 
     private static InputConstants.Type keyboardType() {
         try {
@@ -37,7 +36,7 @@ public final class WorldBinderKeybinds {
         try {
             return InputConstants.class.getField(field).getInt(null);
         } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException("Missing Minecraft key: " + field, exception);
+            throw new net.worldbinder.validation.FindingStateException(net.worldbinder.validation.Finding.of("worldbinder.error.key_constant", field), exception);
         }
     }
 
@@ -45,42 +44,42 @@ public final class WorldBinderKeybinds {
     }
 
     public static void register(SelectionManager selections, SceneCaptureService capture, ScenePlacementService placement, SceneLibrary library) {
-        KeyMapping openMenu = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping openMenu = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.open_menu",
                 keyboardType(),
                 keyCode("KEY_F9"),
                 WORLD_BINDER_CATEGORY,
                 0
         ));
-        KeyMapping setFirst = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping setFirst = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.set_pos_1",
                 keyboardType(),
                 keyCode("KEY_F7"),
                 WORLD_BINDER_CATEGORY,
                 1
         ));
-        KeyMapping setSecond = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping setSecond = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.set_pos_2",
                 keyboardType(),
                 keyCode("KEY_F8"),
                 WORLD_BINDER_CATEGORY,
                 2
         ));
-        KeyMapping quickCapture = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping quickCapture = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.quick_capture_world",
                 keyboardType(),
                 keyCode("KEY_F6"),
                 WORLD_BINDER_CATEGORY,
                 3
         ));
-        KeyMapping openMap = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping openMap = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.open_map",
                 keyboardType(),
                 keyCode("KEY_F10"),
                 WORLD_BINDER_CATEGORY,
                 4
         ));
-        KeyMapping openMovement = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping openMovement = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.open_movement",
                 keyboardType(),
                 keyCode("KEY_F12"),
@@ -88,7 +87,7 @@ public final class WorldBinderKeybinds {
                 5
         ));
 
-        KeyMapping toggleMovementMaster = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+        KeyMapping toggleMovementMaster = net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                 "key.worldbinder.toggle_movement",
                 keyboardType(),
                 InputConstants.UNKNOWN.getValue(),
@@ -98,7 +97,7 @@ public final class WorldBinderKeybinds {
         java.util.EnumMap<net.worldbinder.movement.MovementTool, KeyMapping> toolKeys = new java.util.EnumMap<>(net.worldbinder.movement.MovementTool.class);
         int order = 7;
         for (net.worldbinder.movement.MovementTool tool : net.worldbinder.movement.MovementTool.values()) {
-            toolKeys.put(tool, KeyMappingHelper.registerKeyMapping(new KeyMapping(
+            toolKeys.put(tool, net.worldbinder.platform.Platform.get().registerKey(new KeyMapping(
                     tool.keybindKey(),
                     keyboardType(),
                     InputConstants.UNKNOWN.getValue(),
@@ -108,20 +107,14 @@ public final class WorldBinderKeybinds {
         }
         MovementKeys.register(toggleMovementMaster, toolKeys);
 
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            MovementKeys.tick(client);
-            if (StorageFlow.progress().stage() != lastStorageStage) {
-                lastStorageStage = StorageFlow.progress().stage();
-                if (lastStorageStage == StorageStage.SNAPSHOT) {
-                    storagePopupOpenedForCurrentJob = false;
-                }
-            }
-            if (client.player == null && StorageFlow.progress().isRunning() && !storagePopupOpenedForCurrentJob && !(net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderStorageProgressScreen)) {
-                storagePopupOpenedForCurrentJob = true;
+        captureKeys=client -> {
+            if (client.player == null && StorageFlow.progress().isRunning() && storagePopupJob != StorageFlow.progress().jobId()) {
+                storagePopupJob = StorageFlow.progress().jobId();
+                if (!(net.worldbinder.compat.ClientCompat.screen(client) instanceof WorldBinderStorageProgressScreen))
                 net.worldbinder.compat.ClientCompat.setScreen(client, new WorldBinderStorageProgressScreen(net.worldbinder.compat.ClientCompat.screen(client)));
             }
             while (openMenu.consumeClick()) {
-                net.worldbinder.compat.ClientCompat.setScreen(Minecraft.getInstance(), new WorldBinderScreen(selections, capture, placement, library));
+                net.worldbinder.client.WorldBinderClient.openControlCenter();
             }
             while (setFirst.consumeClick()) {
                 selections.setFirstFromCrosshair();
@@ -146,7 +139,11 @@ public final class WorldBinderKeybinds {
             while (openMovement.consumeClick()) {
                 net.worldbinder.compat.ClientCompat.setScreen(client, WorldBinderConfigScreen.movement(net.worldbinder.compat.ClientCompat.screen(client)));
             }
-            capture.tick();
+        };
+        net.worldbinder.platform.Platform.get().endTick(client -> {
+            MovementKeys.tick(client);
+            captureKeys.accept(client);
+            net.worldbinder.client.WorldBinderClient.captureTick();
             placement.tick();
         });
     }

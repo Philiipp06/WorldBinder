@@ -186,12 +186,12 @@ public final class WorldBinderLegalStartScreen extends Screen {
         }
         Button start = WbButton.icon(WbButton.primary(WbButton.create(innerX + innerW - startW, buttonY, startW, 24, actionLabel,
                 Lang.text("worldbinder.legal.start.tooltip"), b -> startWithName())), WbIcon.PLAY);
-        WbTooltips.hint(start, Component.literal("Enter"));
+        WbTooltips.hint(start, Lang.text("worldbinder.key.enter"));
         addRenderableWidget(start);
         Button cancel = WbButton.icon(WbButton.quiet(WbButton.create(innerX, buttonY, cancelW, 24,
                 Lang.string("worldbinder.gui.cancel"), Lang.text("worldbinder.legal.cancel.tooltip"),
                 b -> net.worldbinder.compat.ClientCompat.setScreen(minecraft, parent))), WbIcon.CLOSE);
-        WbTooltips.hint(cancel, Component.literal("Esc"));
+        WbTooltips.hint(cancel, Lang.text("worldbinder.key.escape"));
         addRenderableWidget(cancel);
         setInitialFocus(archiveName);
     }
@@ -270,7 +270,7 @@ public final class WorldBinderLegalStartScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_RETURN") || event.key() == net.worldbinder.compat.ClientCompat.key("KEY_NUMPADENTER")) {
             startWithName();
             return true;
         }

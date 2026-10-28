@@ -188,12 +188,12 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         Button undoButton = WbButton.iconOnly(WbButton.quiet(WbButton.create(innerX, toolsY, 22, 18, Lang.string("worldbinder.widget_editor.undo"),
                 Component.translatable("worldbinder.tooltip.widget_editor.undo"), button -> undo())), WbIcon.BACK);
         undoButton.active = !undo.isEmpty();
-        WbTooltips.hint(undoButton, Component.literal("Ctrl + Z"));
+        WbTooltips.hint(undoButton, Lang.text("worldbinder.shortcut.undo"));
         addRenderableWidget(undoButton);
         Button redoButton = WbButton.iconOnly(WbButton.quiet(WbButton.create(innerX + 26, toolsY, 22, 18, Lang.string("worldbinder.widget_editor.redo"),
                 Component.translatable("worldbinder.tooltip.widget_editor.redo"), button -> redo())), WbIcon.CHEVRON_RIGHT);
         redoButton.active = !redo.isEmpty();
-        WbTooltips.hint(redoButton, Component.literal("Ctrl + Y"));
+        WbTooltips.hint(redoButton, Lang.text("worldbinder.shortcut.redo"));
         addRenderableWidget(redoButton);
         Button reset = WbButton.quiet(WbButton.create(innerX + 52, toolsY, compact ? 22 : innerW - 52, 18,
                 Component.translatable("worldbinder.widget_editor.reset_widget"), Component.translatable("worldbinder.tooltip.widget_editor.reset"),
@@ -210,12 +210,12 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
         Button apply = WbButton.icon(WbButton.primary(WbButton.create(actionsX, buttonY, actionW, 20,
                 Component.translatable("worldbinder.widget_editor.apply"), Component.translatable("worldbinder.tooltip.widget_editor.apply"),
                 button -> applyAndClose())), WbIcon.CHECK);
-        WbTooltips.hint(apply, Component.literal("Enter"));
+        WbTooltips.hint(apply, Lang.text("worldbinder.key.enter"));
         addRenderableWidget(apply);
         Button cancel = WbButton.icon(WbButton.quiet(WbButton.create(actionsX + actionW + 6, buttonY, actionW, 20,
                 Component.translatable("worldbinder.config.cancel"), Component.translatable("worldbinder.tooltip.config.back"),
                 button -> onClose())), WbIcon.CLOSE);
-        WbTooltips.hint(cancel, Component.literal("Esc"));
+        WbTooltips.hint(cancel, Lang.text("worldbinder.key.escape"));
         addRenderableWidget(cancel);
     }
 
@@ -228,7 +228,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
                     WorldBinderWidgetLayout.setEnabled(working, selected, !WorldBinderWidgetLayout.enabled(working, selected));
                     rebuildControls();
                 });
-        WbTooltips.hint(enabled, Component.literal("Del"));
+        WbTooltips.hint(enabled, Lang.text("worldbinder.key.delete"));
         addRenderableWidget(WbButton.toggle(enabled, accent(), WorldBinderWidgetLayout.enabled(working, selected)));
         y += 24;
         int maxScale = selected == WorldBinderWidgetLayout.Widget.NOTIFICATIONS ? 160 : 180;
@@ -477,7 +477,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             return true;
         }
         if (insidePanel(event.x(), event.y())) {
-            if (!panelCollapsed && event.button() == InputConstants.MOUSE_BUTTON_LEFT
+            if (!panelCollapsed && event.button() == net.worldbinder.compat.ClientCompat.mouseLeft()
                     && event.y() < panelY() + 24 && event.x() < panelX() + panelWidth() - 52) {
                 movingPanel = true;
                 dragOffsetX = (int) Math.round(event.x()) - panelX();
@@ -486,7 +486,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             }
             return super.mouseClicked(event, doubleClick);
         }
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+        if (event.button() == net.worldbinder.compat.ClientCompat.mouseLeft()) {
             WorldBinderWidgetLayout.Widget hit = widgetAt(event.x(), event.y());
             if (hit != null) {
                 boolean changedSelection = selected != hit;
@@ -517,13 +517,13 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double offsetX, double offsetY) {
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && movingPanel) {
+        if (event.button() == net.worldbinder.compat.ClientCompat.mouseLeft() && movingPanel) {
             panelLeft = clamp((int) Math.round(event.x()) - dragOffsetX, 4, width - panelWidth() - 4);
             panelTop = clamp((int) Math.round(event.y()) - dragOffsetY, 4, height - panelHeight() - 4);
             rebuildControls();
             return true;
         }
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && resizing) {
+        if (event.button() == net.worldbinder.compat.ClientCompat.mouseLeft() && resizing) {
             int deltaX = (int) Math.round(event.x()) - resizeStartX;
             int deltaY = (int) Math.round(event.y()) - resizeStartY;
             int delta = Math.round((deltaX + deltaY) / 2.0F);
@@ -534,7 +534,7 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
             WorldBinderWidgetLayout.setScale(working, selected, nextScale);
             return true;
         }
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && dragging) {
+        if (event.button() == net.worldbinder.compat.ClientCompat.mouseLeft() && dragging) {
             WorldBinderHud.WidgetBounds bounds = WorldBinderHud.previewBounds(minecraft, working, selected);
             int x = (int) Math.round(event.x()) - dragOffsetX;
             int y = (int) Math.round(event.y()) - dragOffsetY;
@@ -609,45 +609,45 @@ public final class WorldBinderWidgetEditorScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         int key = event.key();
-        if (previewMode && (key == InputConstants.KEY_ESCAPE || key == InputConstants.KEY_H)) {
+        if (previewMode && (key == net.worldbinder.compat.ClientCompat.key("KEY_ESCAPE") || key == net.worldbinder.compat.ClientCompat.key("KEY_H"))) {
             togglePreview();
             return true;
         }
-        if (event.hasControlDown() && key == InputConstants.KEY_Z) {
+        if (event.hasControlDown() && key == net.worldbinder.compat.ClientCompat.key("KEY_Z")) {
             if (event.hasShiftDown()) redo(); else undo();
             return true;
         }
-        if (event.hasControlDown() && key == InputConstants.KEY_Y) {
+        if (event.hasControlDown() && key == net.worldbinder.compat.ClientCompat.key("KEY_Y")) {
             redo();
             return true;
         }
         if (getFocused() == null || !(getFocused() instanceof net.minecraft.client.gui.components.AbstractSliderButton)) {
             int step = event.hasShiftDown() ? 10 : 1;
-            if (key == InputConstants.KEY_LEFT) { moveSelectedBy(-step, 0); return true; }
-            if (key == InputConstants.KEY_RIGHT) { moveSelectedBy(step, 0); return true; }
-            if (key == InputConstants.KEY_UP) { moveSelectedBy(0, -step); return true; }
-            if (key == InputConstants.KEY_DOWN) { moveSelectedBy(0, step); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_LEFT")) { moveSelectedBy(-step, 0); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_RIGHT")) { moveSelectedBy(step, 0); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_UP")) { moveSelectedBy(0, -step); return true; }
+            if (key == net.worldbinder.compat.ClientCompat.key("KEY_DOWN")) { moveSelectedBy(0, step); return true; }
         }
-        if (key == InputConstants.KEY_H) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_H")) {
             togglePreview();
             return true;
         }
-        if (key == InputConstants.KEY_DELETE) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_DELETE")) {
             checkpoint();
             WorldBinderWidgetLayout.setEnabled(working, selected, !WorldBinderWidgetLayout.enabled(working, selected));
             rebuildControls();
             return true;
         }
-        if (key == InputConstants.KEY_RETURN && !(getFocused() instanceof Button)) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_RETURN") && !(getFocused() instanceof Button)) {
             applyAndClose();
             return true;
         }
-        if (key == InputConstants.KEY_TAB && event.hasControlDown()) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_TAB") && event.hasControlDown()) {
             WorldBinderWidgetLayout.Widget[] widgets = WorldBinderWidgetLayout.Widget.values();
             select(widgets[Math.floorMod(selected.ordinal() + (event.hasShiftDown() ? -1 : 1), widgets.length)]);
             return true;
         }
-        if (key == InputConstants.KEY_TAB) {
+        if (key == net.worldbinder.compat.ClientCompat.key("KEY_TAB")) {
             WbTooltips.noteKeyboardNavigation();
         }
         return super.keyPressed(event);

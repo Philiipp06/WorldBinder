@@ -1,6 +1,6 @@
 package net.worldbinder.io;
 
-import net.fabricmc.loader.api.FabricLoader;
+
 import net.worldbinder.util.Lang;
 import net.worldbinder.WorldBinder;
 import net.worldbinder.util.FileNames;
@@ -10,10 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class WorldBinderPaths {
-    public static final Path BASE = FabricLoader.getInstance().getConfigDir().resolve(WorldBinder.MOD_ID);
+    public static final Path BASE = net.worldbinder.platform.Platform.get().configDirectory().resolve(WorldBinder.MOD_ID);
     public static final Path ARCHIVES = BASE.resolve("archives");
     public static final Path SCENES = ARCHIVES.resolve("scenes");
-    public static final Path GAME_DIR = FabricLoader.getInstance().getGameDir();
+    public static final Path GAME_DIR = net.worldbinder.platform.Platform.get().gameDirectory();
     public static final Path MINECRAFT_SAVES = GAME_DIR.resolve("saves");
     public static final Path RECOVERY_ROOT = MINECRAFT_SAVES.resolve("WorldBinder");
     public static final Path CACHE_ROOT = RECOVERY_ROOT.resolve(".cache");

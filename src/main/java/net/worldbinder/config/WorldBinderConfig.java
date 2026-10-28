@@ -60,6 +60,18 @@ public final class WorldBinderConfig {
     public boolean mapSmoothCamera = true;
     public double mapZoom = 2.0D;
     public boolean mapExploreMode = false;
+    public boolean scannerSkipVerified = true;
+    public boolean worldChunkOverlay = false;
+    /** Opt-in: records other players from the tab list and the world for the players.csv export. */
+    public boolean recordPlayerList = false;
+    /** Outlines received containers whose contents the project does not know yet (1.7.0). */
+    public boolean containerHighlight = true;
+    public int containerHighlightRadius = 24;
+    public boolean containerHighlightPartial = true;
+    public boolean containerHighlightVerified = false;
+    public boolean containerHighlightThroughWalls = false;
+    public boolean containerHighlightLabels = true;
+    public int worldChunkOverlayRadius = 4;
     public boolean mapShowHostile = true;
     public boolean mapShowPassive = true;
     public boolean mapShowItems = false;
@@ -128,7 +140,12 @@ public final class WorldBinderConfig {
         BALANCED,
         FAST,
         EXTREME,
-        CUSTOM
+        CUSTOM;
+        public String label(){return net.worldbinder.util.Lang.string(switch(this){
+            case SAFE->"worldbinder.gui.preset_safe";case BALANCED->"worldbinder.gui.preset_balanced";
+            case FAST->"worldbinder.gui.preset_fast";case EXTREME->"worldbinder.gui.preset_extreme";
+            case CUSTOM->"worldbinder.gui.custom_mode";
+        });}
     }
 
     public enum MapLayerMode {
@@ -195,6 +212,9 @@ public final class WorldBinderConfig {
     public int maxArchiveWorkMs = 12;
     public boolean serverSafetyMode = true;
     public boolean autoSaveOnDisconnect = true;
+    public net.worldbinder.scene.CaptureSettings captureDefaults = new net.worldbinder.scene.CaptureSettings();
+    public boolean autoCaptureOnJoin;
+    public java.util.Map<String,net.worldbinder.scene.NetworkProfile> networkProfiles=new java.util.LinkedHashMap<>();
     public boolean crashRecovery = true;
     public int recoveryAutosaveSeconds = 30;
     public int captureMinY = -64;
@@ -582,6 +602,15 @@ public final class WorldBinderConfig {
     }
 
     private WorldBinderConfig normalized() {
+        if(captureDefaults==null)captureDefaults=new net.worldbinder.scene.CaptureSettings();
+        captureDefaults.normalize();
+        if(networkProfiles==null)networkProfiles=new java.util.LinkedHashMap<>();
+        networkProfiles.values().removeIf(java.util.Objects::isNull);
+        for(var profile:networkProfiles.values()){
+            if(profile.backends==null)profile.backends=new java.util.LinkedHashMap<>();
+            profile.backends.entrySet().removeIf(e->e.getValue()==null||!e.getKey().equals(e.getValue().id));
+            if(profile.captureSettings!=null)profile.captureSettings.normalize();
+        }
         messageMode = effectiveMessageMode();
         if (movement == null) movement = new net.worldbinder.movement.MovementSettings();
         movement.normalize();

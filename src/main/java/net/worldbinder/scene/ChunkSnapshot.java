@@ -3,7 +3,7 @@ package net.worldbinder.scene;
 import java.time.Instant;
 import java.util.Arrays;
 
-public final class ChunkSnapshot {
+public final class ChunkSnapshot implements Cloneable {
     public int chunkX;
     public int chunkZ;
     public int[] colors = new int[16 * 16];
@@ -17,7 +17,15 @@ public final class ChunkSnapshot {
     public int savedBlocks;
     public int entityCount;
     public int blockEntityCount;
-    public boolean hasBiomeData = true;
+    public boolean hasBiomeData;
+    public int captureMinY = Integer.MIN_VALUE;
+    public int captureMaxY = Integer.MIN_VALUE;
+    public boolean fullChunkColumns;
+    public boolean relightRequired;
+    public int[] captureBox;
+    public java.util.List<int[]> coverageBoxes = new java.util.ArrayList<>();
+    public java.util.List<int[]> replacementRanges = new java.util.ArrayList<>();
+    public java.util.Map<Integer, ChunkSectionData> sections = new java.util.LinkedHashMap<>();
     public boolean lightEstimated = true;
     public boolean hasSnapshot;
     public boolean verifiedEmpty;
@@ -45,6 +53,23 @@ public final class ChunkSnapshot {
         this();
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
+    }
+
+    /** In-memory snapshots must not serialize/compress every array just to clone it on the client thread. */
+    public ChunkSnapshot copy() {
+        try {
+            ChunkSnapshot copy=(ChunkSnapshot)super.clone();
+            copy.colors=colors==null?null:colors.clone();copy.heights=heights==null?null:heights.clone();
+            copy.captureBox=captureBox==null?null:captureBox.clone();copy.coverageBoxes=new java.util.ArrayList<>();
+            if(coverageBoxes!=null)for(int[] box:coverageBoxes)copy.coverageBoxes.add(box.clone());
+            copy.states=states==null?null:states.clone();copy.markerHeights=markerHeights==null?null:markerHeights.clone();copy.markerColors=markerColors==null?null:markerColors.clone();
+            copy.replacementRanges=replacementRanges==null?null:new java.util.ArrayList<>();
+            if(replacementRanges!=null)for(int[] range:replacementRanges)copy.replacementRanges.add(range.clone());
+            copy.sections=new java.util.LinkedHashMap<>();
+            if(sections!=null)sections.forEach((key,value)->{var section=new ChunkSectionData();
+                section.biomes=value.biomes==null?null:value.biomes.clone();section.blockLight=value.blockLight==null?null:value.blockLight.clone();section.skyLight=value.skyLight==null?null:value.skyLight.clone();copy.sections.put(key,section);});
+            return copy;
+        }catch(CloneNotSupportedException impossible){throw new AssertionError(impossible);}
     }
 
     public void markScanned(boolean saved, boolean blockEntity) {
@@ -242,12 +267,12 @@ public final class ChunkSnapshot {
 
     public String lastScannedText() {
         if (lastScannedAtMillis <= 0L) {
-            return "never";
+            return net.worldbinder.util.Lang.string("worldbinder.quality.never");
         }
         long seconds = Math.max(0L, (System.currentTimeMillis() - lastScannedAtMillis) / 1000L);
-        if (seconds < 60L) return seconds + "s ago";
+        if (seconds < 60L) return net.worldbinder.util.Lang.string("worldbinder.time.seconds_ago", seconds);
         long minutes = seconds / 60L;
-        if (minutes < 60L) return minutes + "m ago";
+        if (minutes < 60L) return net.worldbinder.util.Lang.string("worldbinder.time.minutes_ago", minutes);
         return Instant.ofEpochMilli(lastScannedAtMillis).toString();
     }
 

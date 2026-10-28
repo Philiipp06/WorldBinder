@@ -12,6 +12,9 @@ public final class MapData {
     private MapData() {
     }
 
+    public static void demand() { MapExplorer.get().demand(); MapVoxels.get().demand(); }
+    public static void invalidate(int x, int z) { MapExplorer.get().invalidate(x,z); MapVoxels.get().invalidate(x,z); }
+
     public static LongFunction<ChunkSnapshot> lookup(Map<Long, ChunkSnapshot> captured) {
         MapExplorer explorer = MapExplorer.get();
         if (explorer.size() == 0) {
@@ -24,7 +27,7 @@ public final class MapData {
     }
 
     public static LongFunction<ChunkSnapshot> lookup(SceneCaptureService capture) {
-        return lookup(capture == null ? Map.of() : capture.chunkSnapshotsView());
+        return lookup(capture == null||!capture.projectMatchesCurrentWorld() ? Map.of() : capture.chunkSnapshotsView());
     }
 
     /** Copy of every known chunk (explored first, captured overriding) for background export. */
@@ -36,6 +39,9 @@ public final class MapData {
 
     /** Chunk bounds {minX, minZ, maxX, maxZ} of all known data, or {@code null} when nothing is known. */
     public static int[] bounds(Map<Long, ChunkSnapshot> captured) {
+        return bounds(captured,true);
+    }
+    public static int[] bounds(Map<Long, ChunkSnapshot> captured,boolean live) {
         int minX = Integer.MAX_VALUE;
         int minZ = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE;
@@ -49,7 +55,7 @@ public final class MapData {
             maxZ = Math.max(maxZ, cz);
         }
         MapExplorer explorer = MapExplorer.get();
-        if (explorer.hasBounds()) {
+        if (live&&explorer.hasBounds()) {
             minX = Math.min(minX, explorer.minChunkX());
             minZ = Math.min(minZ, explorer.minChunkZ());
             maxX = Math.max(maxX, explorer.maxChunkX());

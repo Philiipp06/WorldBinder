@@ -1,0 +1,46 @@
+[
+  {
+    "file": "worldedit-mod-7.4.6.jar",
+    "version": "7.4.6",
+    "sourceVersionId": "ByRNkO83",
+    "runtime": "fabric",
+    "url": "https://cdn.modrinth.com/data/1u6JkXh5/versions/ByRNkO83/worldedit-mod-7.4.6.jar",
+    "algorithm": "SHA512",
+    "hash": "3bc4fbf2ee36746f54dc036283b3ded3f17fd91991eaa1ead76b0861aa902cd7ffbc0962db0065d8690e46d1c4890847ebe97ee0b4e36a979b41168c30586ee4"
+  },
+  {
+    "file": "litematica-fabric-26.3-0.29.1.jar",
+    "version": "0.29.1",
+    "sourceVersionId": "ZqV316KY",
+    "runtime": "fabric",
+    "url": "https://cdn.modrinth.com/data/bEpr0Arc/versions/ZqV316KY/litematica-fabric-26.3-0.29.1.jar",
+    "algorithm": "SHA512",
+    "hash": "45a8d468463afb97b3fc72efa168024ad69e670e77f5455ecf588583434a1787b32795edf5236579c32c828b02873efb39a4808caa08bbbaf1d8b6b090b160c3"
+  },
+  {
+    "file": "malilib-fabric-26.3-0.30.2.jar",
+    "version": "0.30.2",
+    "sourceVersionId": "JX9bESec",
+    "runtime": "fabric",
+    "url": "https://cdn.modrinth.com/data/GcWjdA9I/versions/JX9bESec/malilib-fabric-26.3-0.30.2.jar",
+    "algorithm": "SHA512",
+    "hash": "8f17a5d70cb2f461aeb540f4a99de01c3351f8d3678d902d3d00cfe5d10c039fdc111c1079fe23aacb7936b793ad1cd045a8dc3a9e7926865820c254d92345b8"
+  },
+  {
+    "file": "FastAsyncWorldEdit-Paper-2.16.1.jar",
+    "version": "2.16.1",
+    "sourceVersionId": "A1gBu4MM",
+    "runtime": "paper",
+    "url": "https://cdn.modrinth.com/data/z4HZZnLr/versions/A1gBu4MM/FastAsyncWorldEdit-Paper-2.16.1.jar",
+    "algorithm": "SHA512",
+    "hash": "711c7c358a5b4ec73160413a4aa08829d2cd474f75e1dc379c0ebc9b63b5b6458de8113c10bbaf3594497db558d7ae2519c7d7c37353be142a797a7eeee3ce43"
+  },
+  {
+    "file": "paper-26.3-222.jar",
+    "version": "26.3 build 222",
+    "runtime": "paper",
+    "url": "https://fill-data.papermc.io/v1/objects/f649771a2190214306fb0cfba22c7b2cbac5df6308b1158309593603ed07d488/paper-26.3-222.jar",
+    "algorithm": "SHA256",
+    "hash": "f649771a2190214306fb0cfba22c7b2cbac5df6308b1158309593603ed07d488"
+  }
+]

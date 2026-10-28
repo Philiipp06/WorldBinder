@@ -1,0 +1,79 @@
+[
+  {
+    "id": "bungee",
+    "version": "2107",
+    "file": "bungee-2107-BungeeCord.jar",
+    "url": "https://hub.spigotmc.org/jenkins/job/BungeeCord/2107/artifact/bootstrap/target/BungeeCord.jar",
+    "source": "https://hub.spigotmc.org/jenkins/job/BungeeCord/2107/",
+    "algorithm": "sha256",
+    "hash": "9f178e6b6db2b09fbc25407f872f30a007ee0a171622787407318662377e9b48",
+    "checksumProvenance": "Locally measured SHA-256 of the pinned official Jenkins build; no publisher SHA-256 was supplied"
+  },
+  {
+    "id": "bungee-command",
+    "version": "2107",
+    "file": "bungee-2107-cmd_server.jar",
+    "url": "https://hub.spigotmc.org/jenkins/job/BungeeCord/2107/artifact/module/cmd-server/target/cmd_server.jar",
+    "source": "https://hub.spigotmc.org/jenkins/job/BungeeCord/2107/",
+    "algorithm": "sha256",
+    "hash": "a14e8c2a764a71c336123c7e154dc4585872540c4fb6367c0a2a0dcf9813f45d",
+    "checksumProvenance": "Locally measured SHA-256 of the pinned official Jenkins build; no publisher SHA-256 was supplied"
+  },
+  {
+    "id": "waterfall",
+    "version": "1.21 build 615",
+    "file": "waterfall-1.21-615.jar",
+    "url": "https://fill-data.papermc.io/v1/objects/5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c/waterfall-1.21-615.jar",
+    "source": "https://fill.papermc.io/v3/projects/waterfall/versions/1.21/builds/615",
+    "algorithm": "sha256",
+    "hash": "5eda8bfd0691e5088701f87020c68964299586df0faba289a634122d282d598c"
+  },
+  {
+    "id": "waterfall-command",
+    "version": "1.21 build 615",
+    "file": "cmd_server-1.21-615.jar",
+    "url": "https://fill-data.papermc.io/v1/objects/d1c68f7c0469e61c83939a37abae08f8ad231fc5bb4c7f455065af42f7950710/cmd_server-1.21-615.jar",
+    "source": "https://fill.papermc.io/v3/projects/waterfall/versions/1.21/builds/615",
+    "algorithm": "sha256",
+    "hash": "d1c68f7c0469e61c83939a37abae08f8ad231fc5bb4c7f455065af42f7950710"
+  },
+  {
+    "id": "viaversion",
+    "version": "5.12.1",
+    "file": "ViaVersion-5.12.1.jar",
+    "url": "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.1/ViaVersion-5.12.1.jar",
+    "source": "https://github.com/ViaVersion/ViaVersion/releases/tag/5.12.1",
+    "algorithm": "sha256",
+    "hash": "b8033807e7182c35003a45962352dd642c1e91880ca281da3a43cb6f481a95a2"
+  },
+  {
+    "id": "viafabric",
+    "version": "0.4.22+188-26.x",
+    "versionType": "alpha",
+    "file": "ViaFabric-0.4.22+188-26.x.jar",
+    "url": "https://cdn.modrinth.com/data/YlKdE5VK/versions/z1FVDMnq/ViaFabric-0.4.22%2B188-26.x.jar",
+    "source": "https://modrinth.com/mod/viafabric/version/z1FVDMnq",
+    "algorithm": "sha512",
+    "hash": "090e8b47b413523b8682c3953beb6d99e5a92473a8d0580bdbf6a057352aadb8ad8b7a2d08f36c99c14ed3294923102c45724c88b24d697a05b729925ce03de3",
+    "minecraft": [
+      "26.1",
+      "26.1.1",
+      "26.1.2",
+      "26.2",
+      "26.3"
+    ]
+  },
+  {
+    "id": "viafabricplus",
+    "version": "5.1.2",
+    "versionType": "release",
+    "file": "ViaFabricPlus-5.1.2.jar",
+    "url": "https://cdn.modrinth.com/data/rIC2XJV4/versions/USbdQnMN/ViaFabricPlus-5.1.2.jar",
+    "source": "https://modrinth.com/mod/viafabricplus/version/USbdQnMN",
+    "algorithm": "sha512",
+    "hash": "9e9cfb42ce09d5a18b876c20a18d8a6e76fc334976a44f14f2546b99cbf2ebc01b3f092ed2c1ba978a0213859e175e2387d05a32844166a741fa3fe18655022f",
+    "minecraft": [
+      "26.3"
+    ]
+  }
+]

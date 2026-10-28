@@ -10,7 +10,7 @@ public final class WbText {
     }
 
     public static void draw(GuiGraphicsExtractor context, Font font, String text, int x, int y, int color) {
-        draw(context, font, Component.literal(text), x, y, color);
+        draw(context, font, Component.literal(net.worldbinder.util.Lang.resolve(text)), x, y, color);
     }
 
     public static void draw(GuiGraphicsExtractor context, Font font, Component text, int x, int y, int color) {
@@ -31,7 +31,7 @@ public final class WbText {
 
     public static int drawWrapped(GuiGraphicsExtractor context, Font font, Component text, int x, int y, int width, int color, int maxLines) {
         int line = 0;
-        String remaining = text == null ? "" : text.getString();
+        String remaining = text == null ? "" : net.worldbinder.util.Lang.resolve(text.getString());
         while (!remaining.isBlank() && line < maxLines) {
             int cut = fitIndex(font, remaining, width);
             String current = remaining.substring(0, cut).strip();
@@ -47,6 +47,7 @@ public final class WbText {
     }
 
     public static String ellipsize(Font font, String text, int width) {
+        text=net.worldbinder.util.Lang.resolve(text);
         if (text == null || width <= 10) {
             return "";
         }

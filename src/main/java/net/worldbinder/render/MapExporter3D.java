@@ -45,8 +45,12 @@ public final class MapExporter3D {
 
     public static CompletableFuture<MapExporter.Result> export(Map<Long, ChunkSnapshot> captured, Mode mode, MapRenderer3D.Camera camera,
                                                               int viewWidth, int viewHeight, boolean shading) {
-        Map<Long, ChunkSnapshot> merged = MapData.mergedCopy(captured);
-        Map<Long, MapVoxels.Columns> voxels = MapVoxels.get().copy();
+        return export(captured,mode,camera,viewWidth,viewHeight,shading,true);
+    }
+    public static CompletableFuture<MapExporter.Result> export(Map<Long, ChunkSnapshot> captured, Mode mode, MapRenderer3D.Camera camera,
+                                                              int viewWidth, int viewHeight, boolean shading,boolean live) {
+        Map<Long, ChunkSnapshot> merged = live?MapData.mergedCopy(captured):new HashMap<>(captured);
+        Map<Long, MapVoxels.Columns> voxels = live?MapVoxels.get().copy():Map.of();
         Path root = MapExporter.newExportFolder();
         String world = MapExporter.worldName();
         return CompletableFuture.supplyAsync(() -> {
@@ -65,7 +69,7 @@ public final class MapExporter3D {
     private static MapExporter.Result exportRender(Map<Long, ChunkSnapshot> merged, Map<Long, MapVoxels.Columns> voxels, Path root, String world,
                                                    MapRenderer3D.Camera camera, int viewWidth, int viewHeight, boolean shading) throws IOException {
         if (camera == null) {
-            throw new IOException("3D view is not available");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.3d_view_is_not_available"));
         }
         double factor = Math.min(4.0D, MAX_RENDER_SIDE / (double) Math.max(viewWidth, viewHeight));
         int w = Math.max(64, (int) Math.round(viewWidth * factor));
@@ -112,17 +116,9 @@ public final class MapExporter3D {
             image.writeToFile(file);
             background.writeToFile(sky);
         }
-        try (Writer writer = Files.newBufferedWriter(root.resolve("map_info.txt"))) {
-            writer.write("WorldBinder live map 3D render\n");
-            writer.write("World: " + world + "\n");
-            writer.write(String.format(Locale.ROOT, "Center: x %.1f, z %.1f, pivot height %.1f%n", camera.targetX(), camera.targetZ(), camera.baseY()));
-            writer.write(String.format(Locale.ROOT, "Rotation: %.0f deg, tilt: %.0f deg, height scale: %.0f%%%n",
-                    camera.yawDegrees(), camera.pitchDegrees(), camera.heightScale() * 100.0D));
-            writer.write("Size: " + w + " x " + h + " px (" + SUPERSAMPLE + "x" + SUPERSAMPLE + " supersampled)\n");
-            writer.write("Files: map_3d.png (transparent background), map_3d_sky.png (sky background)\n");
-            writer.write("Chunks with block spans: " + voxels.size() + " (other chunks are drawn from the height map)\n");
-            writer.write(ExportLegalNotice.text());
-        }
+        Files.writeString(root.resolve("map_info.txt"), MapExportInfo.image3d(world,
+                camera.targetX(), camera.targetZ(), camera.baseY(), camera.yawDegrees(), camera.pitchDegrees(),
+                camera.heightScale(), w, h, SUPERSAMPLE, voxels.size()));
         return new MapExporter.Result(file, w, h, merged.size(), 2);
     }
 
@@ -164,7 +160,7 @@ public final class MapExporter3D {
             maxCZ = Math.max(maxCZ, cz);
         }
         if (minCX > maxCX) {
-            throw new IOException("No map data to export");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.no_map_data_to_export"));
         }
         int blocksX = (maxCX - minCX + 1) * 16;
         int blocksZ = (maxCZ - minCZ + 1) * 16;
@@ -207,7 +203,7 @@ public final class MapExporter3D {
             }
         }
         if (floor == Integer.MAX_VALUE) {
-            throw new IOException("No map data to export");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.no_map_data_to_export"));
         }
         floor -= 3;
         float vs = (float) heightScale;
@@ -285,7 +281,7 @@ public final class MapExporter3D {
             }
         }
         if (mesh.vertexCount == 0) {
-            throw new IOException("No map data to export");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.no_map_data_to_export"));
         }
         Path glb = root.resolve("map_3d.glb");
         writeGlb(mesh, glb);
@@ -295,18 +291,8 @@ public final class MapExporter3D {
             writeObj(mesh, root.resolve("map_3d.obj"));
             files++;
         }
-        try (Writer writer = Files.newBufferedWriter(root.resolve("map_info.txt"))) {
-            writer.write("WorldBinder live map 3D model\n");
-            writer.write("World: " + world + "\n");
-            writer.write("Chunks: " + known.size() + " (" + (useSpans ? voxels.size() + " with block spans and overhangs" : "height map only") + ")\n");
-            writer.write(String.format(Locale.ROOT, "Model origin (0,0,0) = block x %d, y 0, z %d%n", originX, originZ));
-            writer.write("Units: 1 = 1 block" + (step > 1 ? " (surface merged into " + step + "x" + step + " block cells)" : "") + "\n");
-            writer.write(String.format(Locale.ROOT, "Height scale: %.0f%%%n", heightScale * 100.0D));
-            writer.write("Vertices: " + mesh.vertexCount + ", triangles: " + mesh.indexCount / 3 + "\n");
-            writer.write("Files: map_3d.glb (glTF 2.0 binary, vertex colors, unlit)" + (obj ? ", map_3d.obj (OBJ with vertex colors)" : "") + "\n");
-            writer.write("Note: only surfaces known to the map are included, not complete block data or caves.\n");
-            writer.write(ExportLegalNotice.text());
-        }
+        Files.writeString(root.resolve("map_info.txt"), MapExportInfo.model(world, known.size(), voxels.size(),
+                useSpans, originX, originZ, step, heightScale, mesh.vertexCount, mesh.indexCount / 3, obj));
         return new MapExporter.Result(glb, gw, gd, known.size(), files);
     }
 
@@ -454,7 +440,7 @@ public final class MapExporter3D {
 
     private static void writeObj(Mesh mesh, Path file) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(Files.newBufferedWriter(file), 1 << 20)) {
-            writer.write("# WorldBinder live map 3D model (vertex colors: v x y z r g b)\n");
+            writer.write(MapExportInfo.objHeader());
             writer.write("# " + ExportLegalNotice.shortLine() + "\n");
             writer.write("o WorldBinder_map\n");
             StringBuilder line = new StringBuilder(64);

@@ -62,7 +62,7 @@ final class CapturedEntityFactory {
 
     private static String serialize(Entity entity) {
         try {
-            TagValueOutput output = TagValueOutput.createWithoutContext(ProblemReporter.DISCARDING);
+            TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.registryAccess());
             output.putString("id", typeId(entity));
             entity.saveWithoutId(output);
             return output.buildResult().toString();

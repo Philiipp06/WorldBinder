@@ -65,11 +65,29 @@ abstract class CaptureBlockScanner {
 
     protected abstract void expandBounds(BlockPos pos);
 
+    protected void captureChunkExtras(LevelChunk chunk, ChunkSnapshot snapshot) {}
+
+    protected ChunkSnapshot beginChunkSnapshot(int x, int z) {
+        ChunkSnapshot snapshot = new ChunkSnapshot(x, z);
+        ChunkSnapshot previous = activeScene.chunkSnapshots.get(x + "," + z);
+        if (previous != null && previous.sections != null) {
+            snapshot.sections.putAll(previous.copy().sections);
+        }
+        snapshot.captureMinY = WorldBinder.config().effectiveCaptureMinY();
+        snapshot.captureMaxY = WorldBinder.config().effectiveCaptureMaxY();
+        snapshot.fullChunkColumns = true;
+        snapshot.markScanning();
+        liveChunkSnapshots.put(ChunkPos.pack(x, z), snapshot);
+        activeScene.pendingChunks.put(x + "," + z, snapshot);
+        return snapshot;
+    }
+
     protected abstract int newChunkScheduleLimit();
 
     protected abstract boolean isClientChunkLoaded(Minecraft client, int chunkX, int chunkZ);
 
     protected abstract boolean isPlayerStationary();
+    protected abstract boolean captureWorldMatches(Minecraft client);
 
     private static int unpackChunkX(long key) {
         return (int) key;
@@ -111,9 +129,7 @@ abstract class CaptureBlockScanner {
         removeActiveScan(key);
         partialChunkKeys.add(key);
         blockStore.discard(key);
-        ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.beginBlockScan();
-        snapshot.markScanning();
+        ChunkSnapshot snapshot = beginChunkSnapshot(chunkX, chunkZ);
         mapDataRevision++;
         int minY = WorldBinder.config().effectiveCaptureMinY();
         int maxY = WorldBinder.config().effectiveCaptureMaxY();
@@ -128,27 +144,18 @@ abstract class CaptureBlockScanner {
                 }
             }
         }
-        snapshot.hasBiomeData = true;
-        snapshot.lightEstimated = true;
-        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
         partialChunkKeys.remove(key);
-        completeChunkAfterBlockScan(key, snapshot, null);
+        completeChunkAfterBlockScan(key, snapshot, client.level.getChunk(chunkX, chunkZ));
     }
 
     protected void completeChunkAfterBlockScan(long key, ChunkSnapshot snapshot, LevelChunk sourceChunk) {
         if (snapshot == null) {
             return;
         }
-        if (snapshot.savedBlocks <= 0 && snapshot.blockEntityCount <= 0 && !WorldBinder.config().captureAir) {
-            blockStore.discard(key);
-            snapshot.markPartial();
-            completedChunkKeys.remove(key);
-            failedChunkKeys.remove(key);
-            partialChunkKeys.add(key);
-            mapDataRevision++;
-            return;
-        }
-        if (!blockStore.commit(key)) {
+        if (snapshot.exportError || sourceChunk == null) { snapshot.markPartial(); partialChunkKeys.add(key); return; }
+        if (snapshot.savedBlocks == 0) snapshot.markVerifiedEmpty();
+        captureChunkExtras(sourceChunk, snapshot);
+        if (!blockStore.commit(key, activeScene, snapshot)) {
             snapshot.markPartial();
             completedChunkKeys.remove(key);
             failedChunkKeys.remove(key);
@@ -167,6 +174,8 @@ abstract class CaptureBlockScanner {
             failedChunkKeys.remove(key);
             snapshot.markDone();
             completedChunkKeys.add(key);
+            activeScene.chunkSnapshots.put(snapshot.chunkX + "," + snapshot.chunkZ, snapshot);
+            activeScene.pendingChunks.remove(snapshot.chunkX + "," + snapshot.chunkZ);
         }
         mapDataRevision++;
     }
@@ -307,10 +316,8 @@ abstract class CaptureBlockScanner {
             queueSkippedUnloaded++;
             return null;
         }
-        ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(next, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.beginBlockScan();
-        snapshot.markScanning();
-        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
+        blockStore.discard(next);
+        ChunkSnapshot snapshot = beginChunkSnapshot(chunkX, chunkZ);
         mapDataRevision++;
         return new ScanCursor(next, chunkX, chunkZ, WorldBinder.config().effectiveCaptureMinY(), snapshot, chunk);
     }
@@ -334,7 +341,6 @@ abstract class CaptureBlockScanner {
         queuedChunkKeys.remove(cursor.key);
         activeScanChunkKeys.remove(cursor.key);
         completeChunkAfterBlockScan(cursor.key, cursor.snapshot, cursor.chunk);
-        activeScene.chunkSnapshots.put(cursor.chunkX + "," + cursor.chunkZ, cursor.snapshot);
         return true;
     }
 
@@ -344,7 +350,7 @@ abstract class CaptureBlockScanner {
                 cursor.snapshot.markPartial();
                 partialChunkKeys.add(cursor.key);
                 if (activeScene != null) {
-                    activeScene.chunkSnapshots.put(cursor.chunkX + "," + cursor.chunkZ, cursor.snapshot);
+                    activeScene.pendingChunks.put(cursor.chunkX + "," + cursor.chunkZ, cursor.snapshot);
                 }
             }
             mapDataRevision++;
@@ -407,7 +413,7 @@ abstract class CaptureBlockScanner {
                 CompoundTag nbt = blockEntity.saveWithFullMetadata(client.level.registryAccess());
                 blockEntityNbt = nbt.toString();
             } catch (Throwable throwable) {
-                snapshot.markError("BlockEntity NBT failed at " + pos.toShortString());
+                snapshot.markError(net.worldbinder.util.Lang.stored("worldbinder.capture.block_entity_failed", pos.toShortString()));
                 failedChunkKeys.add(ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4));
                 mapDataRevision++;
                 WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.capture.block_entity_serialize_failed", pos), throwable);
@@ -415,7 +421,10 @@ abstract class CaptureBlockScanner {
         }
         String stateString = BlockStateStrings.toCommandString(state);
         if (!state.isAir()) {
-            snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
+            int marker=net.worldbinder.render.BlockMapColors.markerColor(state);
+            if(marker!=0)snapshot.sampleMarker(pos.getX()&15,pos.getZ()&15,pos.getY(),marker);
+            else if(!net.worldbinder.render.BlockMapColors.isMapTransparent(state,client.level,pos))
+                snapshot.sample(pos.getX() & 15, pos.getZ() & 15, pos.getY(), stateString, blockPreviewColor(state, pos, stateString));
         }
         appendBlockRecord(pos, new BlockRecord(
                 pos.getX() - activeOrigin.getX(),
@@ -464,7 +473,7 @@ abstract class CaptureBlockScanner {
     }
 
     protected void appendBlockRecord(BlockPos pos, BlockRecord record) {
-        if (roamingCapture) {
+        if (roamingCapture || activeScene.selectionBounds != null) {
             long chunkKey = ChunkPos.pack(pos.getX() >> 4, pos.getZ() >> 4);
             blockStore.stage(chunkKey, record);
         } else {

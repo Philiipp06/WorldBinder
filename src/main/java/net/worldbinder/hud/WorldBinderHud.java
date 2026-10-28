@@ -1,7 +1,5 @@
 package net.worldbinder.hud;
 
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.ChatFormatting;
 import net.minecraft.resources.Identifier;
 import net.minecraft.client.Minecraft;
@@ -56,7 +54,7 @@ public final class WorldBinderHud {
     }
 
     public static void register() {
-        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("worldbinder", "hud"), (context, tickCounter) -> {
+        net.worldbinder.platform.Platform.get().hud( (context, tickCounter) -> {
             Minecraft client = Minecraft.getInstance();
             if (client.player == null) {
                 return;
@@ -86,6 +84,11 @@ public final class WorldBinderHud {
                 drawChunkRadar(context, client, capture, radarLayout);
             }
             MovementHud.draw(context, client, config, false);
+            int toolsY=client.getWindow().getGuiScaledHeight()-52,toolsW=client.getWindow().getGuiScaledWidth()-16;
+            if(config.worldChunkOverlay){WbText.drawClipped(context,client.font,Lang.text("worldbinder.overlay.hud"),8,toolsY,toolsW,WbTheme.TEXT_SOFT);WbText.drawClipped(context,client.font,Lang.text("worldbinder.overlay.previous"),8,toolsY+14,toolsW,WbTheme.TEXT_SOFT);}
+            if(capture!=null&&capture.isCapturing()&&capture.scannerEnabled())WbText.drawWrapped(context,client.font,capture.scannerStatus(),8,toolsY-28,toolsW,WbTheme.ACCENT,2);
+            if(config.containerHighlight&&capture!=null&&capture.isCapturing()&&net.worldbinder.render.ContainerHighlight.lastUnopened+net.worldbinder.render.ContainerHighlight.lastPartial>0)
+                WbText.drawClipped(context,client.font,Lang.text("worldbinder.containers.hud",net.worldbinder.render.ContainerHighlight.lastUnopened,net.worldbinder.render.ContainerHighlight.lastPartial),8,toolsY-42,toolsW,net.worldbinder.render.ContainerHighlight.UNOPENED_COLOR);
         });
     }
 
@@ -284,7 +287,7 @@ public final class WorldBinderHud {
         try {
             drawStatusFrame(context, font, config, STATUS_FULL_HEIGHT, WbIcon.CAPTURE,
                     Lang.string("worldbinder.widget_editor.preview.status_title"), 0.62D, true);
-            drawStatusLine(context, font, 33, Lang.string("worldbinder.widget_editor.preview.status_message"), Lang.string("worldbinder.common.eta") + ": 1m 20s", WbTheme.OK, true);
+            drawStatusLine(context, font, 33, Lang.string("worldbinder.widget_editor.preview.status_message"), Lang.string("worldbinder.common.eta") + ": " + net.worldbinder.storage.StorageProgress.formatMillis(80000L), WbTheme.OK, true);
             int gap = 6;
             int meterW = (STATUS_WIDTH - 16 - gap * 2) / 3;
             drawMeter(context, font, 8, 46, meterW, WbIcon.CHUNK, Lang.string("worldbinder.hud.meter.chunks"), "84/120", 0.7D, WbTheme.OK);
@@ -360,7 +363,8 @@ public final class WorldBinderHud {
             float yaw = client.player.getViewYRot(partial);
             int playerChunkX = client.player.blockPosition().getX() >> 4;
             int playerChunkZ = client.player.blockPosition().getZ() >> 4;
-            Map<Long, ChunkSnapshot> snapshots = capture.chunkSnapshotsView();
+            boolean bound=capture.projectMatchesCurrentWorld();
+            Map<Long, ChunkSnapshot> snapshots = bound?capture.chunkSnapshotsView():Map.of();
             LongFunction<ChunkSnapshot> lookup = MapData.lookup(snapshots);
             updateRadarStats(capture, playerChunkX, playerChunkZ, layout.size());
 
@@ -393,11 +397,11 @@ public final class WorldBinderHud {
             boolean strong = mode == WorldBinderConfig.MapLayerMode.CHUNKS_ONLY;
             boolean statusLayer = mode != WorldBinderConfig.MapLayerMode.MAP_ONLY;
             if (statusLayer) {
-                Set<Long> done = capture.downloadedChunksView();
-                Set<Long> partialSet = capture.partialChunksView();
-                Set<Long> queued = capture.queuedChunksView();
-                Set<Long> failed = capture.failedChunksView();
-                RADAR_STATUS.update(minRegionX, minRegionZ, maxRegionX, maxRegionZ, capture.mapDataRevision() * 3L + (strong ? 1 : 0) + WbTheme.ACCENT,
+                Set<Long> done = capture.projectMatchesCurrentWorld()?capture.downloadedChunksView():Set.of();
+                Set<Long> partialSet = bound?capture.partialChunksView():Set.of();
+                Set<Long> queued = bound?capture.queuedChunksView():Set.of();
+                Set<Long> failed = bound?capture.failedChunksView():Set.of();
+                RADAR_STATUS.update(minRegionX, minRegionZ, maxRegionX, maxRegionZ, capture.mapDataRevision() * 3L + (bound?0:7919) + (strong ? 1 : 0) + WbTheme.ACCENT,
                         key -> radarStatusColor(snapshots.get(key), done.contains(key), partialSet.contains(key), queued.contains(key), failed.contains(key), strong));
             }
 
@@ -502,6 +506,7 @@ public final class WorldBinderHud {
     }
 
     private static void updateRadarStats(SceneCaptureService capture, int playerChunkX, int playerChunkZ, int size) {
+        if(!capture.projectMatchesCurrentWorld()){radarDoneInView=0;radarKnownInView=0;return;}
         long now = System.currentTimeMillis();
         if (now < radarStatsMillis) {
             return;
@@ -549,9 +554,9 @@ public final class WorldBinderHud {
     }
 
     private static String facing(float yaw) {
-        String[] names = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+        String[] names = {"south", "south_west", "west", "north_west", "north", "north_east", "east", "south_east"};
         int index = Math.floorMod(Math.round(yaw / 45.0F), 8);
-        return names[index];
+        return Lang.string("worldbinder.direction." + names[index]);
     }
 
     private static void drawRadarPlaceholder(GuiGraphicsExtractor context, int x, int y, int grid, int cell, int accent) {

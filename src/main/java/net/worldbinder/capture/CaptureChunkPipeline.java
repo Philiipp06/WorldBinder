@@ -150,6 +150,7 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
         }
         Minecraft client = Minecraft.getInstance();
         long key = ChunkPos.pack(chunkX, chunkZ);
+        if (!captureWorldMatches(client)) return;
         if (!isInsideActiveRoamingRadius(client, key, 0)) {
             queueSkippedFarAway++;
             return;
@@ -186,19 +187,25 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
     }
 
     public void queueChunkForRescan(int chunkX, int chunkZ) {
+        queueChunkRefresh(chunkX,chunkZ,true);
+    }
+    protected void queueChunkRefresh(int chunkX,int chunkZ,boolean manual){
+        if (!isCapturing() || saving || !captureWorldMatches(Minecraft.getInstance())) return;
         long key = ChunkPos.pack(chunkX, chunkZ);
         completedChunkKeys.remove(key);
         partialChunkKeys.remove(key);
         failedChunkKeys.remove(key);
         clearCapturedBlocksForChunk(chunkX, chunkZ);
-        ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.markQueued("manual-rescan", "ui");
+        ChunkSnapshot snapshot = new ChunkSnapshot(chunkX, chunkZ);
+        liveChunkSnapshots.put(key, snapshot);
+        activeScene.pendingChunks.put(chunkX + "," + chunkZ, snapshot);
+        snapshot.markQueued(manual?"manual-rescan":"replay-refresh",manual?"ui":"replay");
         mapDataRevision++;
         if (queuedChunkKeys.add(key)) {
-            pendingChunkKeys.addFirst(key);
+            if(manual)pendingChunkKeys.addFirst(key);else pendingChunkKeys.addLast(key);
         }
-        Chat.infoKey("worldbinder.chat.chunk_rescan_queued", chunkX, chunkZ);
-        WorldBinderActivityLog.add(Lang.string("worldbinder.activity.chunk_rescan_queued", chunkX, chunkZ));
+        if(manual){Chat.infoKey("worldbinder.chat.chunk_rescan_queued", chunkX, chunkZ);
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.chunk_rescan_queued", chunkX, chunkZ));}
     }
 
     protected void clearCapturedBlocksForChunk(int chunkX, int chunkZ) {
@@ -328,7 +335,7 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
     }
 
     protected boolean captureLoadedChunkHot(Minecraft client, int chunkX, int chunkZ, long key, String reason, boolean replaceDone) {
-        if (!isCapturing() || activeScene == null || client == null || client.level == null) {
+        if (!isCapturing() || activeScene == null || client == null || client.level == null || !captureWorldMatches(client)) {
             return false;
         }
         if (!replaceDone && completedChunkKeys.contains(key)) {
@@ -348,11 +355,9 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
         removeActiveScan(key);
         blockStore.discard(key);
         partialChunkKeys.add(key);
-        ChunkSnapshot snapshot = liveChunkSnapshots.computeIfAbsent(key, ignored -> new ChunkSnapshot(chunkX, chunkZ));
-        snapshot.beginBlockScan();
+        ChunkSnapshot snapshot = beginChunkSnapshot(chunkX, chunkZ);
         snapshot.markQueued(reason, "hot-cache");
         snapshot.markScanning();
-        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
         mapDataRevision++;
 
         int minY = WorldBinder.config().effectiveCaptureMinY();
@@ -384,11 +389,8 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
                 }
             }
         }
-        snapshot.hasBiomeData = true;
-        snapshot.lightEstimated = true;
         partialChunkKeys.remove(key);
         completeChunkAfterBlockScan(key, snapshot, chunk);
-        activeScene.chunkSnapshots.put(chunkX + "," + chunkZ, snapshot);
         return true;
     }
 
@@ -532,7 +534,7 @@ abstract class CaptureChunkPipeline extends CaptureBlockScanner {
             return false;
         }
         try {
-            return client.level.hasChunk(chunkX, chunkZ);
+            return net.worldbinder.compat.ReceivedChunks.chunk(client.level,chunkX,chunkZ)!=null;
         } catch (Throwable ignored) {
             return false;
         }

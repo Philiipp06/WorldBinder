@@ -1,0 +1,26 @@
+[
+  {
+    "minecraft": "1.13.2",
+    "dataVersion": 1631,
+    "blocks": 598,
+    "source": "Mojang official dedicated server --reports output",
+    "reportSHA256": "d386830f6ce9949b1ff893d4588c07dbb5fc23afb8bc2b445ab3b0b5aec68952",
+    "resourceSHA256": "4afc17a53d24f92ae8cdc702bc2326ccc911269702c1a80905df595ab86ec72c"
+  },
+  {
+    "minecraft": "1.16.5",
+    "dataVersion": 2586,
+    "blocks": 763,
+    "source": "Mojang official dedicated server --reports output",
+    "reportSHA256": "03ca0823dc7257851c7e946f5929c7d8334d106d671d5d9438a188048df24cbc",
+    "resourceSHA256": "d92235dc16b73b60dc761b209ee5e386a19befbdc429c954a833a279b94490f3"
+  },
+  {
+    "minecraft": "1.20.4",
+    "dataVersion": 3700,
+    "blocks": 1058,
+    "source": "Mojang official dedicated server --reports output",
+    "reportSHA256": "18d83f2c0c04adda138cd8caeb8db14442628f1e6ca3c949b202db2d63573f73",
+    "resourceSHA256": "7f1edbc0bdb827e0980ac16b6de01883a671d9cef3ed048b44f829c2443fdc0d"
+  }
+]

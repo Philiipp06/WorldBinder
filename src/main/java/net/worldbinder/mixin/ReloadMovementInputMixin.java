@@ -9,6 +9,8 @@ import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(Minecraft.class)
 public abstract class ReloadMovementInputMixin {
+    @org.spongepowered.asm.mixin.injection.Inject(method="runTick",at=@At("HEAD"))
+    private void worldbinder$pausedReplay(boolean renderLevel,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){net.worldbinder.client.WorldBinderClient.replayFrame();}
     @ModifyExpressionValue(method = "tick",
             at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;overlay:Lnet/minecraft/client/gui/screens/Overlay;", ordinal = 2),
             require = 0)

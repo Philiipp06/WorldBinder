@@ -27,7 +27,7 @@ public record Selection(BlockPos first, BlockPos second) {
     public long volumeLong() {
         BlockPos min = min();
         BlockPos max = max();
-        return (long) (max.getX() - min.getX() + 1) * (long) (max.getY() - min.getY() + 1) * (long) (max.getZ() - min.getZ() + 1);
+        return CaptureBounds.of(this).volume();
     }
 
     public int volume() {

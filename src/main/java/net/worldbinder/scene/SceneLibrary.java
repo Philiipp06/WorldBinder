@@ -37,6 +37,9 @@ import java.util.stream.Stream;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class SceneLibrary {
+    // Identical JSON schema and adapters, without millions of indentation writes in block payloads.
+    private static final com.google.gson.Gson ARCHIVE_JSON = WorldBinder.GSON.newBuilder()
+            .setFormattingStyle(com.google.gson.FormattingStyle.COMPACT).create();
     public static final String ARCHIVE_FILE = "worldbinder_archive.json";
     public static final String MANIFEST_FILE = "worldbinder_manifest.json";
     public static final String README_FILE = "README.md";
@@ -44,6 +47,7 @@ public final class SceneLibrary {
 
     private volatile List<Path> cachedArchives = new ArrayList<>();
     private Map<Path, String> cachedValidationLines = new ConcurrentHashMap<>();
+    private volatile String cachedLanguage=Lang.language();
 
     public SceneLibrary() {
         refresh();
@@ -113,6 +117,8 @@ public final class SceneLibrary {
     }
 
     public void save(WorldScene scene, Path path) throws IOException {
+        ProjectData.discoverMapIds(scene);
+        preservePack(scene,path.getParent(),false);
         WorldBinderPaths.ensureBaseFolders();
         Files.createDirectories(path.getParent());
         writeArchiveFileAtomic(scene, path);
@@ -124,55 +130,80 @@ public final class SceneLibrary {
     }
 
     public Path saveWorldFolder(WorldScene scene, Path folder, StorageProgress progress) throws IOException {
+        scene.compressedZip=WorldBinder.config().zipWorldExport;
+        Path destination = folder;
+        int suffix = 2;
+        while (Files.exists(destination)) destination = folder.resolveSibling(folder.getFileName() + "_r" + suffix++);
+        Files.createDirectories(destination.getParent());
+        Path staging = destination.resolveSibling("." + destination.getFileName() + ".writing-" + java.util.UUID.randomUUID());
+        try {
+            ExportValidationReport checked = writeWorldFolder(scene, staging, progress);
+            if (!checked.filesValid) throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.written_world_failed_read_back_validation_value", checked.errors));
+            checked.folder = destination.toAbsolutePath().toString();
+            ExportValidator.writeReport(scene, staging, checked);
+            Path zip = staging.resolveSibling(staging.getFileName() + ".zip");
+            if (net.worldbinder.WorldBinder.config().zipWorldExport) {
+                if(progress!=null)progress.update(StorageStage.ZIP,Lang.stored("worldbinder.storage.progress.compress_zip"),0.9D);
+                zipFolder(staging,zip);
+            }
+            try { Files.move(staging, destination, StandardCopyOption.ATOMIC_MOVE); }
+            catch (java.nio.file.AtomicMoveNotSupportedException ignored) { Files.move(staging, destination); }
+            if (Files.exists(zip)) Files.move(zip, destination.resolveSibling(destination.getFileName() + ".zip"));
+            refresh();
+            return destination;
+        } catch (Exception exception) {
+            // Keep the failed staging folder and its report for diagnosis. Never touch the previous revision.
+            if (exception instanceof IOException io) throw io;
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.project_save_failed_previous_revision_retained_staging_value", staging), exception);
+        }
+    }
+
+    private ExportValidationReport writeWorldFolder(WorldScene scene, Path folder, StorageProgress progress) throws IOException {
+        ProjectData.discoverMapIds(scene);
         WorldBinderPaths.ensureBaseFolders();
-        if (progress != null) progress.update(StorageStage.VALIDATE, "Preparing save folder", 0.08D);
+        if (progress != null) progress.update(StorageStage.VALIDATE, Lang.stored("worldbinder.storage.progress.prepare_folder"), 0.08D);
         Files.createDirectories(folder);
         Path metadataFolder = folder.resolve(WORLDBINDER_FOLDER);
         Files.createDirectories(metadataFolder);
+        preservePack(scene,folder,true);
 
-        if (progress != null) progress.update(StorageStage.METADATA, "Writing WorldBinder archive", 0.16D);
+        if (progress != null) progress.update(StorageStage.METADATA, Lang.stored("worldbinder.storage.progress.write_archive"), 0.16D);
         Path archive = metadataFolder.resolve(ARCHIVE_FILE);
         writeArchiveFileAtomic(scene, archive);
+        WorldScene exportScene=net.worldbinder.export.common.DimensionExportView.prepare(net.worldbinder.export.common.ExportFiltering.apply(scene));
 
-        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, "Writing level.dat and region files", 0.34D);
-        VanillaWorldExporter.ExportResult export = VanillaWorldExporter.export(scene, folder, progress);
+        if (progress != null) progress.update(StorageStage.VANILLA_WORLD, Lang.stored("worldbinder.storage.progress.write_regions"), 0.34D);
+        VanillaWorldExporter.ExportResult export = VanillaWorldExporter.export(exportScene, folder, progress);
 
-        if (progress != null) progress.update(StorageStage.MAP_DATA, "Writing maps, stats and metadata", 0.62D);
-        writePlayerMetadata(scene, folder);
-        writeCaptureMetadata(scene, folder, export);
+        if (progress != null) progress.update(StorageStage.MAP_DATA, Lang.stored("worldbinder.storage.progress.write_metadata"), 0.62D);
+        writePlayerMetadata(exportScene, folder);
+        writeCaptureMetadata(exportScene, folder, export);
+        net.worldbinder.export.common.ServerListsWriter.write(scene, folder);
 
-        if (progress != null) progress.update(StorageStage.RESOURCE_PACK, "Copying server resource pack", 0.75D);
-        copyLatestServerResourcePack(scene, folder);
+        if (progress != null) progress.update(StorageStage.RESOURCE_PACK, Lang.stored("worldbinder.storage.progress.copy_pack"), 0.75D);
 
-        if (net.worldbinder.WorldBinder.config().autoDeleteRecovery && !folder.getFileName().toString().startsWith("_recovery_")) {
-            deleteRecoveryFolders();
-        }
 
         writePreviewThumbnail(scene, metadataFolder.resolve("preview.png"));
-        writeReadme(scene, folder, export);
+        writeReadme(exportScene, folder, export);
 
-        if (progress != null) progress.update(StorageStage.VALIDATE, "Validating vanilla save quality", 0.82D);
-        ExportValidationReport validation = ExportValidator.validate(scene, folder);
+        if (progress != null) progress.update(StorageStage.VALIDATE, Lang.stored("worldbinder.storage.progress.validate"), 0.82D);
+        ExportValidationReport validation = ExportValidator.validate(exportScene, folder, progress);
         ExportValidator.writeReport(scene, folder, validation);
         writeManifest(scene, metadataFolder, export, validation);
-        scene.storageNotes.add("Export validation: " + validation.status + " " + validation.score + "% (" + validation.grade() + ")");
+        scene.storageNotes.add(net.worldbinder.util.Lang.stored("worldbinder.archive.validation_note", net.worldbinder.validation.Finding.of(validationStatusKey(validation.status)), validation.score, net.worldbinder.validation.Finding.of(validation.gradeKey())));
 
-        if (net.worldbinder.WorldBinder.config().zipWorldExport && !folder.getFileName().toString().startsWith("_recovery_")) {
-            if (progress != null) progress.update(StorageStage.ZIP, "Compressing export ZIP", 0.88D);
-            zipFolder(folder, folder.resolveSibling(folder.getFileName().toString() + ".zip"));
-            scene.compressedZip = true;
-        }
-
-        refresh();
-        return folder;
+        return validation;
     }
 
     public Path saveRecoverySnapshot(WorldScene scene, Path folder) throws IOException {
+        if (Files.isRegularFile(archivePath(folder)) && !RecoveryProjects.sameOwner(scene, read(folder)))
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.recovery_belongs_to_another_project_world_or_dimension_value", folder));
+        ProjectData.discoverMapIds(scene);
+        preservePack(scene,folder,false);
         WorldBinderPaths.ensureBaseFolders();
         Files.createDirectories(folder);
         Path metadataFolder = folder.resolve(WORLDBINDER_FOLDER);
         Files.createDirectories(metadataFolder);
-        writeRecoveryManifest(metadataFolder, scene, "writing", null);
 
         Path archive = metadataFolder.resolve(ARCHIVE_FILE);
         Path tmp = metadataFolder.resolve(ARCHIVE_FILE + ".tmp");
@@ -180,15 +211,24 @@ public final class SceneLibrary {
         try {
             WorldScene verified = readArchiveFile(tmp);
             if (verified == null) {
-                throw new IOException("Recovery archive verification returned null");
+                throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.recovery_archive_verification_returned_null"));
             }
         } catch (Exception exception) {
-            writeRecoveryManifest(metadataFolder, scene, "failed", exception.getMessage());
-            throw new IOException("Recovery archive verification failed", exception);
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.recovery_archive_verification_failed"), exception);
         }
-        moveReplace(tmp, archive);
+        // The archive is the commit point. All fallible metadata writes must precede its replacement.
+        Path manifest=metadataFolder.resolve(MANIFEST_FILE);
+        byte[] previousManifest=Files.isRegularFile(manifest)?Files.readAllBytes(manifest):null;
         writeRecoveryManifest(metadataFolder, scene, "complete", null);
-        WorldBinderActivityLog.add("Recovery save written in safe mode");
+        try{moveReplace(tmp, archive);}
+        catch(IOException failure){
+            try{
+                if(previousManifest==null)Files.deleteIfExists(manifest);
+                else{Path restore=manifest.resolveSibling(MANIFEST_FILE+".restore");Files.write(restore,previousManifest);forceFile(restore);moveReplace(restore,manifest);}
+            }catch(IOException restoreFailure){failure.addSuppressed(restoreFailure);}
+            throw failure;
+        }
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.recovery_saved"));
         refresh();
         return folder;
     }
@@ -197,6 +237,7 @@ public final class SceneLibrary {
         if (folder == null) {
             return;
         }
+        if (Files.isRegularFile(archivePath(folder))) return; // Last complete recovery remains usable.
         try {
             Files.createDirectories(folder.resolve(WORLDBINDER_FOLDER));
             writeRecoveryManifest(folder.resolve(WORLDBINDER_FOLDER), null, "failed", error);
@@ -208,7 +249,50 @@ public final class SceneLibrary {
 
     public WorldScene read(Path path) throws IOException {
         Path archive = Files.isDirectory(path) ? archivePath(path) : path;
-        return readArchiveFile(archive);
+        WorldScene scene=readArchiveFile(archive);
+        Path base=Files.isDirectory(path)?path:path.getParent();
+        if(!Files.isDirectory(path)&&ARCHIVE_FILE.equals(path.getFileName().toString())
+                &&base.getFileName()!=null&&WORLDBINDER_FOLDER.equals(base.getFileName().toString()))base=base.getParent();
+        if(scene.resourcePackFile!=null){
+            Path expected=base.resolve(scene.resourcePackFile).normalize();
+            if(!expected.toAbsolutePath().startsWith(base.toAbsolutePath().normalize()))throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.resource_pack_path_leaves_archive_folder"));
+            if(Files.isRegularFile(expected))scene.resourcePackSource=expected.toString();
+        } else if(Files.isDirectory(path)) {
+            for(Path candidate:List.of(path.resolve("resourcepacks/resources.zip"),path.resolve("resources.zip")))if(Files.isRegularFile(candidate)){
+                scene.resourcePackSource=candidate.toString();scene.resourcePackExpected=true;break;
+            }
+        }
+        return scene;
+    }
+
+    private void preservePack(WorldScene scene,Path folder,boolean runtime) throws IOException {
+        if(scene.resourcePackSource==null&&WorldBinder.config().includeServerResourcePack){
+            Minecraft client=Minecraft.getInstance();
+            if(client!=null&&client.level!=null&&scene.worldIdentity!=null
+                    &&scene.worldIdentity.equals(net.worldbinder.capture.WorldIdentity.current(client)))
+                ServerResourcePackLocator.findActiveServerPack().ifPresent(path->{scene.resourcePackSource=path.toString();scene.resourcePackExpected=true;});
+        }
+        if(scene.resourcePackSource==null)return;
+        Path source=Path.of(scene.resourcePackSource);
+        if(!Files.isRegularFile(source))throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.previously_captured_resource_pack_is_unavailable_value", source.getFileName()));
+        String hash=packHash(source);
+        if(scene.resourcePackSha256!=null&&!scene.resourcePackSha256.equals(hash))throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.archived_resource_pack_checksum_differs_previous_project_retained"));
+        Path target=runtime&&WorldBinder.config().includeServerResourcePack
+                ?bundledResourcePackPath(folder,net.worldbinder.version.TargetMinecraftVersion.resolve(scene.targetMinecraftVersion).effectiveDataVersion())
+                :(runtime?folder.resolve(WORLDBINDER_FOLDER):folder).resolve("pack-"+hash+".zip");
+        Files.createDirectories(target.getParent());
+        if(!source.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())&&!Files.exists(target))Files.copy(source,target);
+        if(!packHash(target).equals(hash))throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.resource_pack_copy_verification_failed"));
+        scene.resourcePackFile=folder.relativize(target).toString().replace('\\','/');
+        scene.resourcePackSha256=hash;scene.resourcePackExpected=true;
+    }
+
+    private static String packHash(Path path) throws IOException {
+        try {
+            var digest=java.security.MessageDigest.getInstance("SHA-256");
+            try(var input=Files.newInputStream(path)){byte[] buffer=new byte[65536];int read;while((read=input.read(buffer))>=0)if(read>0)digest.update(buffer,0,read);}
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        }catch(java.security.NoSuchAlgorithmException exception){throw new IllegalStateException(exception);}
     }
 
 
@@ -224,7 +308,7 @@ public final class SceneLibrary {
             target = archiveOrFolder.resolveSibling(fileName.replaceFirst("\\.json$", "") + ".preview.png");
         }
         writePreviewThumbnail(scene, target);
-        WorldBinderActivityLog.add("Archive preview exported");
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.preview_exported"));
         return target;
     }
 
@@ -313,20 +397,23 @@ public final class SceneLibrary {
      */
     public Path reexport(Path exportFolder) throws IOException {
         if (!canReexport(exportFolder)) {
-            throw new IOException("Not a WorldBinder world export: " + exportFolder);
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.not_a_worldbinder_world_export_value", exportFolder));
         }
-        WorldScene scene = read(exportFolder);
+        return reexport(exportFolder, read(exportFolder));
+    }
+
+    public Path reexport(Path exportFolder, WorldScene scene) throws IOException {
         String base = exportFolder.getFileName().toString() + "_" + net.worldbinder.ui.component.WbBrand.VERSION.replace(".", "_");
         Path target = uniqueFinalizedFolder(base);
         saveWorldFolder(scene, target);
-        WorldBinderActivityLog.add("Archive exported again: " + target.getFileName());
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.reexported", target.getFileName()));
         refresh();
         return target;
     }
 
     public Path finalizeRecovery(Path recoveryFolder) throws IOException {
         if (!canFinalizeRecovery(recoveryFolder)) {
-            throw new IOException("Not a WorldBinder recovery folder: " + recoveryFolder);
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.not_a_worldbinder_recovery_folder_value", recoveryFolder));
         }
         WorldScene recovered = read(recoveryFolder);
         WorldScene safeScene = recoverySafeCopy(recovered);
@@ -335,14 +422,14 @@ public final class SceneLibrary {
             safeScene.name = base;
         }
         safeScene.archiveType = "world";
-        safeScene.storageNotes.add("Finalized from recovery. Active/queued/scanning/error chunks were not exported as safe final chunks.");
+        safeScene.storageNotes.add(net.worldbinder.util.Lang.stored("worldbinder.archive.recovery_finalized_note"));
         Path target = uniqueFinalizedFolder(base);
         saveWorldFolder(safeScene, target);
         deleteChunkCacheFolder(recovered == null ? null : recovered.chunkCacheFolder);
         if (Files.exists(recoveryFolder)) {
             deleteRecursive(recoveryFolder);
         }
-        WorldBinderActivityLog.add("Recovery finalized: " + target.getFileName());
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.recovery_finalized", target.getFileName()));
         refresh();
         return target;
     }
@@ -354,14 +441,14 @@ public final class SceneLibrary {
                 : scene.name;
         Path target = uniqueSceneArchive(base);
         save(scene, target);
-        WorldBinderActivityLog.add("Archive copy saved: " + target.getFileName());
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.archive_copied", target.getFileName()));
         refresh();
         return target;
     }
 
     public ExportValidationReport validateArchive(Path archiveOrFolder) throws IOException {
         if (archiveOrFolder == null || !Files.exists(archiveOrFolder)) {
-            throw new IOException("Archive does not exist");
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.archive_does_not_exist"));
         }
         WorldScene scene = read(archiveOrFolder);
         Path folder = Files.isDirectory(archiveOrFolder) ? archiveOrFolder : archiveOrFolder.getParent();
@@ -379,36 +466,7 @@ public final class SceneLibrary {
         if (source == null) {
             return copy;
         }
-        copy.formatVersion = source.formatVersion;
-        copy.archiveType = source.archiveType;
-        copy.name = source.name;
-        copy.createdAt = source.createdAt;
-        copy.minecraftVersion = source.minecraftVersion;
-        copy.targetMinecraftVersion = source.targetMinecraftVersion;
-        copy.targetGenerationProfile = source.targetGenerationProfile;
-        copy.dimension = source.dimension;
-        copy.originX = source.originX;
-        copy.originY = source.originY;
-        copy.originZ = source.originZ;
-        copy.hasPlayerSpawn = source.hasPlayerSpawn;
-        copy.playerSpawnX = source.playerSpawnX;
-        copy.playerSpawnY = source.playerSpawnY;
-        copy.playerSpawnZ = source.playerSpawnZ;
-        copy.playerSpawnYaw = source.playerSpawnYaw;
-        copy.playerSpawnPitch = source.playerSpawnPitch;
-        copy.sizeX = source.sizeX;
-        copy.sizeY = source.sizeY;
-        copy.sizeZ = source.sizeZ;
-        copy.includesBlockEntityNbt = source.includesBlockEntityNbt;
-        copy.includesEntityNbt = source.includesEntityNbt;
-        copy.gameRulesNbt = source.gameRulesNbt;
-        copy.includesMapData = source.includesMapData;
-        copy.includesAdvancements = source.includesAdvancements;
-        copy.includesStats = source.includesStats;
-        copy.compressedZip = false;
-        copy.chunkCacheFolder = source.chunkCacheFolder;
-        copy.mapIds = source.mapIds == null ? new ArrayList<>() : new ArrayList<>(source.mapIds);
-        copy.storageNotes = source.storageNotes == null ? new ArrayList<>() : new ArrayList<>(source.storageNotes);
+        copy = ProjectData.metadataCopy(source);
 
         Set<Long> exportableChunks = new LinkedHashSet<>();
         if (source.chunkSnapshots != null) {
@@ -459,7 +517,7 @@ public final class SceneLibrary {
         }
         deleteRecursive(archiveOrFolder);
         deleteChunkCacheFolder(cacheFolder);
-        WorldBinderActivityLog.add("Archive deleted: " + archiveOrFolder.getFileName());
+        WorldBinderActivityLog.add(net.worldbinder.util.Lang.stored("worldbinder.activity.archive_deleted", archiveOrFolder.getFileName()));
         refresh();
     }
 
@@ -532,6 +590,7 @@ public final class SceneLibrary {
     }
 
     public String validationLine(Path path) {
+        if(!cachedLanguage.equals(Lang.language())){cachedValidationLines.clear();cachedLanguage=Lang.language();}
         return cachedValidationLines.computeIfAbsent(path, this::readValidationLine);
     }
 
@@ -539,9 +598,9 @@ public final class SceneLibrary {
         Path report = Files.isDirectory(path) ? path.resolve(WORLDBINDER_FOLDER).resolve("export_validation.json") : null;
         if (isRecovery(path)) {
             String state = recoveryState(path);
-            if ("writing".equals(state)) return "Recovery writing/incomplete";
-            if ("failed".equals(state)) return "Recovery failed - keep previous complete save";
-            if (report == null || !Files.isRegularFile(report)) return "Recovery " + state;
+            if ("writing".equals(state)) return Lang.string("worldbinder.archive.recovery_writing");
+            if ("failed".equals(state)) return Lang.string("worldbinder.archive.recovery_failed");
+            if (report == null || !Files.isRegularFile(report)) return Lang.string("worldbinder.archive.recovery_status",recoveryLabel(state));
         }
         if (report == null || !Files.isRegularFile(report)) {
             String manifestLine = readManifestValidationLine(path);
@@ -554,10 +613,10 @@ public final class SceneLibrary {
             String missing = extractJsonNumber(json, "missingChunks", "0");
             String partial = extractJsonNumber(json, "partialSnapshots", "0");
             String failed = extractJsonNumber(json, "failedSnapshots", "0");
-            String suffix = ("0".equals(missing) && "0".equals(partial) && "0".equals(failed)) ? "" : " • M:" + missing + " P:" + partial + " F:" + failed;
-            return status + " • Quality " + score + "% • " + gradeFromScore(score) + suffix;
+            String suffix = ("0".equals(missing) && "0".equals(partial) && "0".equals(failed)) ? "" : Lang.string("worldbinder.archive.validation_counts", missing, partial, failed);
+            return Lang.string("worldbinder.archive.quality_summary", validationStatus(status), score, gradeFromScore(score), suffix);
         } catch (IOException exception) {
-            return "Validation unavailable";
+            return Lang.string("worldbinder.archive.validation_unavailable");
         }
     }
 
@@ -580,8 +639,8 @@ public final class SceneLibrary {
             String missing = extractJsonNumber(json, "missingChunks", "0");
             String partial = extractJsonNumber(json, "partialChunks", "0");
             String failed = extractJsonNumber(json, "failedChunks", "0");
-            String suffix = ("0".equals(missing) && "0".equals(partial) && "0".equals(failed)) ? "" : " • M:" + missing + " P:" + partial + " F:" + failed;
-            return status + " • Quality " + score + "% • " + gradeFromScore(score) + suffix;
+            String suffix = ("0".equals(missing) && "0".equals(partial) && "0".equals(failed)) ? "" : Lang.string("worldbinder.archive.validation_counts", missing, partial, failed);
+            return Lang.string("worldbinder.archive.quality_summary", validationStatus(status), score, gradeFromScore(score), suffix);
         } catch (IOException exception) {
             return null;
         }
@@ -589,9 +648,14 @@ public final class SceneLibrary {
 
     private String quickArchiveLine(Path path) {
         if (isRecovery(path)) {
-            return "Recovery " + recoveryState(path);
+            return Lang.string("worldbinder.archive.recovery_status",recoveryLabel(recoveryState(path)));
         }
-        return Files.isDirectory(path) ? "Folder archive" : "Scene archive";
+        return Lang.string(Files.isDirectory(path)?"worldbinder.archive.world_folder":"worldbinder.archive.scene");
+    }
+    private static String validationStatus(String status){return Lang.string(validationStatusKey(status));}
+    private static String validationStatusKey(String status){return "worldbinder.validation.status."+switch(status){case "PASS","OK"->"pass";case "WARN","WARNING"->"warn";case "FAIL","FAILED"->"fail";default->"unknown";};}
+    public static String recoveryLabel(String state){
+        return Lang.string("worldbinder.recovery.state."+(Set.of("none","complete","writing","missing","failed","unknown").contains(state)?state:"unknown"));
     }
 
     private void writeArchiveFileAtomic(WorldScene scene, Path archive) throws IOException {
@@ -605,15 +669,35 @@ public final class SceneLibrary {
     private void writeArchiveFile(WorldScene scene, Path archive) throws IOException {
         Files.createDirectories(archive.getParent());
         try (BufferedWriter writer = Files.newBufferedWriter(archive, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
-            WorldBinder.GSON.toJson(scene, writer);
+            ARCHIVE_JSON.toJson(scene, writer);
             writer.flush();
         }
         forceFile(archive);
     }
 
     private WorldScene readArchiveFile(Path archive) throws IOException {
-        try (Reader reader = Files.newBufferedReader(archive)) {
-            return WorldBinder.GSON.fromJson(reader, WorldScene.class);
+        try {
+            // Modern archives place the persistent ID near the beginning. Inspect it without keeping
+            // a second, multi-million-block JSON object tree alive alongside the actual project.
+            boolean identified=false;
+            try(var header=WorldBinder.GSON.newJsonReader(Files.newBufferedReader(archive))){
+                header.beginObject();while(header.hasNext()){
+                    if(header.nextName().equals("projectId")){identified=header.peek()!=com.google.gson.stream.JsonToken.NULL;if(identified)identified=!header.nextString().isBlank();break;}
+                    header.skipValue();
+                }
+            }
+            WorldScene scene;
+            try(Reader reader=Files.newBufferedReader(archive)){scene=WorldBinder.GSON.fromJson(reader,WorldScene.class);}
+            boolean legacy = scene != null && (scene.formatVersion < 3||!identified);
+            ProjectData.normalize(scene, legacy);
+            if (!identified || scene.projectId == null || scene.projectId.isBlank()) {
+                // Preserve the exact identity algorithm used for legacy folders before streaming was
+                // introduced. Those IDs can already own recovery data and must not change on upgrade.
+                try(Reader reader=Files.newBufferedReader(archive)){var json=com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();scene.projectId=java.util.UUID.nameUUIDFromBytes((archive.toAbsolutePath().normalize()+":"+json).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();}
+            }
+            return scene;
+        } catch (RuntimeException exception) {
+            throw new net.worldbinder.validation.FindingIOException(net.worldbinder.validation.Finding.of("worldbinder.error.unreadable_worldbinder_archive_value", archive.getFileName()), exception);
         }
     }
 
@@ -624,9 +708,12 @@ public final class SceneLibrary {
                 "  \"status\": \"" + escape(status) + "\",\n" +
                 "  \"updatedAt\": \"" + Instant.now() + "\",\n" +
                 "  \"name\": \"" + escape(scene == null ? "" : scene.name) + "\",\n" +
-                "  \"chunks\": " + (scene == null ? 0 : scene.chunkSnapshotCount()) + ",\n" +
-                "  \"blocks\": " + (scene == null ? 0 : scene.blockCount()) + ",\n" +
-                "  \"entities\": " + (scene == null ? 0 : scene.entityCount()) + ",\n" +
+                "  \"projectId\": \"" + escape(scene == null ? "" : scene.projectId) + "\",\n" +
+                "  \"worldIdentity\": \"" + escape(scene == null ? "" : scene.worldIdentity) + "\",\n" +
+                "  \"dimension\": \"" + escape(scene == null ? "" : scene.dimension) + "\",\n" +
+                "  \"chunks\": " + (scene == null ? 0 : scene.projectChunkCount()) + ",\n" +
+                "  \"blocks\": " + (scene == null ? 0 : scene.projectBlockCount()) + ",\n" +
+                "  \"entities\": " + (scene == null ? 0 : scene.projectEntityCount()) + ",\n" +
                 "  \"chunkCacheFolder\": \"" + escape(scene == null ? "" : scene.chunkCacheFolder) + "\"" +
                 (error == null || error.isBlank() ? "\n" : ",\n  \"error\": \"" + escape(error) + "\"\n") +
                 "}\n";
@@ -669,13 +756,13 @@ public final class SceneLibrary {
     private static String gradeFromScore(String score) {
         try {
             int value = Integer.parseInt(score);
-            if (value >= 92) return "Excellent";
-            if (value >= 80) return "Good";
-            if (value >= 65) return "Usable";
-            if (value >= 45) return "Partial";
+            if (value >= 92) return Lang.string("worldbinder.quality.excellent");
+            if (value >= 80) return Lang.string("worldbinder.quality.good");
+            if (value >= 65) return Lang.string("worldbinder.quality.usable");
+            if (value >= 45) return Lang.string("worldbinder.quality.partial");
         } catch (NumberFormatException ignored) {
         }
-        return "Needs review";
+        return Lang.string("worldbinder.quality.review");
     }
 
     private static long chunkKey(int chunkX, int chunkZ) {
@@ -727,11 +814,11 @@ public final class SceneLibrary {
                 "  \"entityRegionFiles\": true,\n" +
                 "  \"poiRegionFiles\": true,\n" +
                 "  \"chunks\": " + export.chunks() + ",\n" +
-                "  \"blocks\": " + scene.blockCount() + ",\n" +
-                "  \"blockEntities\": " + scene.blockEntityCount() + ",\n" +
-                "  \"entities\": " + scene.entityCount() + ",\n" +
-                "  \"chunkSnapshots\": " + scene.chunkSnapshotCount() + ",\n" +
-                "  \"maps\": " + scene.mapCount() + ",\n" +
+                "  \"blocks\": " + scene.projectBlockCount() + ",\n" +
+                "  \"blockEntities\": " + scene.projectBlockEntityCount() + ",\n" +
+                "  \"entities\": " + scene.projectEntityCount() + ",\n" +
+                "  \"chunkSnapshots\": " + scene.projectChunkCount() + ",\n" +
+                "  \"maps\": " + scene.projectMapCount() + ",\n" +
                 "  \"advancements\": " + scene.includesAdvancements + ",\n" +
                 "  \"stats\": " + scene.includesStats + ",\n" +
                 "  \"zip\": " + net.worldbinder.WorldBinder.config().zipWorldExport + ",\n" +
@@ -791,25 +878,8 @@ public final class SceneLibrary {
     private void writeMapDataPlaceholders(WorldScene scene, Path folder) {
     }
 
-    private void writePlayerMetadata(WorldScene scene, Path folder) {
-        Minecraft client = Minecraft.getInstance();
-        if (client.player == null) {
-            return;
-        }
-        try {
-            if (net.worldbinder.WorldBinder.config().exportAdvancements) {
-                Path advancements = folder.resolve("players").resolve("advancements");
-                Files.createDirectories(advancements);
-                Files.writeString(advancements.resolve(client.player.getUUID().toString() + ".json"), "{\n  \"worldbinder\": true,\n  \"note\": \"Client-side advancement export. Full server progress is not exposed reliably on every server.\"\n}\n");
-            }
-            if (net.worldbinder.WorldBinder.config().exportStats) {
-                Path stats = folder.resolve("players").resolve("stats");
-                Files.createDirectories(stats);
-                Files.writeString(stats.resolve(client.player.getUUID().toString() + ".json"), "{\n  \"worldbinder\": true,\n  \"DataVersion\": 4440,\n  \"stats\": {},\n  \"note\": \"Stats folder prepared by WorldBinder.\"\n}\n");
-            }
-        } catch (IOException exception) {
-            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.player_metadata_failed"), exception);
-        }
+    private void writePlayerMetadata(WorldScene scene, Path folder) throws IOException {
+        net.worldbinder.export.common.AuxiliaryDataWriter.write(scene, folder);
     }
 
     private void writeCaptureMetadata(WorldScene scene, Path folder, VanillaWorldExporter.ExportResult export) {
@@ -825,9 +895,9 @@ public final class SceneLibrary {
                     "  \"dimension\": \"" + escape(scene.dimension) + "\",\n" +
                     "  \"targetMinecraftVersion\": \"" + escape(scene.targetMinecraftVersion) + "\",\n" +
                     "  \"targetGenerationProfile\": \"" + escape(scene.targetGenerationProfile) + "\",\n" +
-                    "  \"blocks\": " + scene.blockCount() + ",\n" +
-                    "  \"entities\": " + scene.entityCount() + ",\n" +
-                    "  \"maps\": " + scene.mapCount() + ",\n" +
+                    "  \"blocks\": " + scene.projectBlockCount() + ",\n" +
+                    "  \"entities\": " + scene.projectEntityCount() + ",\n" +
+                    "  \"maps\": " + scene.projectMapCount() + ",\n" +
                     "  \"chunks\": " + export.chunks() + "\n" +
                     "}\n");
         } catch (IOException exception) {
@@ -853,32 +923,19 @@ public final class SceneLibrary {
         return targetDataVersion >= 4786 ? worldFolder.resolve("resourcepacks").resolve("resources.zip") : worldFolder.resolve("resources.zip");
     }
 
-    private void copyLatestServerResourcePack(WorldScene scene, Path worldFolder) {
-        if (!WorldBinder.config().includeServerResourcePack) {
-            return;
-        }
-        try {
-            Optional<Path> pack = ServerResourcePackLocator.findBestPack();
-            if (pack.isPresent()) {
-                int dataVersion = net.worldbinder.version.TargetMinecraftVersion.resolve(scene == null ? null : scene.targetMinecraftVersion).effectiveDataVersion();
-                Path target = bundledResourcePackPath(worldFolder, dataVersion);
-                Files.createDirectories(target.getParent());
-                Files.copy(pack.get(), target, StandardCopyOption.REPLACE_EXISTING);
-                WorldBinderActivityLog.add("Server resource pack copied");
-            }
-        } catch (IOException exception) {
-            WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.resource_pack_copy_failed"), exception);
-        }
-    }
-
-    private void deleteRecoveryFolders() {
+    public void cleanupRecovery(WorldScene owner) {
+        refresh();
         for (Path recovery : recoverySessions()) {
             try {
-                deleteRecursive(recovery);
+                Path root = WorldBinderPaths.RECOVERY_ROOT.toAbsolutePath().normalize();
+                Path candidate = recovery.toAbsolutePath().normalize();
+                if (candidate.startsWith(root) && !candidate.equals(root) && RecoveryProjects.sameOwner(owner, read(recovery)))
+                    deleteRecursive(candidate);
             } catch (IOException exception) {
                 WorldBinder.LOGGER.warn(Lang.string("worldbinder.log.scene.old_recovery_delete_failed", recovery), exception);
             }
         }
+        refresh();
     }
 
     private void deleteRecursive(Path root) throws IOException {

@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.TagParser;
 import net.worldbinder.WorldBinder;
+import net.worldbinder.config.GameRuleCatalog;
 import net.worldbinder.config.GameRuleSettings;
 import net.worldbinder.scene.WorldScene;
 import net.worldbinder.version.TargetMinecraftVersion;
@@ -17,8 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 
 final class WorldExportGameRules {
-    private static final Map<String, String> VANILLA_KEYS = vanillaKeys();
-    private static final Map<String, Rule26Mapping> RULE_26_KEYS = rule26Keys();
 
     private WorldExportGameRules() {
     }
@@ -116,8 +115,10 @@ final class WorldExportGameRules {
             return false;
         }
         if (target != null && target.profile() == TargetMinecraftVersion.GenerationProfile.CURRENT_26) {
-            return key.startsWith("minecraft:")
-                    && RULE_26_KEYS.values().stream().anyMatch(mapping -> mapping.registryKey().equals(key));
+            // Only rules that exist in exactly this target version (facts from the official jars).
+            String canonical = GameRuleCatalog.canonical(key);
+            return key.startsWith("minecraft:") && canonical != null
+                    && GameRuleCatalog.fact(target.name(), GameRuleCatalog.rule(canonical)) != null;
         }
         return key.startsWith("minecraft:");
     }
@@ -139,125 +140,15 @@ final class WorldExportGameRules {
         if (target == null || target.profile() != TargetMinecraftVersion.GenerationProfile.CURRENT_26) {
             return new RuleExport(namespacedSnakeKey(legacyKey), value);
         }
-        Rule26Mapping mapping = RULE_26_KEYS.get(legacyKey);
-        if (mapping == null) {
+        GameRuleCatalog.Rule rule = GameRuleCatalog.rule(legacyKey);
+        if (rule == null || rule.id26() == null) {
             return null;
         }
-        return new RuleExport(mapping.registryKey(), mapping.transform(value));
-    }
-
-    private static Map<String, Rule26Mapping> rule26Keys() {
-        Map<String, Rule26Mapping> keys = new LinkedHashMap<>();
-        register26(keys, "doDaylightCycle", "minecraft:advance_time");
-        register26(keys, "doWeatherCycle", "minecraft:advance_weather");
-        register26(keys, "doTileDrops", "minecraft:block_drops");
-        register26(keys, "doEntityDrops", "minecraft:entity_drops");
-        register26(keys, "doMobLoot", "minecraft:mob_drops");
-        register26(keys, "doMobSpawning", "minecraft:spawn_mobs");
-        register26(keys, "doInsomnia", "minecraft:spawn_phantoms");
-        register26(keys, "doPatrolSpawning", "minecraft:spawn_patrols");
-        register26(keys, "doTraderSpawning", "minecraft:spawn_wandering_traders");
-        register26(keys, "doWardenSpawning", "minecraft:spawn_wardens");
-        register26(keys, "spawnRadius", "minecraft:respawn_radius");
-        register26(keys, "naturalRegeneration", "minecraft:natural_health_regeneration");
-        register26Inverted(keys, "disableRaids", "minecraft:raids");
-        register26Inverted(keys, "disableElytraMovementCheck", "minecraft:elytra_movement_check");
-        register26(keys, "announceAdvancements", "minecraft:show_advancement_messages");
-        register26(keys, "commandBlockOutput", "minecraft:command_block_output");
-        register26(keys, "doImmediateRespawn", "minecraft:immediate_respawn");
-        register26(keys, "doLimitedCrafting", "minecraft:limited_crafting");
-        register26(keys, "doVinesSpread", "minecraft:spread_vines");
-        register26(keys, "drowningDamage", "minecraft:drowning_damage");
-        register26(keys, "fallDamage", "minecraft:fall_damage");
-        register26(keys, "fireDamage", "minecraft:fire_damage");
-        register26(keys, "forgiveDeadPlayers", "minecraft:forgive_dead_players");
-        register26(keys, "keepInventory", "minecraft:keep_inventory");
-        register26(keys, "logAdminCommands", "minecraft:log_admin_commands");
-        register26(keys, "mobGriefing", "minecraft:mob_griefing");
-        register26(keys, "maxCommandChainLength", "minecraft:max_command_sequence_length");
-        register26(keys, "maxEntityCramming", "minecraft:max_entity_cramming");
-        register26(keys, "playersSleepingPercentage", "minecraft:players_sleeping_percentage");
-        register26(keys, "randomTickSpeed", "minecraft:random_tick_speed");
-        register26(keys, "reducedDebugInfo", "minecraft:reduced_debug_info");
-        register26(keys, "sendCommandFeedback", "minecraft:send_command_feedback");
-        register26(keys, "showDeathMessages", "minecraft:show_death_messages");
-        register26(keys, "spectatorsGenerateChunks", "minecraft:spectators_generate_chunks");
-        register26(keys, "universalAnger", "minecraft:universal_anger");
-        register26FireSpread(keys);
-        return keys;
-    }
-
-    private static void register26FireSpread(Map<String, Rule26Mapping> keys) {
-        keys.put("doFireTick", new Rule26Mapping("minecraft:fire_spread_radius_around_player", false) {
-            @Override
-            String transform(String value) {
-                return "true".equalsIgnoreCase(value) ? "-1" : "0";
-            }
-        });
-    }
-
-    private static void register26(Map<String, Rule26Mapping> keys, String legacyKey, String registryKey) {
-        keys.put(legacyKey, new Rule26Mapping(registryKey, false));
-    }
-
-    private static void register26Inverted(Map<String, Rule26Mapping> keys, String legacyKey, String registryKey) {
-        keys.put(legacyKey, new Rule26Mapping(registryKey, true));
+        return new RuleExport(GameRuleCatalog.exportKey(target.name(), rule), GameRuleCatalog.exportValue(target.name(), rule, value));
     }
 
     private static String canonicalKey(String key) {
-        if (key == null || key.isBlank()) {
-            return null;
-        }
-        String cleaned = key.trim();
-        String direct = VANILLA_KEYS.get(cleaned);
-        if (direct != null) {
-            return direct;
-        }
-        direct = VANILLA_KEYS.get(cleaned.toLowerCase(Locale.ROOT));
-        if (direct != null) {
-            return direct;
-        }
-        if (cleaned.contains(":")) {
-            int split = cleaned.indexOf(':');
-            if (!"minecraft".equals(cleaned.substring(0, split))) {
-                return null;
-            }
-            cleaned = cleaned.substring(split + 1);
-        }
-        direct = VANILLA_KEYS.get(cleaned);
-        return direct != null ? direct : VANILLA_KEYS.get(cleaned.toLowerCase(Locale.ROOT));
-    }
-
-    private static Map<String, String> vanillaKeys() {
-        Map<String, String> keys = new LinkedHashMap<>();
-        String[] legacyKeys = {
-                "announceAdvancements", "blockExplosionDropDecay", "commandBlockOutput",
-                "commandModificationBlockLimit", "disableElytraMovementCheck", "disableRaids",
-                "doDaylightCycle", "doEntityDrops", "doFireTick", "doImmediateRespawn",
-                "doInsomnia", "doLimitedCrafting", "doMobLoot", "doMobSpawning",
-                "doPatrolSpawning", "doTileDrops", "doTraderSpawning", "doVinesSpread",
-                "doWardenSpawning", "doWeatherCycle", "drowningDamage", "enderPearlsVanishOnDeath",
-                "fallDamage", "fireDamage", "forgiveDeadPlayers", "globalSoundEvents",
-                "keepInventory", "lavaSourceConversion", "locatorBar", "logAdminCommands",
-                "maxCommandChainLength", "maxEntityCramming", "mobExplosionDropDecay",
-                "mobGriefing", "naturalRegeneration", "playersSleepingPercentage",
-                "projectilesCanBreakBlocks", "randomTickSpeed", "reducedDebugInfo",
-                "sendCommandFeedback", "showDeathMessages", "snowAccumulationHeight",
-                "spawnChunkRadius", "spawnRadius", "spectatorsGenerateChunks",
-                "tntExplosionDropDecay", "universalAnger", "waterSourceConversion"
-        };
-        for (String key : legacyKeys) {
-            registerKey(keys, key);
-        }
-        return keys;
-    }
-
-    private static void registerKey(Map<String, String> keys, String legacyKey) {
-        keys.put(legacyKey, legacyKey);
-        keys.put(legacyKey.toLowerCase(Locale.ROOT), legacyKey);
-        String namespaced = namespacedSnakeKey(legacyKey);
-        keys.put(namespaced, legacyKey);
-        keys.put(namespaced.substring("minecraft:".length()), legacyKey);
+        return GameRuleCatalog.canonical(key);
     }
 
     private static String namespacedSnakeKey(String key) {
@@ -330,32 +221,5 @@ final class WorldExportGameRules {
     }
 
     private record RuleExport(String key, String value) {
-    }
-
-    private static class Rule26Mapping {
-        private final String registryKey;
-        private final boolean inverted;
-
-        private Rule26Mapping(String registryKey, boolean inverted) {
-            this.registryKey = registryKey;
-            this.inverted = inverted;
-        }
-
-        String registryKey() {
-            return registryKey;
-        }
-
-        String transform(String value) {
-            if (!inverted) {
-                return value;
-            }
-            if ("true".equalsIgnoreCase(value)) {
-                return "false";
-            }
-            if ("false".equalsIgnoreCase(value)) {
-                return "true";
-            }
-            return value;
-        }
     }
 }

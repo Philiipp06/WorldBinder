@@ -39,7 +39,21 @@ public final class WorldBinderClientTest implements FabricClientGameTest {
         if (compatibilityJar != null) {
             String codeSource = WorldBinder.class.getProtectionDomain().getCodeSource().getLocation().toString();
             check(codeSource.contains(compatibilityJar), "Compatibility test must load the packaged 26.3 JAR: " + codeSource);
+            try {
+                var artifact=java.nio.file.Path.of(WorldBinder.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+                String sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(artifact)));
+                WorldBinder.LOGGER.info("WORLDBINDER_RELEASE_ARTIFACT {} SHA-256 {}",codeSource,sha);
+            }catch(Exception exception){throw new AssertionError("Cannot verify packaged release artifact",exception);}
         }
+        String serverPhase=System.getProperty("worldbinder.serverTestPhase");
+        String expansionPhase=System.getProperty("worldbinder.expansionPhase");
+        String replayProvider=System.getProperty("worldbinder.replayProvider");
+        if(replayProvider!=null)throw new AssertionError("Use the native replay driver without Fabric's tick phaser");
+        if(Boolean.getBoolean("worldbinder.schematicImports")){SchematicImportClientTest.run(context);return;}
+        if(expansionPhase!=null){ExpansionClientTest.run(context,expansionPhase);return;}
+        if(serverPhase!=null){DedicatedServerClientTest.run(context,serverPhase);return;}
+        if (Boolean.getBoolean("worldbinder.projectOnly")) { ProjectClientRegressionTest.run(context); return; }
+        if (Boolean.getBoolean("worldbinder.projectRestartOnly")) { ProjectRestartClientTest.run(context); return; }
         net.worldbinder.export.common.WorldExportGameRulesTest.run();
         context.runOnClient(client -> {
             WorldBinderConfig config = new WorldBinderConfig();

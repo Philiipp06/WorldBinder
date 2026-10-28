@@ -198,7 +198,7 @@ public final class WorldBinderVersionPickerScreen extends Screen {
         Button cancel = WbButton.icon(WbButton.quiet(WbButton.create(panelX() + panelWidth() - 112, panelY() + panelHeight() - 32,
                 96, 22, Component.translatable("worldbinder.config.cancel"), Component.translatable("worldbinder.tooltip.config.back"),
                 button -> onClose())), WbIcon.CLOSE);
-        WbTooltips.hint(cancel, Component.literal("Esc"));
+        WbTooltips.hint(cancel, Lang.text("worldbinder.key.escape"));
         addRenderableWidget(cancel);
         Button latest = WbButton.icon(WbButton.primary(WbButton.create(panelX() + panelWidth() - 260, panelY() + panelHeight() - 32,
                 140, 22, Component.translatable("worldbinder.version_picker.use_latest", TargetMinecraftVersion.CURRENT),
@@ -395,7 +395,7 @@ public final class WorldBinderVersionPickerScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_RETURN && !query.isBlank()) {
+        if (event.key() == net.worldbinder.compat.ClientCompat.key("KEY_RETURN") && !query.isBlank()) {
             for (Map.Entry<Button, TargetMinecraftVersion.Entry> entry : chipEntries.entrySet()) {
                 choose(entry.getValue());
                 return true;

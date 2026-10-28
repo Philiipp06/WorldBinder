@@ -1,25 +1,40 @@
 package net.worldbinder.config;
 
-import net.worldbinder.version.TargetMinecraftVersion;
-
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Editable game-rule overrides of the settings screen, stored as {@code rule=value;…} with canonical rule IDs.
+ * Types, availability per target version and defaults come from {@link GameRuleCatalog}. Unknown entries from
+ * newer versions or mods are kept unchanged.
+ */
 public final class GameRuleSettings {
+    /** Canonical IDs in display order; must match {@link GameRuleCatalog} (checked on class load and by the language audit). */
     private static final String[] RULES = {
-            "announceAdvancements", "commandBlockOutput", "disableElytraMovementCheck", "disableRaids",
-            "doDaylightCycle", "doEntityDrops", "doFireTick", "doImmediateRespawn", "doInsomnia",
-            "doLimitedCrafting", "doMobLoot", "doMobSpawning", "doPatrolSpawning", "doTileDrops",
-            "doTraderSpawning", "doVinesSpread", "doWardenSpawning", "doWeatherCycle", "drowningDamage",
-            "fallDamage", "fireDamage", "forgiveDeadPlayers", "keepInventory", "logAdminCommands",
-            "mobGriefing", "naturalRegeneration", "reducedDebugInfo", "sendCommandFeedback",
-            "showDeathMessages", "spectatorsGenerateChunks", "universalAnger"
+            "doDaylightCycle", "doWeatherCycle", "doFireTick", "randomTickSpeed", "doVinesSpread", "snowAccumulationHeight",
+            "waterSourceConversion", "lavaSourceConversion",
+            "mobGriefing", "universalAnger", "forgiveDeadPlayers", "disableRaids", "maxEntityCramming",
+            "doMobSpawning", "spawnMonsters", "doInsomnia", "doPatrolSpawning", "doTraderSpawning", "doWardenSpawning",
+            "spawnerBlocksWork", "spawnChunkRadius",
+            "keepInventory", "naturalRegeneration", "doImmediateRespawn", "drowningDamage", "fallDamage", "fireDamage",
+            "freezeDamage", "pvp", "playersSleepingPercentage", "spawnRadius", "doLimitedCrafting", "enderPearlsVanishOnDeath",
+            "locatorBar", "spectatorsGenerateChunks", "disableElytraMovementCheck", "disablePlayerMovementCheck",
+            "allowEnteringNetherUsingPortals", "playersNetherPortalDefaultDelay", "playersNetherPortalCreativeDelay",
+            "doTileDrops", "doEntityDrops", "doMobLoot", "blockExplosionDropDecay", "mobExplosionDropDecay",
+            "tntExplosionDropDecay", "projectilesCanBreakBlocks",
+            "announceAdvancements", "showDeathMessages", "sendCommandFeedback", "commandBlockOutput", "logAdminCommands",
+            "reducedDebugInfo", "globalSoundEvents", "commandBlocksWork", "tntExplodes", "maxCommandChainLength",
+            "maxCommandForkCount", "commandModificationBlockLimit", "maxMinecartSpeed"
     };
 
-    private final Map<String, Boolean> values = new LinkedHashMap<>();
+    static {
+        var catalog = GameRuleCatalog.all().stream().map(GameRuleCatalog.Rule::id).toList();
+        if (!catalog.equals(Arrays.asList(RULES))) throw new IllegalStateException("Game-rule list differs from the catalog");
+    }
+
+    private final Map<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> unknownValues = new LinkedHashMap<>();
-    private int randomTickSpeed;
     private boolean dirty;
 
     public GameRuleSettings() {
@@ -30,6 +45,15 @@ public final class GameRuleSettings {
         return RULES.clone();
     }
 
+    /** Canonical archive/config IDs have stable labels independent of the running Minecraft version. */
+    public static String labelKey(String rule) {
+        return "worldbinder.gamerules.rule." + rule;
+    }
+
+    public static String tooltipKey(String rule) {
+        return "worldbinder.gamerules.rule." + rule + ".tooltip";
+    }
+
     public static String[] rules(String targetVersion) {
         return Arrays.stream(RULES).filter(rule -> supports(targetVersion, rule)).toArray(String[]::new);
     }
@@ -38,40 +62,32 @@ public final class GameRuleSettings {
         return Arrays.stream(rules(targetVersion)).filter(rule -> category(rule) == category).toArray(String[]::new);
     }
 
+    public static int categories() {
+        return GameRuleCatalog.Category.values().length;
+    }
+
     public static int category(String rule) {
-        return switch (rule) {
-            case "doDaylightCycle", "doWeatherCycle", "doFireTick", "doVinesSpread" -> 0;
-            case "disableRaids", "doInsomnia", "doMobLoot", "doMobSpawning", "doPatrolSpawning",
-                    "doTraderSpawning", "doWardenSpawning", "forgiveDeadPlayers", "mobGriefing",
-                    "universalAnger", "doEntityDrops", "doTileDrops" -> 1;
-            case "disableElytraMovementCheck", "doImmediateRespawn", "drowningDamage", "fallDamage",
-                    "fireDamage", "keepInventory", "naturalRegeneration", "spectatorsGenerateChunks" -> 2;
-            default -> 3;
-        };
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        return entry == null ? GameRuleCatalog.Category.MISC.ordinal() : entry.category().ordinal();
     }
 
     public static boolean supports(String targetVersion, String rule) {
-        int dataVersion = TargetMinecraftVersion.resolve(targetVersion).effectiveDataVersion();
-        int first = switch (rule) {
-            case "disableRaids" -> 1968;
-            case "doPatrolSpawning", "doTraderSpawning" -> 2230;
-            case "doImmediateRespawn", "doInsomnia", "drowningDamage", "fallDamage", "fireDamage" -> 2225;
-            case "forgiveDeadPlayers", "universalAnger" -> 2566;
-            case "doVinesSpread" -> 3337;
-            case "doWardenSpawning" -> 3105;
-            default -> 1519;
-        };
-        return dataVersion >= first;
+        String canonical = GameRuleCatalog.canonical(rule);
+        return canonical != null && GameRuleCatalog.supports(targetVersion, GameRuleCatalog.rule(canonical));
+    }
+
+    public static boolean isInteger(String rule) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        return entry != null && entry.type() == GameRuleCatalog.Type.INT;
     }
 
     public void load(String raw) {
         values.clear();
         unknownValues.clear();
         dirty = false;
-        for (String rule : RULES) {
-            values.put(rule, defaultValue(rule));
+        for (GameRuleCatalog.Rule rule : GameRuleCatalog.all()) {
+            values.put(rule.id(), rule.fallback());
         }
-        randomTickSpeed = 3;
         if (raw == null || raw.isBlank()) {
             return;
         }
@@ -82,42 +98,86 @@ public final class GameRuleSettings {
             }
             String key = split[0].trim();
             String value = split[1].trim();
-            if ("randomTickSpeed".equals(key)) {
-                Integer parsed = parseInt(value);
-                randomTickSpeed = parsed == null ? randomTickSpeed : clampRandomTickSpeed(parsed);
-            } else if (values.containsKey(key)) {
-                values.put(key, Boolean.parseBoolean(value));
-            } else if (key.matches("[A-Za-z0-9_.-]+") && !value.isBlank()) {
+            GameRuleCatalog.Rule rule = GameRuleCatalog.rule(key);
+            if (rule != null) {
+                if (rule.bool()) {
+                    values.put(key, Boolean.toString(Boolean.parseBoolean(value)));
+                } else {
+                    Integer parsed = parseInt(value);
+                    if (parsed != null) values.put(key, Integer.toString(clamp(rule, parsed)));
+                }
+            } else if (key.matches("[A-Za-z0-9_.:-]+") && !value.isBlank()) {
                 unknownValues.put(key, value);
             }
         }
     }
 
     public boolean value(String rule) {
-        return values.getOrDefault(rule, defaultValue(rule));
+        return Boolean.parseBoolean(values.getOrDefault(rule, "false"));
+    }
+
+    public int intValue(String rule) {
+        Integer parsed = parseInt(values.get(rule));
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        return parsed != null ? parsed : entry == null ? 0 : Integer.parseInt(entry.fallback());
+    }
+
+    public String raw(String rule) {
+        return values.get(rule);
     }
 
     public boolean toggle(String rule) {
         boolean next = !value(rule);
-        values.put(rule, next);
+        values.put(rule, Boolean.toString(next));
         dirty = true;
         return next;
     }
 
-    public int randomTickSpeed() {
-        return randomTickSpeed;
-    }
-
-    public void setRandomTickSpeed(int value) {
-        int next = clampRandomTickSpeed(value);
-        if (next != randomTickSpeed) {
-            randomTickSpeed = next;
+    public void setInt(String rule, int value) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        if (entry == null) return;
+        String next = Integer.toString(clamp(entry, value));
+        if (!next.equals(values.get(rule))) {
+            values.put(rule, next);
             dirty = true;
         }
     }
 
+    /** True when the stored value equals the vanilla default of the target version. */
+    public boolean isDefault(String targetVersion, String rule) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        return entry == null || GameRuleCatalog.defaultValue(targetVersion, entry).equalsIgnoreCase(values.getOrDefault(rule, ""));
+    }
+
+    /** Sets a rule back to the vanilla default of the target version. */
+    public void reset(String targetVersion, String rule) {
+        GameRuleCatalog.Rule entry = GameRuleCatalog.rule(rule);
+        if (entry == null) return;
+        values.put(rule, GameRuleCatalog.defaultValue(targetVersion, entry));
+        dirty = true;
+    }
+
+    /** Number of supported rules of the target that differ from its vanilla default. */
+    public int changedCount(String targetVersion) {
+        int changed = 0;
+        for (String rule : rules(targetVersion)) if (!isDefault(targetVersion, rule)) changed++;
+        return changed;
+    }
+
+    public int randomTickSpeed() {
+        return intValue("randomTickSpeed");
+    }
+
+    public void setRandomTickSpeed(int value) {
+        setInt("randomTickSpeed", value);
+    }
+
     public boolean isDirty() {
         return dirty;
+    }
+
+    public void markDirty() {
+        dirty = true;
     }
 
     public String serializeAndMarkClean() {
@@ -126,9 +186,8 @@ public final class GameRuleSettings {
             if (!builder.isEmpty()) {
                 builder.append(';');
             }
-            builder.append(rule).append('=').append(value(rule));
+            builder.append(rule).append('=').append(values.get(rule));
         }
-        builder.append(";randomTickSpeed=").append(randomTickSpeed);
         for (Map.Entry<String, String> entry : unknownValues.entrySet()) {
             builder.append(';').append(entry.getKey()).append('=').append(entry.getValue());
         }
@@ -136,8 +195,8 @@ public final class GameRuleSettings {
         return builder.toString();
     }
 
-    private static int clampRandomTickSpeed(int value) {
-        return Math.max(0, Math.min(64, value));
+    private static int clamp(GameRuleCatalog.Rule rule, int value) {
+        return Math.max(rule.uiMin(), Math.min(rule.uiMax(), value));
     }
 
     private static Integer parseInt(String value) {
@@ -149,17 +208,5 @@ public final class GameRuleSettings {
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private static boolean defaultValue(String rule) {
-        return switch (rule) {
-            case "announceAdvancements", "commandBlockOutput", "doDaylightCycle", "doEntityDrops",
-                    "doFireTick", "doInsomnia", "doMobLoot", "doMobSpawning", "doPatrolSpawning",
-                    "doTileDrops", "doTraderSpawning", "doVinesSpread", "doWardenSpawning",
-                    "doWeatherCycle", "drowningDamage", "fallDamage", "fireDamage",
-                    "forgiveDeadPlayers", "logAdminCommands", "mobGriefing", "naturalRegeneration",
-                    "sendCommandFeedback", "showDeathMessages", "spectatorsGenerateChunks" -> true;
-            default -> false;
-        };
     }
 }
