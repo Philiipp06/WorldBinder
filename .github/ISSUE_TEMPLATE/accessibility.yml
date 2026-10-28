@@ -1,0 +1,26 @@
+name: Accessibility barrier
+description: Something in WorldBinder is hard or impossible for you to use
+title: "Accessibility: "
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. You do not need to know the technical cause – describe what happened in your own words. See ACCESSIBILITY.md for current features and known limitations.
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What is the barrier?
+      description: What were you trying to do, and where (screen, menu, HUD, map)?
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Your setup
+      description: Assistive technology or settings you use (keyboard only, screen reader, high contrast, reduced motion, GUI scale, window size …) and your Minecraft/WorldBinder versions.
+  - type: textarea
+    id: expectation
+    attributes:
+      label: What would help?
+      description: Optional – ideas for how it could work better for you.

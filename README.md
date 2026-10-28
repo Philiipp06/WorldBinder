@@ -1,8 +1,37 @@
-# WorldBinder 1.6.3
+# WorldBinder 1.7.0
 
-WorldBinder is a client-side Fabric mod for permitted Minecraft world capture, archive recovery, inspection and target-version vanilla world export.
+WorldBinder is a client-side Fabric and NeoForge mod for permitted Minecraft world capture, persistent world projects, inspection and target-version vanilla world export.
 
 It is designed for players, builders, server owners, developers and preservation-focused users who want to save world data that their client has already received. Optional Movement Tools support navigation in singleplayer, local test worlds and servers that explicitly permit them. WorldBinder does not bypass server permissions or anti-cheat checks and cannot reveal hidden world data.
+
+> **1.7.0 – Keep the project, continue tomorrow:**
+> - Reopen finished archives in the matching world project. Explore new chunks or deliberately rescan known ones, including removed blocks. Related dimensions can share a project; unrelated proxy backends stay isolated. The map, committed chunks and received auxiliary data survive restarts.
+> - Review new/updated chunk counts, version impacts and your replacement blocks before saving a new revision. Failed writes leave the previous revision intact.
+> - Preserve server-confirmed container slots and full item data, checked empty inventories, original section biomes/light, received Minecraft map images, and optional own player/ender chest/statistics/advancements.
+> - Choose Void, Flat or Normal generation outside the recording, with an optional seed. A seed cannot reconstruct unknown server areas.
+> - Reopen the written world files for validation. **Valid files** and **complete received data** are separate results; unknown inventories, maps and original section data remain visible as gaps.
+> - A separate **NeoForge 26.3** jar uses the same capture, export, map, HUD and movement implementation. See the [tested-version matrix and evidence](docs/1.7.0-validation.md).
+> - Strict replacement validation rejects unknown IDs/properties/values without changing your choice. Missing, empty or damaged expected cache files stop saving and retain the previous revision.
+> - Changed blocks invalidate exported light in the affected chunk and neighbours; original archive light is retained. Player validation compares actual slots, components, equipment, statistic values and advancement criteria.
+> - `/worldbinder` opens the F9 Control Center on either loader, in singleplayer and multiplayer, entirely on the client. Both map views build received terrain while open; Explore keeps it running with the map closed. Player headings use bounded angles and the shown camera projection.
+> - Export preparation and recovery cache reads run in the background. Acceptance includes a real dedicated vanilla server with an HTTP pack and a full process restart, plus measured 10,000-chunk projects.
+> - Recovery belongs to a persistent project/world/dimension identity. Equally named projects cannot overwrite or clean up each other's recovery.
+> - F7/F8 and F10 share an inclusive 3D area selection. Large selections use bounded processing; unreceived areas stay unknown. Export complete recorded block data as a selected world or **Sponge v3 `.schem`**.
+> - Explicitly enable the **container scanner** to open one reachable container at a time and wait for verified full server contents. It supports checked empty containers, double chests and supported container vehicles, and stops on manual input, pause or world changes.
+> - Optional world chunk frames distinguish confirmed scope, pending work and failures, retaining a visible previous secured revision during updates. Export filters exclude block/entity types in the export copy while preserving the complete source project.
+> - DE/EN text audits check keys and argument counts. New report findings retain translation keys; old text reports remain readable. Generated world help and validation reports are bilingual.
+> - **French** joins English and German as a full interface language; the audit checks all three catalogs.
+> - **Unopened containers** are outlined in the world (amber = unopened, blue = partly known, optional green = verified) with slot labels and an HUD counter.
+> - Exports can add a **player list** (`worldbinder/players.csv`, opt-in recording) and a **dimension tree** (`worldbinder/dimensions.txt`).
+> - A new **Capture** settings tab and a version-aware game-rule editor: 60 rules with exact per-version availability and defaults, seven categories, "changed only", per-rule reset and tooltips.
+> - Choose container **Keep / Overwrite confirmed slots / Fill missing** in the optional container overlay. Project live-entity filters reduce new capture data while preserving previously saved records and normal Minecraft networking.
+> - Capture during optional **ReplayMod / Flashback playback**, including pause, seek fences and explicit earlier-time branches. Saved projects can be resumed with the same recording after a full restart. Replay cameras never invent own player data.
+> - Enable default-off automatic capture on join, with explicit backend/project association and optional server profiles. Unknown network transitions commit Recovery and wait for assignment. F10 can display the project's stored dimensions.
+> - Exact legacy registry facts and structural NBT mappings improve older exports. Minecraft 1.13 receives its required final `fullchunk` status; read-back rejects an incompatible generation stage before it can cause regenerated terrain.
+>
+> [Projects, networks, profiles and replay guide / Projekte, Netzwerke, Profile und Replays](docs/1.7.0-beta-expansion.md) · [Areas, scanner and filters / Bereiche, Scanner und Filter](docs/1.7.0-area-scanner-and-filters.md) · [Containers, lists and settings / Container, Listen und Einstellungen](docs/1.7.0-containers-lists-settings.md) · [Continue a project / Projekt fortsetzen](docs/1.7.0-projects.md) · [User guide](HOW_TO_USE.md) · [Release notes](CHANGELOG.md)
+
+The following notes describe earlier releases; their fixes remain included.
 
 > **1.6.3 – Hotfix for Minecraft 26.3 exports:**
 > - **Blocks are exported again:** Minecraft 26.3 changed how block states are stored in chunks (`id`/`properties` instead of `Name`/`Properties`). Exports for 26.3 now use the new format; before, every block loaded as air and only entities remained.
@@ -39,20 +68,34 @@ It is designed for players, builders, server owners, developers and preservation
 
 The reload setting offers Interactive and Vanilla modes. Interactive keeps a ready menu or world visible and accepts input while resources reload, without an extra WorldBinder progress display. Vanilla keeps Minecraft's blocking loading screen. Early startup and failed reloads retain Minecraft's loading/error handling. The resource reload itself is unchanged.
 
-## Supported loader
+## Supported loaders
 
-WorldBinder uses one **Fabric** jar for Minecraft **26.1, 26.1.1, 26.1.2, 26.2 and 26.3**.
+| Loader | Declared Minecraft support | 1.7.0 runtime verification | Requirements |
+| --- | --- | --- | --- |
+| Fabric | 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | Packaged 1.7.0 artifact checks; full hash/version matrix in the evidence | Loader 0.19.5+, matching Fabric API, Java 25 |
+| NeoForge | 26.3 | 26.3 with NeoForge 26.3.0.95 | NeoForge 26.3.0.95+, Java 25 |
 
-Use Fabric Loader 0.19.5 or newer and the Fabric API build matching your Minecraft version (for example, 0.145.1+26.1 on 26.1 or 0.160.7+26.3 on 26.3). Forge, NeoForge and Quilt are not supported at this time.
+Install **one** loader-specific jar. Fabric requires the Fabric API matching Minecraft (for example 0.145.1+26.1 or 0.160.7+26.3); Mod Menu is optional. NeoForge does not require Fabric API or Mod Menu. Forge and Quilt are not declared supported. All five listed Fabric versions loaded the same final 1.7.0 jar; the validation record describes the tested flows and remaining limits.
+
+Loader support is separate from support for additional mod content. Unknown mod registries, plugin data, server-only logic and pack-dependent content still require target-game review; NeoForge support does not turn a vanilla export into a full modpack backup.
+
+The dedicated-server lifecycle uses a real unmodded matching-version vanilla server on loopback. The current [verification matrix](docs/1.7.0-validation.md) lists the separately tested ViaFabric, ViaFabricPlus, ViaVersion and proxy combinations. The source includes the reproducible test drivers; the verification matrix distinguishes previously completed native tests from a new source build.
 
 ## Main features
 
 - HotCache-first client-side chunk capture
+- Persistent, world-bound projects with deliberate chunk updates and retained revisions
+- Authoritative container inventories, received map images and optional own player state
+- Original section biomes and light, with explicit missing-data reporting
+- Version-impact review, per-state replacement blocks and Void/Flat/Normal generation
 - Durable chunk block cache for large captures
 - Vanilla world folder export
+- Faster export with reusable prepared recordings, compact archives and chunk-by-chunk read-back validation
+- Export dashboard with recording counts, work phases, timing and report access, including after disconnect
+- Client-only `/worldbinder` shortcuts for settings, map, capture, archives, movement, tools, profiler, status and help
 - Target output version selection
 - Block, block entity and entity export where available
-- Server resource pack export as `resources.zip`
+- Server resource pack export with pinned archive provenance (`resourcepacks/resources.zip` on 26.x)
 - Recovery and autosave tools
 - Recovery cache reuse after crashes
 - Automatic temporary cache cleanup after successful exports
@@ -62,7 +105,7 @@ Use Fabric Loader 0.19.5 or newer and the Fabric API build matching your Minecra
 - F12 Movement Tools shortcut, optional toggle hotkeys for every movement tool and a master toggle key
 - Ctrl+C chunk center coordinate copying
 - Queue Dashboard / Profiler for capture and export telemetry
-- Export validation reports
+- Written-region/NBT read-back validation with separate file validity and recording completeness
 - HUD Widget Editor with snapping guides, 3×3 anchor presets, keyboard nudging, undo/redo, preview mode, color tools and widget specific options (radar range/zoom/rotation, movement HUD style, toast duration)
 - Visual color picker with HEX/ARGB input, opacity control and per-widget quick colors
 - Refined WorldBinder toast notifications with multi-line text and proportional scaling
@@ -77,7 +120,10 @@ Use Fabric Loader 0.19.5 or newer and the Fabric API build matching your Minecra
 - WorldBinder icon buttons in the Minecraft main menu and pause menu
 - Fixed virtual GUI sizing across different window sizes and GUI scales
 - Dedicated WorldBinder keybind category in Minecraft Controls
-- German and English language support
+- English, German and French UI, status and report text through a shared, audited language catalog; generated export help is bilingual German/English ([translation guidelines](CONTRIBUTING.md#translations))
+- Unopened and partly known containers highlighted directly in the world, with slot labels and an HUD counter
+- Optional `players.csv` player list and `dimensions.txt` dimension tree in exports
+- Capture settings tab and version-aware game rules in seven categories with per-rule tooltips and reset ([guide](docs/1.7.0-containers-lists-settings.md))
 
 ## Movement Tools
 
@@ -158,7 +204,7 @@ The toolbar offers Follow, Player, Origin, zoom, **Layers** (view mode, relief, 
 
 **Waypoints** are stored per world/server and dimension. Place one with P, Shift+right click or middle click; right click a waypoint to remove it. The last death point is added automatically and can be turned off in the config (`mapDeathWaypoint`).
 
-**Explore mode** samples the surface of every chunk your client has loaded (colors and heights only, nothing is captured or written to an archive) so you can build overview maps or exports while simply playing. It resets on disconnect and dimension change.
+**Both 2D and 3D** sample received chunks while the map is open, even without capture or Explore. They read the client chunk cache independently of visible/rendered sections. **Explore mode** continues that sampling with the map closed (colors/heights only; no world recording). Changing views keeps map data. Received block updates invalidate the corresponding surface/voxel samples. Session exploration resets on disconnect and dimension change.
 
 ## Chunk radar
 
@@ -173,7 +219,7 @@ level.dat
 level.dat_old
 session.lock
 icon.png
-resources.zip
+resourcepacks/resources.zip   # 26.x; resources.zip on older targets
 README.md
 region/
 entities/
@@ -190,10 +236,11 @@ The `worldbinder/` folder contains metadata, validation output and archive infor
 For Minecraft 26.x targets, WorldBinder writes a compatibility-oriented layout:
 
 - root-level `region/`, `entities/` and `poi/` folders for Bukkit/Paper/Multiverse-style imports
-- `dimensions/minecraft/overworld/` mirrors for modern 26.x world loading
+- `dimensions/minecraft/<dimension>/` for modern 26.x world loading (the recorded dimension is preserved)
 - one optional `dimensions/minecraft/<world-key>/` mirror for server world keys when a clean world name is available
 - modern saved-data files under `data/minecraft/`
 - a single export `README.md` instead of multiple loose note files
+- `data/minecraft/maps/<id>.dat` for received map images; older targets use `data/map_<id>.dat`
 
 This keeps the exported folder usable for both local testing and common server import workflows while avoiding timestamp-based duplicate dimension keys.
 
@@ -213,7 +260,9 @@ WorldBinder can export captured data for different target Minecraft versions.
 
 This allows capturing with a newer client and selecting an older output version, for example 1.20.4. WorldBinder applies version-aware handling for folder layout, gamerules, entities, item data, POI data and world metadata.
 
-Downgrades may still be imperfect when captured data contains blocks, entities, items, resource pack content or world features that did not exist in the selected target version.
+The export review lists known block/property/biome/entity/item-data changes with counts. Select a known block/property row to set a replacement such as `minecraft:stone`; the same policy drives preview and export. Uncatalogued changes are explicitly unknown. Original archive data stays available for another target.
+
+Downgrades may still be imperfect when captured data contains blocks, entities, items, resource pack content or world features that did not exist in the selected target version. Automated read-back is supplemented by actual target-game checks; see [their scope and remaining checks](docs/1.7.0-validation.md).
 
 ## Important limitations
 
@@ -243,7 +292,7 @@ Helpful reports include:
 
 - Minecraft version
 - WorldBinder version
-- Fabric Loader and Fabric API version
+- Loader/version (and Fabric API version on Fabric)
 - Selected target output version
 - Window mode and GUI scale if the issue is UI-related
 - What was captured
@@ -260,16 +309,21 @@ Helpful reports include:
 
 ## Build from source
 
-WorldBinder requires Java 25, Fabric Loader 0.19.5 or newer and a Fabric API build matching Minecraft 26.1-26.3. The build targets 26.3 while compatibility tests load the same packaged jar on the earlier releases.
+Build with JDK 25. Common code lives in `src/main/`; `src/fabric/` and `neoforge/src/main/` contain the loader adapters. Both build against Minecraft 26.3. Fabric compatibility checks load the packaged jar on earlier releases.
 
 ```bash
-./gradlew clean build
+./gradlew build regressionTest
+# Individual artifacts: ./gradlew buildFabric   /   ./gradlew buildNeoForge
 ```
 
-The official release artifact is the Fabric jar from `build/libs/`.
+Separate loader artifacts: `build/libs/worldbinder-1.7.0+mc26.1-26.3-fabric.jar` for Fabric and `neoforge/build/libs/worldbinder-1.7.0+mc26.3-neoforge.jar` for NeoForge. Install the matching loader's JAR. Gradle includes the loader in each filename, including the source archives. Test harnesses are separate source sets and are not included in these jars. See [CONTRIBUTING.md](CONTRIBUTING.md) for actual Minecraft test tasks.
+
+For a clean package build without running tests or verification tasks, use `gradlew :clean :neoforge:clean :assemble :neoforge:assemble --no-parallel`. Development run directories and QA evidence may live below `build/`; preserve needed worlds and evidence before cleaning them.
 
 ## Status
 
-WorldBinder 1.6.3 targets Minecraft 26.1-26.3 with a single Fabric jar. The matching 1.6.3 release texts are in `Publish/`; 1.4.x, 1.5.0, 1.6.0, 1.6.1 and 1.6.2 files remain as historical release records.
+WorldBinder 1.7.0 adds persistent projects and a separate NeoForge build. The [changelog](CHANGELOG.md) lists changes since 1.6.3, while [verification results](docs/1.7.0-validation.md) distinguish builds, automated checks, actual Minecraft execution and known limits. The [source layout](docs/source-layout.md) explains the build and test inputs included in this repository.
+
+Real BungeeCord, Waterfall, server-side ViaVersion and client-side ViaFabric/ViaFabricPlus runs pass within the documented version scope. Both loaders were checked with End portal round trips and a custom dimension using a received vanilla type. Minecraft 1.13 cannot retain map locks and may leave changed chunks dark instead of recalculating lighting; the export review reports both limits. Nonstandard Void/Flat generation in recorded Nether/End dimensions can produce Minecraft's experimental-settings warning. See the verification matrix for precise tested artifacts and limits.
 
 The project will continue to improve capture accuracy, target-version compatibility, entity handling, recovery behavior, performance and overall usability based on real feedback.

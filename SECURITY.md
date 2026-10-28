@@ -1,6 +1,6 @@
 # Security Policy
 
-WorldBinder is a client-side Fabric mod. It runs inside the Minecraft client, reads world data the client has received, reads resource pack files, and writes archives, exports and configuration files to your computer. This document explains which versions receive security fixes, what counts as a security problem in WorldBinder, and how to report one privately.
+WorldBinder is a client-side Fabric and NeoForge mod. It runs inside the Minecraft client, reads world data the client has received, reads resource pack files, and writes archives, exports and configuration files to your computer. This document explains which versions receive security fixes, what counts as a security problem in WorldBinder, and how to report one privately.
 
 ## Supported versions
 
@@ -8,8 +8,8 @@ Security fixes are released for the latest WorldBinder version only. Please upda
 
 | WorldBinder | Minecraft | Supported |
 | ----------- | --------- | --------- |
-| 1.6.x (latest) | 26.1 – 26.3 | :white_check_mark: |
-| 1.5.x and older | 26.1 – 26.3 and earlier | :x: |
+| 1.7.x (current development/release line) | Fabric 26.1 – 26.3; NeoForge 26.3 | :white_check_mark: |
+| 1.6.x and older | 26.1 – 26.3 and earlier | :x: |
 
 Only builds downloaded from the official [GitHub releases](https://github.com/Philiipp06/WorldBinder/releases) or the official Modrinth project are supported. Re-uploads on other sites may be modified.
 
@@ -28,7 +28,7 @@ The following are **not** security vulnerabilities and should be reported as nor
 - Bugs without a security impact (wrong colors, UI glitches, export errors). Use the [issue tracker](https://github.com/Philiipp06/WorldBinder/issues).
 - WorldBinder saving data that the client legitimately received from a server. This is the purpose of the mod; please read the responsible-use section in the [README](README.md).
 - Requests to bypass anti-cheat systems, server permissions or bans, or reports that a server detects Movement Tools. WorldBinder does not support circumventing server rules.
-- Vulnerabilities in Minecraft, Fabric Loader, Fabric API or other mods. Report them to the respective project; let us know if WorldBinder makes them worse.
+- Vulnerabilities in Minecraft, Fabric Loader, Fabric API, NeoForge or other mods. Report them to the respective project; let us know if WorldBinder makes them worse.
 
 ## Reporting a vulnerability
 

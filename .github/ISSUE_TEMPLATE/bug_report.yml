@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in WorldBinder does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please search existing issues first.
+        **Security problems must not be reported here** – see SECURITY.md.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Minecraft, WorldBinder, loader/version and Fabric API if applicable
+      placeholder: "Minecraft 26.3, WorldBinder 1.7.0, NeoForge 26.3.0.95 (or Fabric 0.19.5 + API 0.160.7+26.3)"
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+        - Other (not declared supported)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Capture / cache / recovery
+        - Project resume / chunk updates / auxiliary data
+        - Export (world, target version)
+        - Live map (F10) / 3D view / map export
+        - HUD widgets / chunk radar
+        - Interface / settings
+        - Movement Tools
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open F10\n2. ...\n3. ..."
+  - type: textarea
+    id: context
+    attributes:
+      label: Logs, screenshots and setup
+      description: latest.log or crash report, screenshots, other mods, window mode and GUI scale for UI issues, target version for export issues. Remove private data first.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checks
+      options:
+        - label: I am using the latest WorldBinder version from GitHub or Modrinth.
+          required: true
+        - label: I follow the Code of Conduct and only use WorldBinder on content I am allowed to archive.
+          required: true

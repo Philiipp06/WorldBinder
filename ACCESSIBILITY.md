@@ -15,10 +15,10 @@ WorldBinder follows the intent of the [Web Content Accessibility Guidelines (WCA
 
 | Area | Supported |
 | ---- | --------- |
-| Minecraft | Java Edition 26.1, 26.1.1, 26.1.2, 26.2 and 26.3 with Fabric Loader 0.19.5+ and Fabric API |
+| Minecraft | Fabric: Java Edition 26.1–26.3, Loader 0.19.5+, matching Fabric API. NeoForge: Java Edition 26.3, NeoForge 26.3.0.95+. See the actual [tested-version matrix](docs/1.7.0-validation.md). |
 | Operating systems | Windows, macOS and Linux (everything Minecraft Java Edition supports) |
 | Input | Mouse and keyboard; all main functions also work with the keyboard alone |
-| Languages | English and German |
+| Languages | English, German and French |
 | Display | Any window size and GUI scale; WorldBinder menus use a fixed virtual canvas that scales with the window |
 
 ## Accessibility features
@@ -44,7 +44,8 @@ We know about these barriers and are working on them where possible:
 - **Text size**: menus scale with the window. In small windows text can become small; a separate text size option does not exist yet.
 - **Color vision**: theme accents are selectable, but there is no dedicated color-blind palette for map status colors yet.
 - **Movement Tools** change how the player moves and can be disorienting; they are off by default.
-- **Languages**: only English and German are available.
+- **Languages**: English, German and French are available; every other Minecraft language falls back to English. Generated export files stay German/English.
+- **Container highlights** use color and, within 12 blocks, a text label ("Unopened" or known/total slots), so their state does not rely on color alone.
 
 ## Reporting a barrier
 
@@ -68,11 +69,11 @@ Please check interface changes against this list before opening a pull request (
 - [ ] Animations respect reduced motion and the animation speed setting; nothing flashes more than three times per second.
 - [ ] Sounds go through the interface sound settings and are never the only feedback.
 - [ ] Layouts work at small window sizes and high GUI scales without overlapping or cut-off text.
-- [ ] New texts exist in English and German.
+- [ ] New texts exist in English, German and French.
 
 ## Further reading
 
 - [Accessibility best practices for your project](https://opensource.guide/accessibility-best-practices-for-your-project/) (Open Source Guides)
 - [Open Source Accessibility toolkit](https://github.com/open-source-accessibility/accessibility-toolkit)
 
-*Last reviewed: October 2026, WorldBinder 1.6.2.*
+*Platform information updated for WorldBinder 1.7.0, October 2026. The export report now wraps and paginates long details. The last broader accessibility review was for 1.6.2; a complete new accessibility audit is not claimed.*

@@ -1,6 +1,6 @@
 # WorldBinder Code of Conduct
 
-WorldBinder is a client-side Fabric mod for permitted world capture, archive recovery and target-version export, with optional Movement Tools. People come to this project as players, builders, server owners, preservationists, translators and developers, with very different levels of experience. This Code of Conduct describes how we treat each other in every WorldBinder space and what happens when someone does not.
+WorldBinder is a client-side Fabric and NeoForge mod for permitted world capture, archive recovery and target-version export, with optional Movement Tools. People come to this project as players, builders, server owners, preservationists, translators and developers, with very different levels of experience. This Code of Conduct describes how we treat each other in every WorldBinder space and what happens when someone does not.
 
 ## Our pledge
 

@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an idea or improvement for WorldBinder
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        WorldBinder only archives data the client has already received and does not help bypass server rules or anti-cheat systems. Please check CONTRIBUTING.md ("Project boundaries") before suggesting a feature.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+      description: How could WorldBinder help? Mockups and examples are welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and context
+      description: Other ideas you considered, who would benefit, links.

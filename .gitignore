@@ -1,9 +1,21 @@
 .gradle/
 build/
+.qa-evidence/
 out/
 *.iml
 .idea/
 run/
 logs/
 crash-reports/
+libraries/
+versions/
 *.log
+
+# Release preparation and machine-local output stay outside the public source tree.
+/Publish/
+/docs/qa/
+.qa-evidence/
+*.class
+*.hprof
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
